@@ -371,13 +371,17 @@ describe('applyPresence', () => {
 // ── startBotStatus / stopBotStatus ─────────────────────────────────────────
 
 describe('startBotStatus / stopBotStatus', () => {
+  let randomSpy;
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
   });
 
   afterEach(() => {
     stopBotStatus();
+    randomSpy.mockRestore();
     vi.useRealTimers();
   });
 
@@ -395,6 +399,10 @@ describe('startBotStatus / stopBotStatus', () => {
     });
     getConfig.mockReturnValue(cfg);
     const client = makeClient();
+    randomSpy
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0)
+      .mockReturnValueOnce(0.5);
 
     startBotStatus(client);
     expect(client.user.setPresence).toHaveBeenCalledTimes(1);
@@ -459,6 +467,7 @@ describe('startBotStatus / stopBotStatus', () => {
     });
     getConfig.mockReturnValue(cfg);
     const client = makeClient();
+    randomSpy.mockReturnValue(0);
 
     startBotStatus(client);
     // Initial: first
@@ -469,7 +478,7 @@ describe('startBotStatus / stopBotStatus', () => {
     expect(calls[1][0].activities[0].name).toBe('second');
 
     vi.advanceTimersByTime(20_000);
-    // Wraps back to first
+    // With two activities, avoiding repeats means the only valid next pick is the first item again.
     expect(calls[2][0].activities[0].name).toBe('first');
   });
 
@@ -487,6 +496,7 @@ describe('startBotStatus / stopBotStatus', () => {
     });
     getConfig.mockReturnValue(cfg);
     const client = makeClient();
+    randomSpy.mockReturnValue(0);
 
     startBotStatus(client);
     expect(client.user.setPresence.mock.calls[0][0].activities[0].name).toBe('first');
@@ -499,13 +509,17 @@ describe('startBotStatus / stopBotStatus', () => {
 // ── reloadBotStatus ────────────────────────────────────────────────────────
 
 describe('reloadBotStatus', () => {
+  let randomSpy;
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0);
   });
 
   afterEach(() => {
     stopBotStatus();
+    randomSpy.mockRestore();
     vi.useRealTimers();
   });
 

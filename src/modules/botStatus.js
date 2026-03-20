@@ -64,7 +64,7 @@ const DEFAULT_ACTIVITY_TEXT = 'with Discord';
 let rotateInterval = null;
 
 /** @type {number} Current activity index in the rotation */
-let currentActivityIndex = 0;
+let currentActivityIndex = -1;
 
 /** @type {import('discord.js').Client | null} */
 let _client = null;
@@ -380,6 +380,27 @@ function buildActivityPayload(text, type) {
 }
 
 /**
+ * Pick a random activity index, avoiding the previously used index when possible.
+ *
+ * @param {number} messageCount
+ * @param {number} previousIndex
+ * @returns {number}
+ */
+function pickNextActivityIndex(messageCount, previousIndex) {
+  if (messageCount <= 1) return 0;
+
+  const candidateIndexes = [];
+  for (let index = 0; index < messageCount; index += 1) {
+    if (index !== previousIndex) {
+      candidateIndexes.push(index);
+    }
+  }
+
+  const randomIndex = Math.floor(Math.random() * candidateIndexes.length);
+  return candidateIndexes[randomIndex] ?? 0;
+}
+
+/**
  * Apply the current activity to the Discord client's presence.
  *
  * @param {import('discord.js').Client} client - Discord client
@@ -393,7 +414,9 @@ export function applyPresence(client) {
   const messages = getRotationMessages(cfg);
   if (messages.length === 0) return;
 
-  currentActivityIndex = currentActivityIndex % messages.length;
+  if (currentActivityIndex < 0 || currentActivityIndex >= messages.length) {
+    currentActivityIndex = 0;
+  }
   const activeMessage = messages[currentActivityIndex];
   const activityType = resolveActivityType(activeMessage.type);
   const text = interpolateActivity(activeMessage.text, client);
@@ -422,7 +445,8 @@ export function applyPresence(client) {
  * @param {import('discord.js').Client} client - Discord client
  */
 function rotate(client) {
-  currentActivityIndex += 1;
+  const messages = getRotationMessages(getConfig()?.botStatus);
+  currentActivityIndex = pickNextActivityIndex(messages.length, currentActivityIndex);
   applyPresence(client);
 }
 
@@ -445,7 +469,7 @@ export function startBotStatus(client) {
     return;
   }
 
-  currentActivityIndex = 0;
+  currentActivityIndex = pickNextActivityIndex(getRotationMessages(cfg).length, -1);
   applyPresence(client);
 
   const messages = getRotationMessages(cfg);
@@ -473,6 +497,7 @@ export function stopBotStatus() {
     rotateInterval = null;
     info('Bot status rotation stopped');
   }
+  currentActivityIndex = -1;
   _client = null;
 }
 

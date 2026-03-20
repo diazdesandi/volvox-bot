@@ -159,15 +159,27 @@
       "messages": [
         {
           "type": "Watching",
-          "text": "{guildCount} servers"
-        },
-        {
-          "type": "Listening",
-          "text": "to {memberCount} members"
+          "text": "{guildCount} servers and {memberCount} members"
         },
         {
           "type": "Playing",
-          "text": "with /help"
+          "text": "with /help in {guildCount} servers"
+        },
+        {
+          "type": "Competing",
+          "text": "in the bug squashing Olympics across {guildCount} servers"
+        },
+        {
+          "type": "Watching",
+          "text": "{memberCount} members ship on a Friday"
+        },
+        {
+          "type": "Listening",
+          "text": "to mechanical keyboard symphonies from {memberCount} members"
+        },
+        {
+          "type": "Playing",
+          "text": "regex roulette with {guildCount} servers"
         }
       ]
     }
