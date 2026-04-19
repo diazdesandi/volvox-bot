@@ -46,7 +46,7 @@ describe('ComparisonTable', () => {
 
   it('should render all competitor column headers', () => {
     render(<ComparisonTable />);
-    expect(screen.getByText('Volvox')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /volvox\.bot/i })).toBeInTheDocument();
     expect(screen.getByText('MEE6')).toBeInTheDocument();
     expect(screen.getByText('DYNO')).toBeInTheDocument();
     expect(screen.getByText('CARL-BOT')).toBeInTheDocument();
