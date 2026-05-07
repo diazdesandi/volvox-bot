@@ -17,7 +17,7 @@ description: Release notes for Volvox.Bot covering new features, dashboard impro
 
 **Stronger phishing and link filtering** — The link filter now catches malicious URLs hidden inside markdown links (`[click here](https://...)`), angle-bracket links (`<https://...>`), and links wedged against punctuation. It also detects phishing keywords in URL query strings (for example, `?gift=nitro` on a `.xyz` domain). See [moderation](/features/moderation) for the full set of safeguards.
 
-**Better reliability monitoring** — Volvox.Bot now tracks dashboard errors and performance issues in the background, so we spot and fix problems faster. It scrubs sensitive data — Discord IDs, message content, tokens, query params, headers, and request bodies — before anything leaves your browser, keeping your server's data private by default.
+**Better reliability monitoring** — Volvox.Bot now tracks dashboard errors and performance issues in the background, so we spot and fix problems faster. It scrubs sensitive data — Discord IDs, message content, tokens, query params, headers, and request bodies — before anything leaves your browser. Your server's data stays private by default.
 
 ## Fixes
 
@@ -51,9 +51,9 @@ description: Release notes for Volvox.Bot covering new features, dashboard impro
 <Update label="2026-04-29" description="April 2026" tags={["Features", "Improvements", "Fixes"]}>
 ## New features
 
-**AI auto-moderation** — Active Sentry now scores incoming messages with AI across toxicity, spam, harassment, hate speech, sexual content, violence, and self-harm. Choose a detection model, set per-category sensitivity thresholds, and configure response actions (ignore, delete, flag, warn, timeout, kick, or ban) — including multiple actions per violation. Volvox.Bot logs AI auto-mod actions alongside classic moderation cases. Configure under **Config → Moderation & Safety → Content Safety** in the [dashboard](/dashboard). See the [moderation docs](/features/moderation) for details.
+**AI auto-moderation** — Active Sentry now scores incoming messages with AI across toxicity, spam, harassment, hate speech, sexual content, violence, and self-harm. Select a detection model and set per-category sensitivity thresholds. Configure response actions — ignore, delete, flag, warn, timeout, kick, or ban — including multiple actions per violation. Volvox.Bot logs AI auto-mod actions alongside classic moderation cases. Configure under **Config → Moderation & Safety → Content Safety** in the [dashboard](/dashboard). See the [moderation docs](/features/moderation) for details.
 
-**Configurable model for `/tldr`** — You can now choose which provider/model the [TL;DR command](/features/tldr) uses to generate summaries, right from the dashboard. MiniMax M2.7 is the new default.
+**Configurable model for `/tldr`** — You can now select which provider/model the [TL;DR command](/features/tldr) uses to generate summaries, right from the dashboard. MiniMax M2.7 is the new default.
 
 **MiniMax provider** — MiniMax is now a first-class AI provider, with models like **MiniMax M2.7** and **MiniMax M2.7 Highspeed** available across [AI automation](/features/ai-conversations) and [TL;DR](/features/tldr).
 
@@ -95,7 +95,7 @@ description: Release notes for Volvox.Bot covering new features, dashboard impro
 <Update label="2026-04-24" description="April 2026" tags={["Features", "Improvements"]}>
 ## New features
 
-**More AI providers** — Moonshot and OpenRouter are now first-class providers for [AI automation](/features/ai-conversations) and [TL;DR](/features/tldr). Choose models from these providers in your AI settings using the `provider:model` format (for example, `moonshot:kimi-k2.6`).
+**More AI providers** — Moonshot and OpenRouter are now first-class providers for [AI automation](/features/ai-conversations) and [TL;DR](/features/tldr). Select models from these providers in your AI settings using the `provider:model` format (for example, `moonshot:kimi-k2.6`).
 
 **TL;DR is now front and center** — We now highlight `/tldr` on the landing page, and it has a [dedicated docs page](/features/tldr) covering setup, configuration, and examples.
 
