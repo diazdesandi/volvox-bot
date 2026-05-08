@@ -71,6 +71,9 @@ export function RoleSelector({
     (roleId: string) => {
       if (selected.includes(roleId)) {
         onChange(selected.filter((id) => id !== roleId));
+      } else if (maxSelections === 1) {
+        onChange([roleId]);
+        setOpen(false);
       } else if (!maxSelections || selected.length < maxSelections) {
         onChange([...selected, roleId]);
       }
@@ -164,7 +167,7 @@ export function RoleSelector({
               <CommandGroup className="p-2">
                 {roles.map((role) => {
                   const isSelected = selected.includes(role.id);
-                  const isDisabled = !isSelected && atMaxSelection;
+                  const isDisabled = !isSelected && atMaxSelection && maxSelections !== 1;
                   const colorHex = discordColorToHex(role.color);
 
                   return (

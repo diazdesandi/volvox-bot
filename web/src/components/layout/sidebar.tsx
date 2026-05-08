@@ -8,7 +8,6 @@ import {
   Clock,
   LayoutDashboard,
   LifeBuoy,
-  MessageSquare,
   MessagesSquare,
   ScrollText,
   Settings,
@@ -49,10 +48,7 @@ const navGroups = [
   {
     label: 'Intelligence',
     icon: Sparkles,
-    items: [
-      { name: 'AI Chat', href: '/dashboard/ai', icon: MessageSquare },
-      { name: 'Conversations', href: '/dashboard/conversations', icon: MessagesSquare },
-    ],
+    items: [{ name: 'Conversations', href: '/dashboard/conversations', icon: MessagesSquare }],
   },
   {
     label: 'System Ops',
@@ -177,7 +173,8 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
   const pathname = usePathname();
   const _guildId = useGuildSelection();
   const { isGlobalAdmin } = useGlobalAdminStatus();
-  const { activeCategoryId, activeTabId, setActiveCategoryId, setActiveTabId } = useConfigContext();
+  const { activeCategoryId, activeTabId, setActiveCategoryId, setActiveTabId, handleSearchChange } =
+    useConfigContext();
 
   const isSettingsMode = pathname.startsWith('/dashboard/settings');
 
@@ -204,7 +201,10 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
           /* Back to Dashboard Button */
           <Link
             href="/dashboard"
-            onClick={onNavClick}
+            onClick={() => {
+              handleSearchChange('');
+              onNavClick?.();
+            }}
             className="group relative flex h-14 w-full items-center gap-3 overflow-hidden rounded-[20px] px-4 transition-all active:scale-[0.98] bg-card/40 border border-border/40 backdrop-blur-xl shadow-lg hover:bg-card/60 hover:border-primary/30"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary transition-transform duration-300 group-hover:-translate-x-0.5">
@@ -239,6 +239,7 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
                     icon={Icon}
                     isActive={isActive}
                     onClick={() => {
+                      handleSearchChange('');
                       setActiveCategoryId(category.id);
                       if (category.tabs.length > 0) {
                         setActiveTabId(category.tabs[0].id);
@@ -268,6 +269,7 @@ export function Sidebar({ className, onNavClick }: SidebarProps) {
                                 icon={TabIcon}
                                 isActive={isTabActive}
                                 onClick={() => {
+                                  handleSearchChange('');
                                   setActiveTabId(tab.id);
                                   onNavClick?.();
                                 }}

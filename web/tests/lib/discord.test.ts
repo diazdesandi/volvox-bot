@@ -581,12 +581,18 @@ describe("getMutualGuilds", () => {
 
   it("returns only guilds where bot is present", async () => {
     const userGuilds = [
-      { id: "1", name: "Server 1", icon: null, owner: true, permissions: "8", features: [] },
+      { id: "1", name: "Server 1", icon: "user-icon-hash", owner: true, permissions: "8", features: [] },
       { id: "2", name: "Server 2", icon: null, owner: false, permissions: "0", features: [] },
       { id: "3", name: "Server 3", icon: null, owner: false, permissions: "0", features: [] },
     ];
     const botGuilds = [
-      { id: "1", name: "Server 1", icon: null },
+      {
+        id: "1",
+        name: "Server 1",
+        icon: "https://cdn.example.com/server-1.webp",
+        iconHash: "bot-icon-hash",
+        config: { communityHubs: { enabled: true } },
+      },
       { id: "3", name: "Server 3", icon: null },
     ];
 
@@ -610,6 +616,9 @@ describe("getMutualGuilds", () => {
     expect(mutualGuilds[0].id).toBe("1");
     expect(mutualGuilds[1].id).toBe("3");
     expect(mutualGuilds[0].botPresent).toBe(true);
+    expect(mutualGuilds[0].icon).toBe("https://cdn.example.com/server-1.webp");
+    expect(mutualGuilds[0].iconHash).toBe("bot-icon-hash");
+    expect(mutualGuilds[0].config).toEqual({ communityHubs: { enabled: true } });
   });
 
   it("returns all user guilds unfiltered when bot API fails", async () => {
@@ -656,5 +665,116 @@ describe("getMutualGuilds", () => {
 
     expect(mutualGuilds).toHaveLength(1);
     expect(mutualGuilds[0].botPresent).toBe(false);
+  });
+
+  it("generates icon URL from bot guild iconHash when bot guild has no direct icon URL", async () => {
+    const userGuilds = [
+      { id: "1", name: "Server 1", icon: "user-hash", owner: true, permissions: "8", features: [] },
+    ];
+    const botGuilds = [
+      { id: "1", name: "Server 1", icon: null, iconHash: "server-hash" },
+    ];
+
+    process.env.BOT_API_URL = "http://localhost:3001";
+    process.env.BOT_API_SECRET = "test-secret";
+
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/users/@me/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(userGuilds) } as Response);
+      }
+      if (urlStr.includes("/api/v1/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(botGuilds) } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+    });
+
+    const mutualGuilds = await getMutualGuilds("test-token");
+
+    expect(mutualGuilds).toHaveLength(1);
+    // icon should be generated from bot iconHash
+    expect(mutualGuilds[0].icon).toBe("https://cdn.discordapp.com/icons/1/server-hash.webp?size=128");
+    expect(mutualGuilds[0].iconHash).toBe("server-hash");
+  });
+
+  it("falls back to user guild icon hash when bot guild has neither icon nor iconHash", async () => {
+    const userGuilds = [
+      { id: "1", name: "Server 1", icon: "user-hash", owner: true, permissions: "8", features: [] },
+    ];
+    const botGuilds = [
+      { id: "1", name: "Server 1", icon: null },
+    ];
+
+    process.env.BOT_API_URL = "http://localhost:3001";
+    process.env.BOT_API_SECRET = "test-secret";
+
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/users/@me/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(userGuilds) } as Response);
+      }
+      if (urlStr.includes("/api/v1/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(botGuilds) } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+    });
+
+    const mutualGuilds = await getMutualGuilds("test-token");
+
+    expect(mutualGuilds).toHaveLength(1);
+    // falls back to generating URL from user guild icon hash
+    expect(mutualGuilds[0].iconHash).toBe("user-hash");
+    expect(mutualGuilds[0].icon).toBe("https://cdn.discordapp.com/icons/1/user-hash.webp?size=128");
+  });
+
+  it("generates a gif URL when bot guild iconHash is animated (a_ prefix)", async () => {
+    const userGuilds = [
+      { id: "1", name: "Server 1", icon: null, owner: true, permissions: "8", features: [] },
+    ];
+    const botGuilds = [
+      { id: "1", name: "Server 1", icon: null, iconHash: "a_animated123" },
+    ];
+
+    process.env.BOT_API_URL = "http://localhost:3001";
+    process.env.BOT_API_SECRET = "test-secret";
+
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/users/@me/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(userGuilds) } as Response);
+      }
+      if (urlStr.includes("/api/v1/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(botGuilds) } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+    });
+
+    const mutualGuilds = await getMutualGuilds("test-token");
+
+    expect(mutualGuilds).toHaveLength(1);
+    expect(mutualGuilds[0].iconHash).toBe("a_animated123");
+    expect(mutualGuilds[0].icon).toBe("https://cdn.discordapp.com/icons/1/a_animated123.gif?size=128");
+  });
+
+  it("when bot API unavailable, generates icon URL from user guild icon hash", async () => {
+    const userGuilds = [
+      { id: "1", name: "Server 1", icon: "user-static-hash", owner: true, permissions: "8", features: [] },
+    ];
+
+    delete process.env.BOT_API_URL;
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(userGuilds),
+    } as Response);
+
+    const mutualGuilds = await getMutualGuilds("test-token");
+
+    expect(mutualGuilds).toHaveLength(1);
+    expect(mutualGuilds[0].botPresent).toBe(false);
+    // icon is mapped from user guild's icon hash
+    expect(mutualGuilds[0].iconHash).toBe("user-static-hash");
+    expect(mutualGuilds[0].icon).toBe("https://cdn.discordapp.com/icons/1/user-static-hash.webp?size=128");
   });
 });

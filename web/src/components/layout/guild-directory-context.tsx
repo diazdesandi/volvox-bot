@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import type { MutualGuild } from '@/types/discord';
+import type { GuildCommunityConfig, MutualGuild } from '@/types/discord';
 
 interface GuildDirectoryContextValue {
   error: boolean;
@@ -20,15 +20,71 @@ interface GuildDirectoryContextValue {
 
 const GuildDirectoryContext = createContext<GuildDirectoryContextValue | null>(null);
 
-function isMutualGuild(value: unknown): value is MutualGuild {
-  const g = value as Record<string, unknown>;
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof g.id === 'string' &&
-    typeof g.name === 'string' &&
-    typeof g.botPresent === 'boolean'
-  );
+const VALID_ACCESS_LEVELS = new Set(['owner', 'admin', 'moderator', 'viewer']);
+
+type ParsedMutualGuild = MutualGuild;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseGuildConfig(value: unknown): GuildCommunityConfig | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const config: GuildCommunityConfig = {};
+  const { communityHubs } = value;
+  if (isRecord(communityHubs) && typeof communityHubs.enabled === 'boolean') {
+    config.communityHubs = { enabled: communityHubs.enabled };
+  }
+
+  return Object.keys(config).length > 0 ? config : undefined;
+}
+
+function parseMutualGuild(value: unknown): ParsedMutualGuild | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const { id, name, botPresent } = value;
+  if (typeof id !== 'string' || typeof name !== 'string' || typeof botPresent !== 'boolean') {
+    return null;
+  }
+
+  const guild: ParsedMutualGuild = {
+    id,
+    name,
+    botPresent,
+    icon: typeof value.icon === 'string' || value.icon === null ? value.icon : null,
+    iconHash: typeof value.iconHash === 'string' || value.iconHash === null ? value.iconHash : null,
+    owner: typeof value.owner === 'boolean' ? value.owner : false,
+    permissions: typeof value.permissions === 'string' ? value.permissions : '0',
+    features: Array.isArray(value.features)
+      ? value.features.filter((feature): feature is string => typeof feature === 'string')
+      : [],
+  };
+
+  if (typeof value.access === 'string' && VALID_ACCESS_LEVELS.has(value.access)) {
+    guild.access = value.access as MutualGuild['access'];
+  }
+
+  const config = parseGuildConfig(value.config);
+  if (config) {
+    guild.config = config;
+  }
+
+  return guild;
+}
+
+function parseMutualGuilds(data: unknown): MutualGuild[] {
+  if (!Array.isArray(data)) {
+    throw new TypeError('Invalid guild response');
+  }
+
+  return data.flatMap((entry) => {
+    const guild = parseMutualGuild(entry);
+    return guild ? [guild] : [];
+  });
 }
 
 export function GuildDirectoryProvider({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -56,11 +112,7 @@ export function GuildDirectoryProvider({ children }: Readonly<{ children: React.
       }
 
       const data: unknown = await response.json();
-      if (!Array.isArray(data)) {
-        throw new TypeError('Invalid guild response');
-      }
-
-      setGuilds(data.filter(isMutualGuild));
+      setGuilds(parseMutualGuilds(data));
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
         return;

@@ -5,7 +5,6 @@ import {
   ArrowDown,
   ArrowUp,
   Bot,
-  Heart,
   type LucideIcon,
   MessageSquare,
   Minus,
@@ -313,75 +312,6 @@ function AnimatedValue({ value, format }: { value: number; format: (n: number) =
   return <>{format(display)}</>;
 }
 
-// ─── Live activity feed (animated preview) ──────────────────────────────────
-
-function FadeInLine({ text }: { text: string }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    let innerRaf = 0;
-    const raf = requestAnimationFrame(() => {
-      innerRaf = requestAnimationFrame(() => setVisible(true));
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      cancelAnimationFrame(innerRaf);
-    };
-  }, []);
-
-  return (
-    <div
-      className="text-[11px] text-muted-foreground/50 transition-all duration-500 ease-out"
-      style={{ opacity: visible ? 1 : 0, transform: visible ? 'translateY(0)' : 'translateY(4px)' }}
-    >
-      <span className="text-primary/30 mr-1.5">›</span>
-      {text}
-    </div>
-  );
-}
-
-const SAMPLE_ACTIVITY = [
-  'User joined #general',
-  'AI handled support ticket',
-  'New ticket #1042 opened',
-  'Config updated by admin',
-  'XP awarded: @alex → Lv.15',
-  'Warning issued to @spam_user',
-  'Welcome message sent',
-  'Level up: @jordan → Lv.22',
-  'Bot responded in #help',
-  'Member milestone reached',
-];
-
-function LiveActivityFeed() {
-  const [lines, setLines] = useState<Array<{ id: number; text: string }>>([]);
-  const idRef = useRef(0);
-
-  useEffect(() => {
-    let index = 0;
-    const interval = setInterval(() => {
-      const newLine = {
-        id: idRef.current++,
-        text: SAMPLE_ACTIVITY[index % SAMPLE_ACTIVITY.length],
-      };
-      index++;
-      setLines((prev) => [...prev.slice(-3), newLine]);
-    }, 2200);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <div className="mt-4 space-y-1.5 min-h-[80px]">
-      {lines.length === 0 && (
-        <div className="text-[11px] text-muted-foreground/25 italic">Monitoring activity…</div>
-      )}
-      {lines.map((line) => (
-        <FadeInLine key={line.id} text={line.text} />
-      ))}
-    </div>
-  );
-}
-
 /**
  * Render the analytics dashboard UI showing workspace metrics, charts, and interactive filters.
  *
@@ -478,7 +408,7 @@ export function AnalyticsDashboard() {
   const engagementMetrics = analytics?.userEngagement
     ? [
         {
-          label: 'Tracked users',
+          label: 'Active Users',
           value: formatNumber(analytics.userEngagement.trackedUsers),
           icon: Users,
           accentClassName: 'text-primary',
@@ -490,14 +420,17 @@ export function AnalyticsDashboard() {
           accentClassName: 'text-primary',
         },
         {
-          label: 'Reactions given',
-          value: formatNumber(analytics.userEngagement.totalReactionsGiven),
-          icon: Heart,
+          label: 'AI Response Rate',
+          value: `${analytics.userEngagement.aiResponseRate.toFixed(1)}%`,
+          icon: Zap,
           accentClassName: 'text-primary',
         },
         {
-          label: 'Reactions received',
-          value: formatNumber(analytics.userEngagement.totalReactionsReceived),
+          label: 'Peak Activity',
+          value:
+            analytics.userEngagement.peakHour !== null
+              ? `${String(analytics.userEngagement.peakHour).padStart(2, '0')}:00`
+              : 'N/A',
           icon: Activity,
           accentClassName: 'text-primary',
         },
@@ -629,7 +562,6 @@ export function AnalyticsDashboard() {
               <RealtimeMetricCard key={metric.label} {...metric} />
             ))}
           </div>
-          <LiveActivityFeed />
         </DashboardCard>
 
         <DashboardCard>

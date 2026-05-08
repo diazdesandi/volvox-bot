@@ -178,11 +178,19 @@ function isValidUserEngagement(ue: unknown): boolean {
   return (
     isRecord(ue) &&
     isFiniteNumber(ue.trackedUsers) &&
-    isFiniteNumber(ue.totalMessagesSent) &&
-    isFiniteNumber(ue.totalReactionsGiven) &&
-    isFiniteNumber(ue.totalReactionsReceived) &&
-    isFiniteNumber(ue.avgMessagesPerUser)
+    isFiniteNumber(ue.avgMessagesPerUser) &&
+    isFiniteNumber(ue.aiResponseRate) &&
+    isFiniteNumberOrNull(ue.peakHour)
   );
+}
+
+function isValidActivityEvent(entry: unknown): boolean {
+  if (!isRecord(entry)) return false;
+  return isString(entry.id) && isString(entry.text) && isString(entry.timestamp);
+}
+
+function isValidActivityEventArray(arr: unknown): boolean {
+  return arr === undefined || (Array.isArray(arr) && arr.every(isValidActivityEvent));
 }
 
 function isValidXpEconomy(xp: unknown): boolean {
@@ -211,6 +219,7 @@ export function isDashboardAnalyticsPayload(value: unknown): value is DashboardA
   }
 
   if (!isValidCommandUsage(value.commandUsage)) return false;
+  if (!isValidActivityEventArray(value.recentEvents)) return false;
   if (!isValidComparison(value.comparison)) return false;
   if (!isValidHeatmap(value.heatmap)) return false;
   if (!isValidUserEngagement(value.userEngagement)) return false;

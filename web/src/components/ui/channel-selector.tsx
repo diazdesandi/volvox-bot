@@ -193,12 +193,13 @@ export function ChannelSelector({
   channels: externalChannels,
 }: ChannelSelectorProps) {
   const [open, setOpen] = React.useState(false);
+  const shouldUseCachedChannels = externalChannels === undefined;
   const {
     channels: cachedChannels,
     error: cachedError,
     loading: cachedLoading,
     ensureChannelsLoaded,
-  } = useGuildChannels(guildId);
+  } = useGuildChannels(shouldUseCachedChannels ? guildId : null);
   const channels = externalChannels ?? cachedChannels;
   const loading = externalChannels ? false : cachedLoading;
   const error = externalChannels ? null : cachedError;
@@ -219,6 +220,9 @@ export function ChannelSelector({
     (channelId: string) => {
       if (selected.includes(channelId)) {
         onChange(selected.filter((id) => id !== channelId));
+      } else if (maxSelections === 1) {
+        onChange([channelId]);
+        setOpen(false);
       } else if (!maxSelections || selected.length < maxSelections) {
         onChange([...selected, channelId]);
       }
@@ -312,7 +316,7 @@ export function ChannelSelector({
               <CommandGroup className="p-2">
                 {filteredChannels.map((channel) => {
                   const isSelected = selected.includes(channel.id);
-                  const isDisabled = !isSelected && atMaxSelection;
+                  const isDisabled = !isSelected && atMaxSelection && maxSelections !== 1;
                   const isCategory = channel.type === CHANNEL_TYPES.GUILD_CATEGORY;
                   const icon = getChannelIcon(channel.type);
 

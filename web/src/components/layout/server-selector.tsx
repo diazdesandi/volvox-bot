@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/material-dropdown-menu';
 import { isGuildManageable } from '@/hooks/use-guild-role';
-import { getBotInviteUrl, getGuildIconUrl } from '@/lib/discord';
+import { getBotInviteUrl } from '@/lib/discord';
 import { broadcastSelectedGuild, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
 import { cn } from '@/lib/utils';
 import type { MutualGuild } from '@/types/discord';
@@ -29,13 +29,17 @@ function formatServerCount(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? '' : 's'}`;
 }
 
+function hasCommunityHubsEnabled(guild: MutualGuild): boolean {
+  return guild.config?.communityHubs?.enabled === true;
+}
+
 /** Compact guild icon + name row used in both sections of the dropdown. */
 function GuildRow({ guild }: { readonly guild: MutualGuild }) {
   return (
     <>
       {guild.icon ? (
         <Image
-          src={getGuildIconUrl(guild.id, guild.icon, 64) ?? ''}
+          src={guild.icon}
           alt={guild.name}
           width={20}
           height={20}
@@ -53,14 +57,16 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
   const [selectedGuild, setSelectedGuild] = useState<MutualGuild | null>(null);
   const { error, guilds, loading, refreshGuilds } = useGuildDirectory();
 
-  // Split guilds into manageable (mod/admin/owner) and member-only (viewer)
-  const { manageable, memberOnly } = useMemo(
-    () => ({
-      manageable: guilds.filter(isGuildManageable),
-      memberOnly: guilds.filter((g) => !isGuildManageable(g)),
-    }),
-    [guilds],
-  );
+  // Split guilds into manageable (mod/admin/owner) and enabled member-only community hubs.
+  const { manageable, memberOnly } = useMemo(() => {
+    const manageableGuilds = guilds.filter(isGuildManageable);
+    return {
+      manageable: manageableGuilds,
+      memberOnly: guilds.filter(
+        (guild) => !isGuildManageable(guild) && hasCommunityHubsEnabled(guild),
+      ),
+    };
+  }, [guilds]);
 
   const accessSummary =
     manageable.length === 0
@@ -177,7 +183,7 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
               <div className="flex h-full w-full items-center justify-center rounded-[13px] bg-background/50 backdrop-blur-md">
                 {selectedGuild?.icon ? (
                   <Image
-                    src={getGuildIconUrl(selectedGuild.id, selectedGuild.icon, 128) ?? ''}
+                    src={selectedGuild.icon}
                     alt={selectedGuild.name}
                     width={28}
                     height={28}
@@ -193,7 +199,11 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
                 Workspace
               </span>
               <span className="truncate text-[13px] font-black tracking-tight text-foreground/90">
-                {manageable.length === 0 ? 'No Access' : (selectedGuild?.name ?? 'Select Hub')}
+                {manageable.length === 0
+                  ? memberOnly.length > 0
+                    ? 'Community Hubs'
+                    : 'No Access'
+                  : (selectedGuild?.name ?? 'Select Hub')}
               </span>
             </div>
           </div>
@@ -206,12 +216,12 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
           className={cn(
             'w-80 rounded-[28px] p-2.5 backdrop-blur-3xl transition-all',
             'border-t border-border/40 bg-gradient-to-b from-popover/95 to-popover/60',
-            'shadow-[inset_0_1px_1px_hsl(var(--foreground)/0.1),0_32px_64px_-16px_hsl(var(--foreground)/0.6)]',
+            'shadow-lg shadow-border/20',
           )}
           align="start"
           sideOffset={12}
         >
-          {manageable.length > 0 ? (
+          {manageable.length > 0 && (
             <>
               <DropdownMenuLabel className="px-4 pt-4 pb-2">
                 <div className="flex flex-col gap-1">
@@ -253,37 +263,41 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
                   </DropdownMenuItem>
                 ))}
               </div>
-
-              {memberOnly.length > 0 && (
-                <>
-                  <DropdownMenuSeparator className="mx-2 my-2 bg-border/20" />
-                  <DropdownMenuLabel className="px-4 py-3">
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40">
-                      Community Hubs
-                    </span>
-                  </DropdownMenuLabel>
-                  <div className="space-y-1.5">
-                    {memberOnly.map((guild) => (
-                      <DropdownMenuItem
-                        key={guild.id}
-                        asChild
-                        className="rounded-[20px] border border-transparent transition-all hover:bg-muted/40 hover:border-border/40 active:scale-[0.98]"
-                        onSelect={onSelect}
-                      >
-                        <Link
-                          href={`/community/${guild.id}`}
-                          className="flex items-center gap-3 w-full"
-                        >
-                          <GuildRow guild={guild} />
-                          <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-20" />
-                        </Link>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                </>
-              )}
             </>
-          ) : (
+          )}
+
+          {memberOnly.length > 0 && (
+            <>
+              {manageable.length > 0 && (
+                <DropdownMenuSeparator className="mx-2 my-2 bg-border/20" />
+              )}
+              <DropdownMenuLabel className="px-4 py-3">
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/40">
+                  Community Hubs
+                </span>
+              </DropdownMenuLabel>
+              <div className="space-y-1.5">
+                {memberOnly.map((guild) => (
+                  <DropdownMenuItem
+                    key={guild.id}
+                    asChild
+                    className="rounded-[20px] border border-transparent transition-all hover:bg-muted/40 hover:border-border/40 active:scale-[0.98]"
+                    onSelect={onSelect}
+                  >
+                    <Link
+                      href={`/community/${guild.id}`}
+                      className="flex items-center gap-3 w-full"
+                    >
+                      <GuildRow guild={guild} />
+                      <ExternalLink className="ml-auto h-3 w-3 shrink-0 opacity-20" />
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </div>
+            </>
+          )}
+
+          {manageable.length === 0 && memberOnly.length === 0 && (
             <div className="flex flex-col items-center justify-center px-6 py-12 text-center text-xs text-muted-foreground">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/30 shadow-inner ring-1 ring-border/40">
                 <Server className="h-6 w-6 opacity-10" />

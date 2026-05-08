@@ -18,6 +18,7 @@ const DEFAULT_TOTAL_RETRY_BUDGET_MS = 8_000;
 
 /** Discord returns at most 200 guilds per page. */
 const GUILDS_PER_PAGE = 200;
+const DISCORD_CDN = 'https://cdn.discordapp.com';
 const inFlightUserGuildRequests = new Map<string, Promise<DiscordGuild[]>>();
 
 interface FetchWithRateLimitOptions extends RequestInit {
@@ -49,6 +50,22 @@ function getUserGuildRequestKey(accessToken: string): string {
 
 function getAbortReason(signal: AbortSignal): unknown {
   return signal.reason ?? new DOMException('The operation was aborted.', 'AbortError');
+}
+
+function getGuildIconUrl(guildId: string, iconHash: string | null, size = 128): string | null {
+  if (!iconHash) return null;
+  const ext = iconHash.startsWith('a_') ? 'gif' : 'webp';
+  return `${DISCORD_CDN}/icons/${guildId}/${iconHash}.${ext}?size=${size}`;
+}
+
+function mapDiscordGuildToMutualGuild(guild: DiscordGuild): MutualGuild {
+  const iconHash = guild.icon;
+  return {
+    ...guild,
+    icon: getGuildIconUrl(guild.id, iconHash),
+    iconHash,
+    botPresent: false as const,
+  };
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
@@ -322,18 +339,25 @@ export async function getMutualGuilds(
   // the UI can still be useful. If the API was available but the bot is
   // genuinely in zero guilds, return an empty list.
   if (!botResult.available) {
-    return userGuilds.map((guild) => ({
-      ...guild,
-      botPresent: false as const,
-    }));
+    return userGuilds.map(mapDiscordGuildToMutualGuild);
   }
 
-  const botGuildIds = new Set(botResult.guilds.map((g) => g.id));
+  const botGuildsById = new Map(botResult.guilds.map((guild) => [guild.id, guild]));
 
-  return userGuilds
-    .filter((guild) => botGuildIds.has(guild.id))
-    .map((guild) => ({
-      ...guild,
-      botPresent: true as const,
-    }));
+  return userGuilds.flatMap((guild) => {
+    const botGuild = botGuildsById.get(guild.id);
+    if (!botGuild) return [];
+
+    const iconHash = botGuild.iconHash ?? guild.icon;
+    return [
+      {
+        ...guild,
+        name: botGuild.name,
+        icon: botGuild.icon ?? getGuildIconUrl(guild.id, iconHash),
+        iconHash,
+        botPresent: true as const,
+        config: botGuild.config,
+      },
+    ];
+  });
 }

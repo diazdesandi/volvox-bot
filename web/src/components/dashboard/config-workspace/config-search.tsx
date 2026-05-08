@@ -1,6 +1,7 @@
 'use client';
 
 import { Search, Settings2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { inputClasses } from '@/components/dashboard/config-editor-utils';
 import { cn } from '@/lib/utils';
 import { getCategoryById } from './config-categories';
@@ -17,11 +18,28 @@ interface ConfigSearchProps {
  * Render a searchable UI for configuration items with inline clear and selectable results.
  */
 export function ConfigSearch({ value, onChange, results, onSelect }: ConfigSearchProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const normalizedValue = value.trim();
   const limitedResults = results.slice(0, 8);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        event.target instanceof Node &&
+        !containerRef.current.contains(event.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
-    <div className="relative group/search space-y-2">
+    <div ref={containerRef} className="relative group/search">
       <div className="relative">
         <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
           <Search
@@ -34,7 +52,11 @@ export function ConfigSearch({ value, onChange, results, onSelect }: ConfigSearc
           id="config-search"
           type="text"
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
           className={cn(
             inputClasses,
             'h-12 pl-12 pr-10 rounded-2xl bg-muted/20 dark:bg-black/40 border-border dark:border-white/[0.03] text-foreground dark:text-zinc-200 placeholder:text-muted-foreground/50 focus:bg-muted/30 dark:focus:bg-black/60',
@@ -46,7 +68,10 @@ export function ConfigSearch({ value, onChange, results, onSelect }: ConfigSearc
           <button
             type="button"
             className="absolute right-3 top-1/2 -translate-y-1/2 h-6 w-6 flex items-center justify-center rounded-full bg-muted/50 dark:bg-white/5 hover:bg-muted/80 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground transition-all duration-200"
-            onClick={() => onChange('')}
+            onClick={() => {
+              onChange('');
+              setIsOpen(false);
+            }}
             aria-label="Clear search"
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -54,8 +79,8 @@ export function ConfigSearch({ value, onChange, results, onSelect }: ConfigSearc
         )}
       </div>
 
-      {normalizedValue.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-2 z-50 overflow-hidden rounded-3xl border border-border bg-popover/90 dark:bg-black/60 backdrop-blur-3xl shadow-2xl dark:shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in slide-in-from-top-2 duration-300">
+      {isOpen && normalizedValue.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-50 overflow-hidden rounded-3xl border border-border bg-popover/90 dark:bg-black/60 backdrop-blur-3xl shadow-lg shadow-border/20 animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="p-2">
             {limitedResults.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center px-4">
@@ -74,7 +99,10 @@ export function ConfigSearch({ value, onChange, results, onSelect }: ConfigSearc
                     <button
                       type="button"
                       className="group/item flex items-center gap-3 w-full p-3 text-left rounded-2xl hover:bg-muted/50 dark:hover:bg-white/[0.05] border border-transparent hover:border-border dark:hover:border-white/[0.05] transition-all duration-200"
-                      onClick={() => onSelect(item)}
+                      onClick={() => {
+                        onSelect(item);
+                        setIsOpen(false);
+                      }}
                     >
                       <div className="size-9 shrink-0 rounded-xl bg-muted/50 dark:bg-gradient-to-br dark:from-zinc-800 dark:to-zinc-900 border border-border dark:border-white/10 flex items-center justify-center shadow-md group-hover/item:scale-105 transition-transform">
                         <Settings2 className="size-4 text-muted-foreground/60 group-hover/item:text-primary transition-colors" />

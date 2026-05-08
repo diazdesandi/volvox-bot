@@ -87,11 +87,10 @@ function buildEngagementSection(analytics: DashboardAnalytics): string {
   if (!ue) return '';
 
   const rows = [
-    ['Tracked users', formatNumber(ue.trackedUsers)],
-    ['Total messages sent', formatNumber(ue.totalMessagesSent)],
-    ['Total reactions given', formatNumber(ue.totalReactionsGiven)],
-    ['Total reactions received', formatNumber(ue.totalReactionsReceived)],
+    ['Active users', formatNumber(ue.trackedUsers)],
     ['Avg messages / user', ue.avgMessagesPerUser.toFixed(1)],
+    ['AI Response Rate', `${ue.aiResponseRate.toFixed(1)}%`],
+    ['Peak Activity', ue.peakHour !== null ? `${String(ue.peakHour).padStart(2, '0')}:00` : 'N/A'],
   ];
 
   const rowsHtml = rows

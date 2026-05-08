@@ -25,6 +25,21 @@ if (typeof HTMLElement !== 'undefined' && !HTMLElement.prototype.scrollIntoView)
   HTMLElement.prototype.scrollIntoView = vi.fn();
 }
 
+// Radix/cmdk command primitives observe popover geometry; jsdom does not provide ResizeObserver.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverMock {
+    observe = vi.fn();
+    unobserve = vi.fn();
+    disconnect = vi.fn();
+  }
+
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    writable: true,
+    configurable: true,
+    value: ResizeObserverMock,
+  });
+}
+
 afterEach(() => {
   cleanup();
 });

@@ -2,6 +2,7 @@
 
 import {
   Bold,
+  ChevronDown,
   Code,
   CodeSquare,
   EyeOff,
@@ -14,7 +15,6 @@ import {
   Quote,
   Strikethrough,
   Underline,
-  Variable,
 } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
@@ -389,8 +389,13 @@ export function DiscordMarkdownEditor({
                 aria-label="Insert variable"
                 aria-expanded={showVariables}
               >
-                <Variable className="h-4 w-4" />
                 Variables
+                <ChevronDown
+                  className={cn(
+                    'h-3 w-3 opacity-50 transition-transform duration-200',
+                    showVariables && 'rotate-180',
+                  )}
+                />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

@@ -3,6 +3,7 @@
  * Endpoints for guild info, config, stats, members, moderation, and actions
  */
 
+import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { error, info, warn } from '../../logger.js';
 import { getConfig, setConfigValue, setMultipleConfigValues } from '../../modules/config.js';
@@ -190,6 +191,7 @@ async function hasOAuthGuildPermission(user, guildId, anyOfFlags) {
     const guilds = await fetchUserGuilds(user.userId, accessToken);
     const guild = guilds.find((g) => g.id === guildId);
     if (!guild) return false;
+    if (guild.owner === true) return true;
     const permissions = Number(guild.permissions);
     if (Number.isNaN(permissions)) return false;
     return (permissions & anyOfFlags) !== 0;
@@ -239,8 +241,8 @@ function isOAuthGuildModerator(user, guildId) {
 }
 
 function accessSatisfiesRequirement(access, requiredAccess) {
-  if (requiredAccess === 'admin') return access === 'admin';
-  return access === 'admin' || access === 'moderator';
+  if (requiredAccess === 'admin') return access === 'admin' || access === 'owner';
+  return access === 'admin' || access === 'owner' || access === 'moderator';
 }
 
 function hasPermissionFlag(permissions, flag) {
@@ -252,10 +254,47 @@ function hasPermissionFlag(permissions, flag) {
 }
 
 function getOAuthDerivedAccessLevel(owner, permissions) {
-  if (owner) return 'admin';
+  if (owner) return 'owner';
   if (hasPermissionFlag(permissions, ADMINISTRATOR_FLAG)) return 'admin';
   if (hasPermissionFlag(permissions, MANAGE_GUILD_FLAG)) return 'moderator';
   return null;
+}
+
+function getGuildIconUrl(guild) {
+  if (typeof guild.iconURL === 'function') {
+    return guild.iconURL({ size: 128 });
+  }
+  if (guild.icon) {
+    const ext = guild.icon.startsWith('a_') ? 'gif' : 'webp';
+    return `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.${ext}?size=128`;
+  }
+  return null;
+}
+
+function getGuildIconHash(guild) {
+  return guild.icon || null;
+}
+
+function getGuildListConfig(guildId) {
+  const config = getConfig(guildId);
+  return {
+    communityHubs: {
+      enabled: config?.communityHubs?.enabled === true,
+    },
+  };
+}
+
+function getGuildListItem(guild, extra = {}) {
+  return {
+    id: guild.id,
+    name: guild.name,
+    icon: getGuildIconUrl(guild),
+    iconHash: getGuildIconHash(guild),
+    memberCount: guild.memberCount,
+    botPresent: true,
+    config: getGuildListConfig(guild.id),
+    ...extra,
+  };
 }
 
 function isUnknownMemberError(err) {
@@ -320,8 +359,9 @@ async function getGuildAccessLevel(guild, userId) {
  * Return Express middleware that enforces a guild-level permission for OAuth users.
  *
  * The middleware bypasses checks for API-secret requests and for configured bot owners.
- * For cached bot guilds it resolves dashboard access via `getGuildAccessLevel(...)`;
- * otherwise it falls back to `permissionCheck(user, guildId)`. The resolved access
+ * For cached bot guilds it resolves dashboard access via `getGuildAccessLevel(...)`,
+ * then falls back to the OAuth owner/permission check when cached access is insufficient.
+ * Otherwise it uses `permissionCheck(user, guildId)`. The resolved access
  * level must satisfy `requiredAccess`.
  * - responds 403 with `errorMessage` when the resolved access is insufficient,
  * - responds 502 when the permission verification throws,
@@ -344,7 +384,11 @@ function requireGuildPermission(permissionCheck, errorMessage, requiredAccess) {
         const guild = req.app.locals.client?.guilds?.cache?.get(req.params.id);
         if (guild) {
           const access = await getGuildAccessLevel(guild, req.user.userId);
-          if (!accessSatisfiesRequirement(access, requiredAccess)) {
+          if (accessSatisfiesRequirement(access, requiredAccess)) {
+            return next();
+          }
+
+          if (!(await permissionCheck(req.user, req.params.id))) {
             return res.status(403).json({ error: errorMessage });
           }
           return next();
@@ -413,8 +457,9 @@ export function validateGuild(req, res, next) {
  *       - Guilds
  *     summary: List guilds
  *     description: >
- *       For OAuth users: returns guilds where the user has MANAGE_GUILD or ADMINISTRATOR.
- *       Global admins (configured via BOT_OWNER_IDS) see all guilds. For API-secret users: returns all bot guilds.
+ *       For OAuth users: returns bot-present guilds from the user's Discord guild list,
+ *       including viewer, moderator, and admin access metadata. Global admins
+ *       (configured via BOT_OWNER_IDS) see all bot guilds. For API-secret users: returns all bot guilds.
  *     security:
  *       - ApiKeyAuth: []
  *       - BearerAuth: []
@@ -435,11 +480,38 @@ export function validateGuild(req, res, next) {
  *                   icon:
  *                     type: string
  *                     nullable: true
+ *                     description: Renderable Discord CDN URL for the guild icon.
+ *                   iconHash:
+ *                     type: string
+ *                     nullable: true
+ *                     description: Raw Discord icon hash, when available.
  *                   memberCount:
  *                     type: integer
+ *                   botPresent:
+ *                     type: boolean
+ *                   owner:
+ *                     type: boolean
+ *                     description: Whether the OAuth user owns the guild. OAuth responses only.
+ *                   permissions:
+ *                     type: string
+ *                     description: Discord permissions bitset from the OAuth guild object. OAuth responses only.
+ *                   features:
+ *                     type: array
+ *                     items:
+ *                       type: string
+ *                     description: Discord guild features. OAuth responses only.
  *                   access:
  *                     type: string
- *                     enum: [admin, moderator]
+ *                     enum: [owner, admin, moderator, viewer]
+ *                   config:
+ *                     type: object
+ *                     description: Minimal guild config needed by dashboard navigation gates.
+ *                     properties:
+ *                       communityHubs:
+ *                         type: object
+ *                         properties:
+ *                           enabled:
+ *                             type: boolean
  *       "401":
  *         $ref: "#/components/responses/Unauthorized"
  *       "502":
@@ -459,13 +531,9 @@ router.get('/', async (req, res) => {
 
   if (req.authMethod === 'oauth') {
     if (isOAuthBotOwner(req.user)) {
-      const ownerGuilds = Array.from(botGuilds.values()).map((g) => ({
-        id: g.id,
-        name: g.name,
-        icon: g.iconURL(),
-        memberCount: g.memberCount,
-        access: 'admin',
-      }));
+      const ownerGuilds = Array.from(botGuilds.values()).map((g) =>
+        getGuildListItem(g, { access: 'admin' }),
+      );
       return res.json(ownerGuilds);
     }
 
@@ -495,15 +563,13 @@ router.get('/', async (req, res) => {
           const access =
             getOAuthDerivedAccessLevel(ug.owner, ug.permissions) ??
             (await getGuildAccessLevel(botGuild, req.user.userId));
-          if (access === 'viewer') return null;
 
-          return {
-            id: ug.id,
-            name: botGuild.name,
-            icon: botGuild.iconURL(),
-            memberCount: botGuild.memberCount,
+          return getGuildListItem(botGuild, {
+            owner: ug.owner,
+            permissions: ug.permissions,
+            features: botGuild.features || [],
             access,
-          };
+          });
         },
       );
 
@@ -518,12 +584,7 @@ router.get('/', async (req, res) => {
   }
 
   if (req.authMethod === 'api-secret') {
-    const guilds = Array.from(botGuilds.values()).map((g) => ({
-      id: g.id,
-      name: g.name,
-      icon: g.iconURL(),
-      memberCount: g.memberCount,
-    }));
+    const guilds = Array.from(botGuilds.values()).map((g) => getGuildListItem(g));
     return res.json(guilds);
   }
 
@@ -651,6 +712,9 @@ function getGuildChannels(guild) {
  *                 icon:
  *                   type: string
  *                   nullable: true
+ *                 iconHash:
+ *                   type: string
+ *                   nullable: true
  *                 memberCount:
  *                   type: integer
  *                 channels:
@@ -680,7 +744,8 @@ router.get('/:id', requireGuildAdmin, validateGuild, (req, res) => {
   res.json({
     id: guild.id,
     name: guild.name,
-    icon: guild.iconURL(),
+    icon: getGuildIconUrl(guild),
+    iconHash: getGuildIconHash(guild),
     memberCount: guild.memberCount,
     channelCount: guild.channels.cache.size,
     channels: getGuildChannels(guild),
@@ -1233,6 +1298,110 @@ function buildFilteredQuery(baseParts, baseValues, channelFilter, channelColumn)
   return { where: parts.join(' AND '), values };
 }
 
+function normalizeEventDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date(0) : date;
+}
+
+function buildRecentEventId(row, timestamp) {
+  const stableFields = [row.type, timestamp.toISOString(), row.actor || '', row.detail || ''];
+  const digest = createHash('sha256')
+    .update(JSON.stringify(stableFields))
+    .digest('hex')
+    .slice(0, 16);
+  return `${row.type}-${digest}`;
+}
+
+function formatRecentEvents(messageRows, commandRows) {
+  return [...messageRows, ...commandRows]
+    .map((row) => ({ ...row, ts: normalizeEventDate(row.ts), detail: row.detail || '' }))
+    .sort((a, b) => b.ts.getTime() - a.ts.getTime())
+    .slice(0, 10)
+    .map((row) => {
+      let text = '';
+      if (row.type === 'message') {
+        const detail = row.detail.length > 40 ? `${row.detail.slice(0, 40)}...` : row.detail;
+        text = `${row.actor}: ${detail}`;
+      } else {
+        text = `${row.actor} used /${row.detail}`;
+      }
+      return {
+        id: buildRecentEventId(row, row.ts),
+        text,
+        timestamp: row.ts.toISOString(),
+      };
+    });
+}
+
+async function fetchRecentEvents(dbPool, guildId, channelFilter) {
+  const { where: activityConvWhere, values: activityConvValues } = buildFilteredQuery(
+    ['guild_id = $1', "role = 'user'"],
+    [guildId],
+    channelFilter,
+    'channel_id',
+  );
+
+  const { where: activityCmdWhere, values: activityCmdValues } = buildFilteredQuery(
+    ['guild_id = $1'],
+    [guildId],
+    channelFilter,
+    'channel_id',
+  );
+
+  const [recentMessagesResult, recentCommandsResult] = await Promise.all([
+    dbPool
+      .query(
+        `SELECT
+           'message' as type,
+           COALESCE(NULLIF(username, ''), '<@' || NULLIF(user_id, '') || '>', 'Unknown user') as actor,
+           SUBSTR(content, 1, 41) as detail,
+           created_at as ts
+         FROM conversations
+         WHERE ${activityConvWhere}
+         ORDER BY created_at DESC LIMIT 10`,
+        activityConvValues,
+      )
+      .catch((err) => {
+        warn('Recent messages query failed; returning empty recent messages dataset', {
+          guild: guildId,
+          error: err.message,
+        });
+        return { rows: [] };
+      }),
+    dbPool
+      .query(
+        `SELECT
+           'command' as type,
+           COALESCE(command_actor.username, '<@' || command_usage.user_id || '>') as actor,
+           command_name as detail,
+           used_at as ts
+         FROM command_usage
+         LEFT JOIN LATERAL (
+           SELECT username
+           FROM conversations
+           WHERE conversations.guild_id = command_usage.guild_id
+             AND conversations.user_id = command_usage.user_id
+             AND conversations.username IS NOT NULL
+             AND conversations.username <> ''
+           ORDER BY conversations.created_at DESC
+           LIMIT 1
+         ) command_actor ON TRUE
+         WHERE ${activityCmdWhere}
+         ORDER BY used_at DESC LIMIT 10`,
+        activityCmdValues,
+      )
+      .catch((err) => {
+        warn('Recent commands query failed; returning empty recent commands dataset', {
+          guild: guildId,
+          error: err.message,
+        });
+        return { rows: [] };
+      }),
+  ]);
+
+  return formatRecentEvents(recentMessagesResult.rows, recentCommandsResult.rows);
+}
+
 /**
  * Count members that joined within a time range from cached guild members.
  * @param {Map} membersCache - guild.members.cache
@@ -1356,6 +1525,21 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
           'channel_id',
         );
 
+        // Build AI usage query dynamically
+        const { where: aiUsageWhere, values: aiUsageValues } = buildFilteredQuery(
+          ['guild_id = $1', 'created_at >= $2', 'created_at <= $3'],
+          [req.params.id, from.toISOString(), to.toISOString()],
+          activeChannelFilter,
+          'channel_id',
+        );
+
+        const { where: engagementWhere, values: engagementValues } = buildFilteredQuery(
+          ['guild_id = $1', 'created_at >= $2', 'created_at <= $3'],
+          [req.params.id, from.toISOString(), to.toISOString()],
+          activeChannelFilter,
+          'channel_id',
+        );
+
         const [
           kpiResult,
           comparisonKpiResult,
@@ -1364,7 +1548,9 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
           heatmapResult,
           commandUsageResult,
           userEngagementResult,
+          peakHourResult,
           xpEconomyResult,
+          aiUsageResult,
         ] = await Promise.all([
           dbPool.query(
             `SELECT
@@ -1439,23 +1625,37 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
             }),
           dbPool
             .query(
-              // NOTE: totalMessagesSent (and related stats) reflect cumulative all-time counts
-              // from user_stats, which has no time-series granularity. The user_stats table
-              // stores running totals per user with no timestamp column for filtering.
-              // TODO: For time-bounded accuracy (e.g. "last 30 days"), add a
-              // message_events log table and aggregate from that instead.
               `SELECT
-               COUNT(DISTINCT user_id)::int AS tracked_users,
-               COALESCE(SUM(messages_sent), 0)::bigint AS total_messages_sent,
-               COALESCE(SUM(reactions_given), 0)::bigint AS total_reactions_given,
-               COALESCE(SUM(reactions_received), 0)::bigint AS total_reactions_received,
-               COALESCE(AVG(messages_sent), 0)::float AS avg_messages_per_user
-             FROM user_stats
-             WHERE guild_id = $1`,
-              [req.params.id],
+               COUNT(DISTINCT CASE
+                 WHEN role = 'user' THEN COALESCE('id:' || NULLIF(user_id, ''), 'name:' || NULLIF(username, ''))
+               END)::int AS tracked_users,
+               COUNT(*) FILTER (WHERE role = 'user')::int AS user_messages
+             FROM conversations
+             WHERE ${engagementWhere}`,
+              engagementValues,
             )
             .catch((err) => {
-              warn('User engagement query failed; returning empty engagement dataset', {
+              warn('Engagement query failed; returning empty engagement dataset', {
+                guild: req.params.id,
+                error: err.message,
+              });
+              return { rows: [] };
+            }),
+          dbPool
+            .query(
+              `SELECT
+               EXTRACT(HOUR FROM created_at)::int AS peak_hour,
+               COUNT(*)::int as count
+             FROM conversations
+             WHERE ${engagementWhere}
+               AND role = 'user'
+             GROUP BY 1
+             ORDER BY 2 DESC
+             LIMIT 1`,
+              engagementValues,
+            )
+            .catch((err) => {
+              warn('Peak hour query failed; returning empty peak hour dataset', {
                 guild: req.params.id,
                 error: err.message,
               });
@@ -1479,12 +1679,42 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
               });
               return { rows: [] };
             }),
+          dbPool
+            .query(
+              `SELECT
+               model,
+               COUNT(*)::int AS requests,
+               COALESCE(SUM(input_tokens), 0)::bigint AS prompt_tokens,
+               COALESCE(SUM(output_tokens), 0)::bigint AS completion_tokens,
+               COALESCE(SUM(cost_usd), 0)::float AS cost_usd
+             FROM ai_usage
+             WHERE ${aiUsageWhere}
+             GROUP BY model
+             ORDER BY requests DESC`,
+              aiUsageValues,
+            )
+            .catch((err) => {
+              warn('AI usage query failed; returning empty dataset', {
+                guild: req.params.id,
+                error: err.message,
+              });
+              return { rows: [] };
+            }),
         ]);
 
         const kpiRow = kpiResult.rows[0] || {
           total_messages: 0,
           ai_requests: 0,
           active_users: 0,
+        };
+
+        const engagementRow = userEngagementResult.rows[0] || {
+          tracked_users: 0,
+          user_messages: 0,
+        };
+
+        const peakHourRow = peakHourResult.rows[0] || {
+          peak_hour: null,
         };
 
         const comparisonKpiRow = comparisonKpiResult.rows[0] || {
@@ -1518,14 +1748,27 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
           messages: Number(row.messages || 0),
         }));
 
-        const usageByModel = [];
+        const usageByModel = aiUsageResult.rows.map((row) => ({
+          model: row.model,
+          requests: Number(row.requests || 0),
+          promptTokens: Number(row.prompt_tokens ?? 0),
+          completionTokens: Number(row.completion_tokens ?? 0),
+          costUsd: Number(row.cost_usd ?? 0),
+        }));
 
-        // Database-backed AI usage details were removed with persisted log tracking. Keep message
-        // counts sourced from conversations, but mark spend/token breakdowns explicitly unavailable
-        // instead of reporting synthetic zeroes when aiRequests may be nonzero.
-        const aiUsageSource = AI_USAGE_UNAVAILABLE_SOURCE;
-        const aiUsageTokens = { prompt: null, completion: null };
-        const aiCostUsd = null;
+        const aiUsageTokens =
+          usageByModel.length > 0
+            ? {
+                prompt: usageByModel.reduce((sum, m) => sum + m.promptTokens, 0),
+                completion: usageByModel.reduce((sum, m) => sum + m.completionTokens, 0),
+              }
+            : { prompt: null, completion: null };
+
+        const aiCostUsd =
+          usageByModel.length > 0 ? usageByModel.reduce((sum, m) => sum + m.costUsd, 0) : null;
+
+        // mark as 'ai_usage' source when we have database entries
+        const aiUsageSource = usageByModel.length > 0 ? 'ai_usage' : AI_USAGE_UNAVAILABLE_SOURCE;
         const comparisonAiCostUsd = null;
 
         const commandUsage = commandUsageResult.rows.map((row) => ({
@@ -1576,21 +1819,22 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
               }
             : null,
           heatmap,
-          userEngagement: userEngagementResult.rows[0]
-            ? {
-                trackedUsers: Number(userEngagementResult.rows[0].tracked_users || 0),
-                totalMessagesSent: Number(userEngagementResult.rows[0].total_messages_sent || 0),
-                totalReactionsGiven: Number(
-                  userEngagementResult.rows[0].total_reactions_given || 0,
-                ),
-                totalReactionsReceived: Number(
-                  userEngagementResult.rows[0].total_reactions_received || 0,
-                ),
-                avgMessagesPerUser: Number(
-                  Number(userEngagementResult.rows[0].avg_messages_per_user || 0).toFixed(1),
-                ),
-              }
-            : null,
+          userEngagement:
+            engagementRow.tracked_users > 0
+              ? {
+                  trackedUsers: Number(engagementRow.tracked_users),
+                  avgMessagesPerUser: Number(
+                    (engagementRow.user_messages / engagementRow.tracked_users).toFixed(1),
+                  ),
+                  aiResponseRate:
+                    engagementRow.user_messages > 0
+                      ? Number(
+                          ((kpiRow.ai_requests / engagementRow.user_messages) * 100).toFixed(1),
+                        )
+                      : 0,
+                  peakHour: peakHourRow.peak_hour,
+                }
+              : null,
           xpEconomy: xpEconomyResult.rows[0]
             ? {
                 totalUsers: Number(xpEconomyResult.rows[0].total_users || 0),
@@ -1638,6 +1882,13 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
       if (status !== 'offline') onlineMemberCount++;
     }
 
+    const recentEventsCacheKey = `analytics:recent-events:${req.params.id}:${activeChannelFilter || ''}`;
+    const recentEvents = await cacheGetOrSet(
+      recentEventsCacheKey,
+      () => fetchRecentEvents(dbPool, req.params.id, activeChannelFilter),
+      TTL.CONFIG,
+    );
+
     let activeAiConversations;
     try {
       const activeAiConversationsResult = await (activeChannelFilter
@@ -1669,6 +1920,7 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
 
     return res.json({
       ...analyticsData,
+      recentEvents,
       kpis: {
         ...analyticsData.kpis,
         newMembers: currentNewMembers,

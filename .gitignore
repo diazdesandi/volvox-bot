@@ -52,3 +52,6 @@ openclaw-studio/
 worktrees/
 TASK.md
 .superpowers/
+
+# Next.js generated files
+web/next-env.d.ts

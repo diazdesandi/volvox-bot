@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, ChevronDown, ChevronsUpDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
+import { Collapsible as CollapsiblePrimitive } from 'radix-ui';
 import { useEffect, useMemo, useState } from 'react';
 import { generateId, inputClasses } from '@/components/dashboard/config-editor-utils';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/command';
 import { DiscordMarkdownEditor } from '@/components/ui/discord-markdown-editor';
 import { defaultEmbedConfig, EmbedBuilder, type EmbedConfig } from '@/components/ui/embed-builder';
+import { InfoTip } from '@/components/ui/info-tip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -544,11 +546,18 @@ function SearchableActionSelect<T extends string>({
 
 function TemplateVariableList() {
   return (
-    <div className="rounded-xl border border-border/50 bg-muted/20 p-3">
-      <Label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        Variables
-      </Label>
-      <div className="mt-3 flex flex-wrap gap-2">
+    <CollapsiblePrimitive.Root
+      defaultOpen
+      className="group rounded-xl border border-border/50 bg-muted/20 p-1"
+    >
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <CollapsiblePrimitive.Trigger className="flex flex-1 cursor-pointer items-center justify-between text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary">
+          <Label className="cursor-pointer">Variables</Label>
+          <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+        </CollapsiblePrimitive.Trigger>
+        <InfoTip text="Dynamic placeholders replaced with real data at message time." />
+      </div>
+      <CollapsiblePrimitive.Content className="mt-1 flex flex-wrap gap-2 px-3 pb-3">
         {TEMPLATE_VARIABLES.map((variable) => (
           <span
             key={variable}
@@ -565,8 +574,8 @@ function TemplateVariableList() {
             ) : null}
           </span>
         ))}
-      </div>
-    </div>
+      </CollapsiblePrimitive.Content>
+    </CollapsiblePrimitive.Root>
   );
 }
 

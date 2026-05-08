@@ -51,10 +51,9 @@ function makeAnalytics(overrides: Partial<DashboardAnalytics> = {}): DashboardAn
     },
     userEngagement: {
       trackedUsers: 30,
-      totalMessagesSent: 400,
-      totalReactionsGiven: 80,
-      totalReactionsReceived: 65,
       avgMessagesPerUser: 13.3,
+      aiResponseRate: 20.5,
+      peakHour: 15,
     },
     xpEconomy: {
       totalUsers: 20,
@@ -142,8 +141,61 @@ describe('exportAnalyticsPdf', () => {
 
     const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
     expect(html).toContain('User Engagement');
-    expect(html).toContain('Tracked users');
+    expect(html).toContain('Active users');
     expect(html).toContain('Avg messages / user');
+  });
+
+  it('HTML output includes AI Response Rate in user engagement section', () => {
+    exportAnalyticsPdf(makeAnalytics());
+
+    const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
+    expect(html).toContain('AI Response Rate');
+    expect(html).toContain('20.5%');
+  });
+
+  it('HTML output includes Peak Activity formatted as HH:00', () => {
+    exportAnalyticsPdf(makeAnalytics());
+
+    const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
+    expect(html).toContain('Peak Activity');
+    expect(html).toContain('15:00');
+  });
+
+  it('HTML output shows N/A for Peak Activity when peakHour is null', () => {
+    exportAnalyticsPdf(
+      makeAnalytics({
+        userEngagement: {
+          trackedUsers: 10,
+          avgMessagesPerUser: 5.0,
+          aiResponseRate: 30.0,
+          peakHour: null,
+        },
+      }),
+    );
+
+    const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
+    const peakActivityRow = html.match(
+      /<tr><td>Peak Activity<\/td><td class="num">(?<value>[^<]+)<\/td><\/tr>/,
+    );
+
+    expect(peakActivityRow?.groups?.value).toBe('N/A');
+    expect(peakActivityRow?.[0]).not.toMatch(/\d{2}:\d{2}/);
+  });
+
+  it('HTML output formats single-digit peak hours with leading zero', () => {
+    exportAnalyticsPdf(
+      makeAnalytics({
+        userEngagement: {
+          trackedUsers: 10,
+          avgMessagesPerUser: 5.0,
+          aiResponseRate: 30.0,
+          peakHour: 9,
+        },
+      }),
+    );
+
+    const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
+    expect(html).toContain('09:00');
   });
 
   it('omits user engagement section when null', () => {

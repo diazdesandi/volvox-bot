@@ -136,4 +136,202 @@ describe('GuildDirectoryProvider', () => {
 
     errorSpy.mockRestore();
   });
+
+  it('parses iconHash and config from guild API response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        {
+          id: '1',
+          name: 'Hub',
+          botPresent: true,
+          icon: 'https://cdn.example.com/hub.webp',
+          iconHash: 'abc123',
+          config: { communityHubs: { enabled: true } },
+        },
+      ],
+    } as Response);
+
+    function GuildConfigConsumer() {
+      const { guilds } = useGuildDirectory();
+      const g = guilds[0];
+      if (!g) return <div data-testid="status">none</div>;
+      return (
+        <div data-testid="status">
+          {g.iconHash}:{g.config?.communityHubs?.enabled ? 'hubs-on' : 'hubs-off'}
+        </div>
+      );
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <GuildConfigConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('abc123:hubs-on');
+    });
+  });
+
+  it('parses valid access levels from guild API response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: '1', name: 'Owner Guild', botPresent: true, access: 'owner' },
+        { id: '2', name: 'Admin Guild', botPresent: true, access: 'admin' },
+        { id: '3', name: 'Mod Guild', botPresent: true, access: 'moderator' },
+        { id: '4', name: 'Viewer Guild', botPresent: true, access: 'viewer' },
+      ],
+    } as Response);
+
+    function AccessConsumer() {
+      const { guilds } = useGuildDirectory();
+      return (
+        <ul>
+          {guilds.map((g) => (
+            <li key={g.id} data-testid={`guild-${g.id}`}>
+              {g.name}:{g.access ?? 'none'}
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <AccessConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guild-1')).toHaveTextContent('Owner Guild:owner');
+      expect(screen.getByTestId('guild-2')).toHaveTextContent('Admin Guild:admin');
+      expect(screen.getByTestId('guild-3')).toHaveTextContent('Mod Guild:moderator');
+      expect(screen.getByTestId('guild-4')).toHaveTextContent('Viewer Guild:viewer');
+    });
+  });
+
+  it('ignores invalid access level strings', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: '1', name: 'Bad Access', botPresent: true, access: 'superadmin' },
+      ],
+    } as Response);
+
+    function AccessConsumer() {
+      const { guilds } = useGuildDirectory();
+      const g = guilds[0];
+      if (!g) return <div data-testid="status">none</div>;
+      return <div data-testid="status">{g.access === undefined ? 'no-access' : g.access}</div>;
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <AccessConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('no-access');
+    });
+  });
+
+  it('defaults permissions to "0" and features to [] when not provided', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: '1', name: 'Sparse Guild', botPresent: true },
+      ],
+    } as Response);
+
+    function FieldConsumer() {
+      const { guilds } = useGuildDirectory();
+      const g = guilds[0];
+      if (!g) return <div data-testid="status">none</div>;
+      return (
+        <div data-testid="status">
+          {g.permissions}:{g.features.length}
+        </div>
+      );
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <FieldConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('0:0');
+    });
+  });
+
+  it('preserves owner=false when not provided', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: '1', name: 'Test', botPresent: true },
+      ],
+    } as Response);
+
+    function OwnerConsumer() {
+      const { guilds } = useGuildDirectory();
+      const g = guilds[0];
+      if (!g) return <div data-testid="status">none</div>;
+      return <div data-testid="status">{g.owner ? 'owner' : 'not-owner'}</div>;
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <OwnerConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('not-owner');
+    });
+  });
+
+  it('ignores invalid communityHubs config shape', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        {
+          id: '1',
+          name: 'Bad Config',
+          botPresent: true,
+          config: { communityHubs: { enabled: 'yes' } },
+        },
+      ],
+    } as Response);
+
+    function ConfigConsumer() {
+      const { guilds } = useGuildDirectory();
+      const g = guilds[0];
+      if (!g) return <div data-testid="status">none</div>;
+      return (
+        <div data-testid="status">
+          {g.config?.communityHubs === undefined ? 'no-hub-config' : 'has-hub-config'}
+        </div>
+      );
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <ConfigConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('no-hub-config');
+    });
+  });
 });

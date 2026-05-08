@@ -67,6 +67,7 @@ import { _resetSecretCache } from '../../../src/api/middleware/verifyJwt.js';
 import { createApp } from '../../../src/api/server.js';
 import { guildCache } from '../../../src/api/utils/discordApi.js';
 import { sessionStore } from '../../../src/api/utils/sessionStore.js';
+import { warn } from '../../../src/logger.js';
 import { getConfig, setConfigValue, setMultipleConfigValues } from '../../../src/modules/config.js';
 import { cacheGetOrSet } from '../../../src/utils/cache.js';
 import { safeSend } from '../../../src/utils/safeSend.js';
@@ -121,6 +122,7 @@ describe('guilds routes', () => {
   const mockGuild = {
     id: 'guild1',
     name: 'Test Server',
+    icon: 'guild-icon-hash',
     iconURL: () => 'https://cdn.example.com/icon.png',
     memberCount: 100,
     channels: { cache: channelCache },
@@ -144,7 +146,7 @@ describe('guilds routes', () => {
     mockGuild.members.cache = new Map([['user1', mockMember]]);
 
     mockPool = {
-      query: vi.fn(),
+      query: vi.fn().mockResolvedValue({ rows: [] }),
     };
 
     const client = {
@@ -255,7 +257,50 @@ describe('guilds routes', () => {
       expect(res.body).toHaveLength(1);
       expect(res.body[0].id).toBe('guild1');
       expect(res.body[0].name).toBe('Test Server');
+      expect(res.body[0].icon).toBe('https://cdn.example.com/icon.png');
+      expect(res.body[0].iconHash).toBe('guild-icon-hash');
       expect(res.body[0].memberCount).toBe(100);
+      expect(res.body[0].config).toEqual({ communityHubs: { enabled: false } });
+    });
+
+    it('should return community hub config for guild lists', async () => {
+      getConfig.mockReturnValueOnce({ communityHubs: { enabled: true } });
+
+      const res = await request(app).get('/api/v1/guilds').set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body[0].config).toEqual({ communityHubs: { enabled: true } });
+    });
+
+    it('should format fallback guild icon URLs by hash type', async () => {
+      const staticGuild = { ...mockGuild, iconURL: undefined, icon: 'static-hash' };
+      const animatedGuild = {
+        ...mockGuild,
+        id: 'guild2',
+        iconURL: undefined,
+        icon: 'a_animated-hash',
+      };
+      const client = {
+        guilds: {
+          cache: new Map([
+            ['guild1', staticGuild],
+            ['guild2', animatedGuild],
+          ]),
+        },
+        ws: { status: 0, ping: 42 },
+        user: { tag: 'Bot#1234' },
+      };
+      app = createApp(client, mockPool);
+
+      const res = await request(app).get('/api/v1/guilds').set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.find((guild) => guild.id === 'guild1')?.icon).toBe(
+        'https://cdn.discordapp.com/icons/guild1/static-hash.webp?size=128',
+      );
+      expect(res.body.find((guild) => guild.id === 'guild2')?.icon).toBe(
+        'https://cdn.discordapp.com/icons/guild2/a_animated-hash.gif?size=128',
+      );
     });
 
     it('should return OAuth guilds with access metadata', async () => {
@@ -289,6 +334,22 @@ describe('guilds routes', () => {
       expect(res.body).toHaveLength(1);
       expect(res.body[0].id).toBe('guild1');
       expect(res.body[0].access).toBe('moderator');
+    });
+
+    it('should mark Discord-owned OAuth guilds with owner access', async () => {
+      vi.stubEnv('SESSION_SECRET', 'jwt-test-secret');
+      const token = createOAuthToken();
+      mockFetchGuilds([{ id: 'guild1', name: 'Test Server', owner: true, permissions: '0' }]);
+
+      const res = await request(app).get('/api/v1/guilds').set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0]).toMatchObject({
+        id: 'guild1',
+        owner: true,
+        access: 'owner',
+      });
     });
 
     it('should include admin and moderator access values when both are present', async () => {
@@ -382,7 +443,8 @@ describe('guilds routes', () => {
       const res = await request(app).get('/api/v1/guilds').set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(0);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].access).toBe('viewer');
 
       mockGuild.members.cache = originalCache;
       mockGuild.members.fetch = originalFetch;
@@ -397,6 +459,7 @@ describe('guilds routes', () => {
       expect(res.body.id).toBe('guild1');
       expect(res.body.name).toBe('Test Server');
       expect(res.body.icon).toBe('https://cdn.example.com/icon.png');
+      expect(res.body.iconHash).toBe('guild-icon-hash');
       expect(res.body.memberCount).toBe(100);
       expect(res.body.channels).toBeInstanceOf(Array);
       expect(res.body.channels).toHaveLength(2);
@@ -467,6 +530,73 @@ describe('guilds routes', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.error).toContain('admin access');
+    });
+
+    it('should treat Discord-owned OAuth guilds as admin when falling back to OAuth permissions', async () => {
+      vi.stubEnv('SESSION_SECRET', 'jwt-test-secret');
+      const token = createOAuthToken();
+      const client = {
+        guilds: { cache: new Map() },
+        ws: { status: 0, ping: 42 },
+        user: { tag: 'Bot#1234' },
+      };
+      app = createApp(client, mockPool);
+      mockFetchGuilds([{ id: 'guild1', name: 'Test', owner: true, permissions: '0' }]);
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/config')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Guild not found');
+    });
+
+    it('should treat Discord-owned OAuth guilds as moderators when falling back to OAuth permissions', async () => {
+      vi.stubEnv('SESSION_SECRET', 'jwt-test-secret');
+      const token = createOAuthToken();
+      const client = {
+        guilds: { cache: new Map() },
+        ws: { status: 0, ping: 42 },
+        user: { tag: 'Bot#1234' },
+      };
+      app = createApp(client, mockPool);
+      mockFetchGuilds([{ id: 'guild1', name: 'Test', owner: true, permissions: '0' }]);
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/moderation')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('Guild not found');
+    });
+
+    it('should allow cached-guild OAuth owner fallback when member access is viewer', async () => {
+      vi.stubEnv('SESSION_SECRET', 'jwt-test-secret');
+      const token = createOAuthToken();
+      const viewerGuild = {
+        ...mockGuild,
+        members: {
+          ...mockGuild.members,
+          cache: new Map(),
+          fetch: vi
+            .fn()
+            .mockRejectedValue(Object.assign(new Error('Unknown Member'), { code: 10007 })),
+        },
+      };
+      const client = {
+        guilds: { cache: new Map([['guild1', viewerGuild]]) },
+        ws: { status: 0, ping: 42 },
+        user: { tag: 'Bot#1234' },
+      };
+      app = createApp(client, mockPool);
+      mockFetchGuilds([{ id: 'guild1', name: 'Test', owner: true, permissions: '0' }]);
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/config')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(viewerGuild.members.fetch).toHaveBeenCalledWith('user1');
     });
 
     it('should deny OAuth users not in the guild', async () => {
@@ -962,7 +1092,7 @@ describe('guilds routes', () => {
               active_users: 10,
             },
           ],
-        })
+        }) // kpiResult
         .mockResolvedValueOnce({
           rows: [
             {
@@ -971,7 +1101,7 @@ describe('guilds routes', () => {
               ai_requests: 40,
             },
           ],
-        })
+        }) // volumeResult
         .mockResolvedValueOnce({
           rows: [
             {
@@ -979,7 +1109,7 @@ describe('guilds routes', () => {
               messages: 80,
             },
           ],
-        })
+        }) // channelResult
         .mockResolvedValueOnce({
           rows: [
             {
@@ -988,19 +1118,24 @@ describe('guilds routes', () => {
               messages: 12,
             },
           ],
-        })
-        .mockResolvedValueOnce({ rows: [] })
+        }) // heatmapResult
+        .mockResolvedValueOnce({ rows: [] }) // commandUsageResult
         .mockResolvedValueOnce({
           rows: [
             {
               tracked_users: 25,
-              total_messages_sent: 500,
-              total_reactions_given: 120,
-              total_reactions_received: 98,
-              avg_messages_per_user: 20.0,
+              user_messages: 100,
             },
           ],
-        })
+        }) // userEngagementResult
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              peak_hour: 14,
+              count: 50,
+            },
+          ],
+        }) // peakHourResult
         .mockResolvedValueOnce({
           rows: [
             {
@@ -1010,7 +1145,38 @@ describe('guilds routes', () => {
               max_level: 12,
             },
           ],
-        })
+        }) // xpEconomyResult
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              model: 'gpt-4o',
+              requests: 40,
+              prompt_tokens: '1000',
+              completion_tokens: '500',
+              cost_usd: 0.05,
+            },
+          ],
+        }) // aiUsageResult
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              type: 'message',
+              actor: 'testuser',
+              detail: 'hello',
+              ts: new Date('2026-02-17T12:00:00.000Z'),
+            },
+          ],
+        }) // recentMessagesResult
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              type: 'command',
+              actor: 'user1',
+              detail: 'help',
+              ts: new Date('2026-02-17T12:01:00.000Z'),
+            },
+          ],
+        }) // recentCommandsResult
         .mockResolvedValueOnce({ rows: [{ count: 3 }] }); // activeAiConversations
 
       const res = await request(app)
@@ -1022,13 +1188,53 @@ describe('guilds routes', () => {
       expect(res.body.kpis.totalMessages).toBe(120);
       expect(res.body.kpis.aiRequests).toBe(40);
       expect(res.body.kpis.activeUsers).toBe(10);
-      expect(res.body.kpis.aiCostUsd).toBeNull();
+      expect(res.body.kpis.aiCostUsd).toBe(0.05);
       expect(res.body.kpis.newMembers).toBeTypeOf('number');
       expect(res.body.realtime.activeAiConversations).toBe(3);
+      const peakHourQuery = mockPool.query.mock.calls.find(([sql]) =>
+        String(sql).includes('AS peak_hour'),
+      )?.[0];
+      expect(peakHourQuery).toContain("AND role = 'user'");
+      const engagementQuery = mockPool.query.mock.calls.find(([sql]) =>
+        String(sql).includes('AS tracked_users'),
+      )?.[0];
+      expect(engagementQuery).toContain("COALESCE('id:' || NULLIF(user_id, '')");
+      expect(engagementQuery).toContain("'name:' || NULLIF(username, '')");
+      const aiUsageQuery = mockPool.query.mock.calls.find(([sql]) =>
+        String(sql).includes('FROM ai_usage'),
+      )?.[0];
+      expect(aiUsageQuery).toContain('COALESCE(SUM(input_tokens), 0)::bigint AS prompt_tokens');
+      expect(aiUsageQuery).toContain(
+        'COALESCE(SUM(output_tokens), 0)::bigint AS completion_tokens',
+      );
+      expect(aiUsageQuery).toContain('COALESCE(SUM(cost_usd), 0)::float AS cost_usd');
+      const recentMessagesQuery = mockPool.query.mock.calls.find(([sql]) =>
+        String(sql).includes("'message' as type"),
+      )?.[0];
+      expect(recentMessagesQuery).toContain(
+        "COALESCE(NULLIF(username, ''), '<@' || NULLIF(user_id, '') || '>', 'Unknown user') as actor",
+      );
+      expect(recentMessagesQuery).toContain('SUBSTR(content, 1, 41) as detail');
+      const recentCommandsQuery = mockPool.query.mock.calls.find(
+        ([sql]) =>
+          String(sql).includes('FROM command_usage') && String(sql).includes('LEFT JOIN LATERAL'),
+      )?.[0];
+      expect(recentCommandsQuery).toContain(
+        "COALESCE(command_actor.username, '<@' || command_usage.user_id || '>') as actor",
+      );
+      expect(recentCommandsQuery).toContain('conversations.user_id = command_usage.user_id');
       expect(res.body.aiUsage).toMatchObject({
-        source: 'unavailable',
-        byModel: [],
-        tokens: { prompt: null, completion: null },
+        source: 'ai_usage',
+        byModel: [
+          {
+            model: 'gpt-4o',
+            requests: 40,
+            promptTokens: 1000,
+            completionTokens: 500,
+            costUsd: 0.05,
+          },
+        ],
+        tokens: { prompt: 1000, completion: 500 },
       });
       expect(res.body.channelActivity[0]).toEqual({
         channelId: 'ch1',
@@ -1038,14 +1244,25 @@ describe('guilds routes', () => {
       expect(res.body.messageVolume).toHaveLength(1);
       expect(res.body.topChannels).toEqual(res.body.channelActivity);
       expect(res.body.commandUsage).toEqual({ source: 'command_usage', items: [] });
+      expect(res.body.recentEvents).toEqual([
+        {
+          id: 'command-9a6e74336efc6921',
+          text: 'user1 used /help',
+          timestamp: '2026-02-17T12:01:00.000Z',
+        },
+        {
+          id: 'message-356855a29f981a39',
+          text: 'testuser: hello',
+          timestamp: '2026-02-17T12:00:00.000Z',
+        },
+      ]);
       expect(res.body.heatmap).toHaveLength(1);
       // New: user engagement metrics
       expect(res.body.userEngagement).toEqual({
         trackedUsers: 25,
-        totalMessagesSent: 500,
-        totalReactionsGiven: 120,
-        totalReactionsReceived: 98,
-        avgMessagesPerUser: 20,
+        avgMessagesPerUser: 4,
+        aiResponseRate: 40,
+        peakHour: 14,
       });
       // New: XP economy
       expect(res.body.xpEconomy).toEqual({
@@ -1056,15 +1273,104 @@ describe('guilds routes', () => {
       });
     });
 
-    it('should recompute member-cache-derived new member KPIs when analytics DB payload is cached', async () => {
-      const analyticsCache = new Map();
-      let analyticsFactoryCalls = 0;
-      cacheGetOrSet.mockImplementation(async (key, factory) => {
-        if (!analyticsCache.has(key)) {
-          analyticsFactoryCalls++;
-          analyticsCache.set(key, await factory());
+    it('should only add recent message ellipsis when the fetched preview is truncated', async () => {
+      const exactForty = 'x'.repeat(40);
+      const overForty = 'y'.repeat(41);
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('AS total_messages')) {
+          return Promise.resolve({
+            rows: [{ total_messages: 2, ai_requests: 0, active_users: 1 }],
+          });
         }
-        return analyticsCache.get(key);
+        if (query.includes("'message' as type")) {
+          return Promise.resolve({
+            rows: [
+              {
+                type: 'message',
+                actor: 'exact',
+                detail: exactForty,
+                ts: new Date('2026-02-17T12:00:00.000Z'),
+              },
+              {
+                type: 'message',
+                actor: 'truncated',
+                detail: overForty,
+                ts: new Date('2026-02-17T12:01:00.000Z'),
+              },
+            ],
+          });
+        }
+        if (
+          query.includes('activeAiConversations') ||
+          query.includes('COUNT(DISTINCT channel_id)')
+        ) {
+          return Promise.resolve({ rows: [{ count: 0 }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/analytics?range=week')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.recentEvents.map((event) => event.text)).toEqual([
+        `truncated: ${'y'.repeat(40)}...`,
+        `exact: ${exactForty}`,
+      ]);
+    });
+
+    it('should warn and return empty recent events when recent event queries fail', async () => {
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('AS total_messages')) {
+          return Promise.resolve({
+            rows: [{ total_messages: 1, ai_requests: 0, active_users: 1 }],
+          });
+        }
+        if (query.includes("'message' as type")) {
+          return Promise.reject(new Error('recent messages unavailable'));
+        }
+        if (query.includes('LEFT JOIN LATERAL')) {
+          return Promise.reject(new Error('recent commands unavailable'));
+        }
+        if (query.includes('COUNT(DISTINCT channel_id)')) {
+          return Promise.resolve({ rows: [{ count: 0 }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/analytics?range=week')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.recentEvents).toEqual([]);
+      expect(warn).toHaveBeenCalledWith(
+        'Recent messages query failed; returning empty recent messages dataset',
+        expect.objectContaining({ guild: 'guild1', error: 'recent messages unavailable' }),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        'Recent commands query failed; returning empty recent commands dataset',
+        expect.objectContaining({ guild: 'guild1', error: 'recent commands unavailable' }),
+      );
+    });
+
+    it('should recompute member-cache-derived new member KPIs when analytics DB payload is cached', async () => {
+      const cache = new Map();
+      let analyticsFactoryCalls = 0;
+      let recentEventsFactoryCalls = 0;
+      cacheGetOrSet.mockImplementation(async (key, factory) => {
+        if (!cache.has(key)) {
+          if (String(key).startsWith('analytics:recent-events:')) {
+            recentEventsFactoryCalls++;
+          } else {
+            analyticsFactoryCalls++;
+          }
+          cache.set(key, await factory());
+        }
+        return cache.get(key);
       });
 
       mockPool.query
@@ -1086,6 +1392,7 @@ describe('guilds routes', () => {
       expect(first.body.kpis.newMembers).toBe(0);
       expect(first.body.comparison.kpis.newMembers).toBe(0);
       expect(analyticsFactoryCalls).toBe(1);
+      expect(recentEventsFactoryCalls).toBe(1);
       const queryCountAfterFirst = mockPool.query.mock.calls.length;
 
       const currentJoinedTimestamp = Math.floor(
@@ -1116,6 +1423,7 @@ describe('guilds routes', () => {
       expect(second.body.kpis.newMembers).toBe(1);
       expect(second.body.comparison.kpis.newMembers).toBe(1);
       expect(analyticsFactoryCalls).toBe(1);
+      expect(recentEventsFactoryCalls).toBe(1);
       expect(mockPool.query.mock.calls.length).toBe(queryCountAfterFirst + 1);
     });
 
@@ -1250,6 +1558,9 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // activeAiConversations
 
       const res = await request(app)
@@ -1266,7 +1577,9 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
@@ -1289,16 +1602,20 @@ describe('guilds routes', () => {
       mockPool.query
         .mockResolvedValueOnce({
           rows: [{ total_messages: 12, ai_requests: 6, active_users: 4 }],
-        })
+        }) // kpi
         .mockResolvedValueOnce({
           rows: [{ total_messages: 8, ai_requests: 4, active_users: 3 }],
-        })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ command_name: 'help', uses: 5 }] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
+        }) // comparisonKpi
+        .mockResolvedValueOnce({ rows: [] }) // volume
+        .mockResolvedValueOnce({ rows: [] }) // channel
+        .mockResolvedValueOnce({ rows: [] }) // heatmap
+        .mockResolvedValueOnce({ rows: [{ command_name: 'help', uses: 5 }] }) // commandUsage
+        .mockResolvedValueOnce({ rows: [] }) // userEngagement
+        .mockResolvedValueOnce({ rows: [] }) // peakHour
+        .mockResolvedValueOnce({ rows: [] }) // xpEconomy
+        .mockResolvedValueOnce({ rows: [] }) // recentMessages
+        .mockResolvedValueOnce({ rows: [] }) // recentCommands
+        .mockResolvedValueOnce({ rows: [] }) // aiUsage
         .mockResolvedValueOnce({ rows: [{ count: 1 }] }); // activeAiConversations
 
       const res = await request(app)
@@ -1321,15 +1638,55 @@ describe('guilds routes', () => {
       expect(comparisonKpiQuery).toContain('channel_id = $4');
     });
 
+    it('should warn and return null peakHour when the peak-hour query fails', async () => {
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('AS total_messages')) {
+          return Promise.resolve({
+            rows: [{ total_messages: 4, ai_requests: 1, active_users: 2 }],
+          });
+        }
+        if (query.includes('AS tracked_users')) {
+          return Promise.resolve({ rows: [{ tracked_users: 2, user_messages: 4 }] });
+        }
+        if (query.includes('AS peak_hour')) {
+          return Promise.reject(new Error('peak hour unavailable'));
+        }
+        if (query.includes('COUNT(DISTINCT channel_id)')) {
+          return Promise.resolve({ rows: [{ count: 0 }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/analytics?range=week')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.userEngagement).toMatchObject({
+        trackedUsers: 2,
+        avgMessagesPerUser: 2,
+        peakHour: null,
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'Peak hour query failed; returning empty peak hour dataset',
+        expect.objectContaining({ guild: 'guild1', error: 'peak hour unavailable' }),
+      );
+    });
+
     it('should mark command usage source unavailable when command query fails', async () => {
       mockPool.query
-        .mockResolvedValueOnce({ rows: [{ total_messages: 1, ai_requests: 1, active_users: 1 }] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
-        .mockRejectedValueOnce(new Error('command logs missing'))
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ total_messages: 1, ai_requests: 1, active_users: 1 }] }) // kpi
+        .mockResolvedValueOnce({ rows: [] }) // volume
+        .mockResolvedValueOnce({ rows: [] }) // channel
+        .mockResolvedValueOnce({ rows: [] }) // heatmap
+        .mockRejectedValueOnce(new Error('command logs missing')) // commandUsageResult
+        .mockResolvedValueOnce({ rows: [] }) // userEngagementResult
+        .mockResolvedValueOnce({ rows: [] }) // peakHourResult
+        .mockResolvedValueOnce({ rows: [] }) // xpEconomyResult
+        .mockResolvedValueOnce({ rows: [] }) // recentMessagesResult
+        .mockResolvedValueOnce({ rows: [] }) // recentCommandsResult
+        .mockResolvedValueOnce({ rows: [] }) // aiUsageResult
         .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // activeAiConversations
 
       const res = await request(app)
@@ -1343,6 +1700,10 @@ describe('guilds routes', () => {
     it('should not query persisted logs and should mark AI usage unavailable for analytics', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ total_messages: 1, ai_requests: 1, active_users: 1 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
@@ -1377,6 +1738,10 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ count: 0 }] });
 
       const res = await request(app)
@@ -1397,10 +1762,11 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('user_stats table missing')) // userEngagement
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockRejectedValueOnce(new Error('user_stats table missing'))
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // activeAiConversations
 
@@ -1418,11 +1784,12 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: 0 }] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('reputation table missing')) // xpEconomy
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockRejectedValueOnce(new Error('reputation table missing'))
         .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // activeAiConversations
 
       const res = await request(app)
@@ -1439,11 +1806,12 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [{ count: 0 }] })
-        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] }) // userEngagementResult: empty
         .mockResolvedValueOnce({ rows: [] }) // xpEconomyResult: empty
+        .mockResolvedValueOnce({ rows: [] }) // recentMessagesResult: empty
+        .mockResolvedValueOnce({ rows: [] }) // recentCommandsResult: empty
+        .mockResolvedValueOnce({ rows: [] }) // aiUsageResult: empty
         .mockResolvedValueOnce({ rows: [{ count: 0 }] }); // activeAiConversations
 
       const res = await request(app)
@@ -1548,6 +1916,39 @@ describe('guilds routes', () => {
 
       expect(res.status).toBe(200);
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('should allow cached-guild OAuth moderator fallback when member access is viewer', async () => {
+      vi.stubEnv('SESSION_SECRET', 'jwt-test-secret');
+      const token = createOAuthToken();
+      const viewerGuild = {
+        ...mockGuild,
+        members: {
+          ...mockGuild.members,
+          cache: new Map(),
+          fetch: vi
+            .fn()
+            .mockRejectedValue(Object.assign(new Error('Unknown Member'), { code: 10007 })),
+        },
+      };
+      const client = {
+        guilds: { cache: new Map([['guild1', viewerGuild]]) },
+        ws: { status: 0, ping: 42 },
+        user: { tag: 'Bot#1234' },
+      };
+      app = createApp(client, mockPool);
+      mockFetchGuilds([{ id: 'guild1', name: 'Test', permissions: String(0x20) }]);
+      mockPool.query.mockResolvedValueOnce({ rows: [{ count: 1 }] }).mockResolvedValueOnce({
+        rows: [{ id: 1, case_number: 1, action: 'warn', guild_id: 'guild1' }],
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/moderation')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(viewerGuild.members.fetch).toHaveBeenCalledWith('user1');
     });
 
     it('should deny OAuth users without moderator permissions', async () => {

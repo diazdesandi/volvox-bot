@@ -1,6 +1,7 @@
 'use client';
 
-import { Copy, Info, RefreshCw, Send } from 'lucide-react';
+import { ChevronRight, Copy, Info, RefreshCw, Send } from 'lucide-react';
+import { Collapsible as CollapsiblePrimitive } from 'radix-ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AiModelSelect } from '@/components/dashboard/ai-model-select';
@@ -451,6 +452,22 @@ export function OnboardingGrowthCategory() {
     [publishWelcomePanel],
   );
 
+  const highlightAvailableChannels = useMemo(
+    () =>
+      guildChannels.filter(
+        (c) => !(draftConfig?.welcome?.dynamic?.excludeChannels ?? []).includes(c.id),
+      ),
+    [guildChannels, draftConfig?.welcome?.dynamic?.excludeChannels],
+  );
+
+  const excludeAvailableChannels = useMemo(
+    () =>
+      guildChannels.filter(
+        (c) => !(draftConfig?.welcome?.dynamic?.highlightChannels ?? []).includes(c.id),
+      ),
+    [guildChannels, draftConfig?.welcome?.dynamic?.highlightChannels],
+  );
+
   const welcomeRoleOptions = useMemo(
     () =>
       (draftConfig?.welcome?.roleMenu?.options ?? []).map((option) => ({
@@ -775,12 +792,12 @@ export function OnboardingGrowthCategory() {
               </div>
             </div>
 
-            <details className="group">
-              <summary className="cursor-pointer text-xs font-bold uppercase tracking-widest text-muted-foreground/60 hover:text-primary transition-colors flex items-center gap-2">
+            <CollapsiblePrimitive.Root className="group">
+              <CollapsiblePrimitive.Trigger className="flex cursor-pointer items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground/60 transition-colors hover:text-primary">
+                <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-90" />
                 <span>View Variables Guide</span>
-                <Info className="h-3 w-3" />
-              </summary>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-muted/10 border border-border/30">
+              </CollapsiblePrimitive.Trigger>
+              <CollapsiblePrimitive.Content className="mt-4 grid grid-cols-1 gap-4 rounded-xl border border-border/30 bg-muted/10 p-4 md:grid-cols-2">
                 <div className="space-y-2 text-xs">
                   <p className="font-bold text-foreground/70 uppercase">Static Variables</p>
                   <ul className="space-y-1 text-muted-foreground">
@@ -801,8 +818,8 @@ export function OnboardingGrowthCategory() {
                     ))}
                   </ul>
                 </div>
-              </div>
-            </details>
+              </CollapsiblePrimitive.Content>
+            </CollapsiblePrimitive.Root>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 pt-4 border-t border-border/40">
               <div className="space-y-2">
@@ -838,6 +855,7 @@ export function OnboardingGrowthCategory() {
                   filter="text"
                 />
               </div>
+
               <div className="space-y-2">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1">
                   Role Menu
@@ -898,9 +916,12 @@ export function OnboardingGrowthCategory() {
             <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <h3 className="text-sm font-bold text-foreground/90">Engine Intelligence</h3>
-                  <p className="text-[11px] text-muted-foreground/60 font-medium">
-                    Enable context-aware dynamic variables.
+                  <h3 className="text-sm font-bold text-foreground/90">
+                    AI-Powered Personalization
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground/60 font-medium leading-relaxed">
+                    Allows the bot to use server context (like active channels or member milestones)
+                    to personalize welcome messages.
                   </p>
                 </div>
                 <ToggleSwitch
@@ -952,6 +973,7 @@ export function OnboardingGrowthCategory() {
                     onChange={(v) => updateWelcomeDynamic('highlightChannels', v)}
                     disabled={saving}
                     filter="text"
+                    channels={highlightAvailableChannels}
                   />
                 </div>
                 <div className="space-y-2">
@@ -964,6 +986,7 @@ export function OnboardingGrowthCategory() {
                     onChange={(v) => updateWelcomeDynamic('excludeChannels', v)}
                     disabled={saving}
                     filter="text"
+                    channels={excludeAvailableChannels}
                   />
                 </div>
               </div>

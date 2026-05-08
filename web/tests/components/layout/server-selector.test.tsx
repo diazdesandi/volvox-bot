@@ -136,6 +136,32 @@ describe('ServerSelector', () => {
     });
   });
 
+  it('uses renderable guild icon urls directly', async () => {
+    const iconUrl = 'https://cdn.example.com/guild-icon.webp';
+    const guilds = [
+      {
+        id: '1',
+        name: 'Icon Server',
+        icon: iconUrl,
+        iconHash: 'guild-icon-hash',
+        owner: true,
+        permissions: '8',
+        features: [],
+        botPresent: true,
+      },
+    ];
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    await waitFor(() => {
+      expect(screen.getByAltText('Icon Server')).toHaveAttribute('src', iconUrl);
+    });
+  });
+
   it('shares the guild directory fetch across multiple server selectors', async () => {
     const guilds = [
       {
@@ -343,6 +369,39 @@ describe('ServerSelector', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /No Access/i }));
     expect(await screen.findByText(/Administrative clearance required/i)).toBeInTheDocument();
+    expect(mockBroadcastSelectedGuild).not.toHaveBeenCalled();
+  });
+
+  it('shows enabled member-only community hubs', async () => {
+    const user = userEvent.setup();
+    const guilds = [
+      {
+        id: "viewer-1",
+        name: "Viewer Hub",
+        icon: null,
+        owner: false,
+        permissions: "0",
+        features: [],
+        botPresent: true,
+        config: { communityHubs: { enabled: true } },
+      },
+    ];
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Community Hubs/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Community Hubs/i }));
+
+    const hubLink = await screen.findByRole("menuitem", { name: /Viewer Hub/i });
+    expect(hubLink).toHaveAttribute("href", "/community/viewer-1");
     expect(mockBroadcastSelectedGuild).not.toHaveBeenCalled();
   });
 

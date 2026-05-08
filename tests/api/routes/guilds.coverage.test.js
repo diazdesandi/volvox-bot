@@ -255,7 +255,7 @@ describe('guilds routes coverage', () => {
         .send({ action: 'sendMessage', channelId: 'ch1', content: 'hello' });
 
       expect(res.status).toBe(403);
-      expect(res.body.error).toContain('admin access');
+      expect(res.body.error).toContain('API secret');
     });
 
     it('returns 400 when body is missing', async () => {

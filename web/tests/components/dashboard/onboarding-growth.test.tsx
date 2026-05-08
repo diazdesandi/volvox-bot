@@ -25,8 +25,12 @@ vi.mock('@/components/dashboard/config-context', () => ({
 }));
 
 vi.mock('@/components/layout/channel-directory-context', () => ({
+  ChannelDirectoryProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useGuildChannels: () => ({
     channels: [
+      { id: 'general', name: 'general', type: 0 },
+      { id: 'introductions', name: 'introductions', type: 0 },
+      { id: 'announcements', name: 'announcements', type: 0 },
       { id: 'rules-channel', name: 'rules', type: 0 },
       { id: 'welcome-channel', name: 'welcome', type: 0 },
       { id: 'new-channel', name: 'introductions', type: 0 },

@@ -51,10 +51,15 @@ export interface CommandUsageEntry {
 
 export interface UserEngagementMetrics {
   trackedUsers: number;
-  totalMessagesSent: number;
-  totalReactionsGiven: number;
-  totalReactionsReceived: number;
   avgMessagesPerUser: number;
+  aiResponseRate: number;
+  peakHour: number | null;
+}
+
+export interface ActivityEvent {
+  id: string;
+  text: string;
+  timestamp: string;
 }
 
 export interface XpEconomy {
@@ -84,6 +89,7 @@ export interface DashboardAnalytics {
     source: string;
     items: CommandUsageEntry[];
   };
+  recentEvents?: ActivityEvent[];
   comparison?: {
     previousRange: {
       from: string;

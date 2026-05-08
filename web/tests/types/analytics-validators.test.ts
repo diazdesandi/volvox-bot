@@ -53,6 +53,117 @@ describe('isDashboardAnalyticsPayload', () => {
     expect(isDashboardAnalyticsPayload(basePayload)).toBe(true);
   });
 
+  it('accepts full user engagement and recent events data', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 40,
+          peakHour: 14,
+        },
+        recentEvents: [
+          { id: '1', text: 'Event 1', timestamp: '2026-02-01T12:00:00Z' },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it('accepts recentEvents as undefined (optional field)', () => {
+    const payload = { ...basePayload, recentEvents: undefined };
+    expect(isDashboardAnalyticsPayload(payload)).toBe(true);
+  });
+
+  it('accepts an empty recentEvents array', () => {
+    expect(
+      isDashboardAnalyticsPayload({ ...basePayload, recentEvents: [] }),
+    ).toBe(true);
+  });
+
+  it('rejects recentEvents entries missing the id field', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        recentEvents: [{ text: 'hello', timestamp: '2026-01-01T00:00:00Z' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects recentEvents entries with a non-string text field', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        recentEvents: [{ id: '1', text: 42, timestamp: '2026-01-01T00:00:00Z' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects recentEvents entries with a missing timestamp', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        recentEvents: [{ id: '1', text: 'hello' }],
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects userEngagement missing aiResponseRate', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          peakHour: 14,
+          // aiResponseRate is missing
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects userEngagement where aiResponseRate is not a number', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 'high',
+          peakHour: 14,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('accepts userEngagement with peakHour=null', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 33.3,
+          peakHour: null,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects userEngagement where peakHour is a string', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 33.3,
+          peakHour: '14',
+        },
+      }),
+    ).toBe(false);
+  });
+
   it('rejects unavailable AI cost values that are omitted or non-numeric', () => {
     expect(
       isDashboardAnalyticsPayload({
