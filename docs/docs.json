@@ -41,7 +41,8 @@
               "configuration/permissions"
             ]
           }
-        ]
+        ],
+        "icon": "book"
       },
       {
         "tab": "Support",
@@ -55,13 +56,15 @@
               "manual-test-plan"
             ]
           }
-        ]
+        ],
+        "icon": "phone-arrow-up-right"
       },
       {
         "tab": "Changelog",
         "pages": [
           "changelog"
-        ]
+        ],
+        "icon": "page-caret-up"
       }
     ]
   },
@@ -73,7 +76,12 @@
   "footer": {
     "socials": {
       "github": "https://github.com/VolvoxLLC/volvox-bot",
-      "discord": "https://discord.gg/8ahXACdamN"
+      "discord": "https://discord.gg/8ahXACdamN",
+      "x": "https://x.com/volvoxdev",
+      "linkedin": "https://www.linkedin.com/company/volvoxllc",
+      "youtube": "https://www.youtube.com/@volvox_llc",
+      "instagram": "https://www.instagram.com/volvox_llc",
+      "website": "https://volvox.dev"
     }
   },
   "background": {
