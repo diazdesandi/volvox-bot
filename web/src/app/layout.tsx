@@ -55,7 +55,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className="dark"
+      style={{ backgroundColor: '#10110e', colorScheme: 'dark' }}
+      suppressHydrationWarning
+    >
       <body
         className={`font-sans ${manrope.variable} ${jetbrainsMono.variable}`}
         suppressHydrationWarning
