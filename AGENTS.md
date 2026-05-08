@@ -5,6 +5,7 @@ Repo-specific operating rules for agents working on Volvox.Bot. Keep this file s
 ## Start Here
 
 - Use Node 22+ and the latest `pnpm`.
+- Keep pnpm workspace-wide security pins and build-script approvals in `pnpm-workspace.yaml`; pnpm 11 expects `overrides` and `allowBuilds` there for workspace installs.
 - Read the relevant code before changing it. Prefer existing patterns over new abstractions.
 - For UI/UX work, read `DESIGN.md` before touching code. This includes dashboard, landing page, shared UI primitives, theme/token, layout, and visual copy changes.
 - Run the narrowest meaningful verification while iterating, then run broader repo gates when the blast radius justifies it.
