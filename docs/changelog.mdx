@@ -4,6 +4,20 @@ sidebarTitle: Changelog
 description: 'Release notes for Volvox.Bot covering new features, dashboard improvements, AI moderation updates, and bug fixes for the Discord bot platform.'
 ---
 
+<Update label="2026-05-08" description="May 2026" tags={["Features", "Improvements"]}>
+## New features
+
+**Customizable onboarding panel messages** — Tailor the copy on your rules, role menu, and introduction panels directly from the [dashboard](/dashboard) under Onboarding & Growth. Each panel has its own Discord markdown editor (up to 2000 characters), so you can match your server's tone instead of relying on the defaults.
+
+**Introduction prompt variables** — The new introduction prompt supports template variables: `{{user}}` mentions the new member, `{{username}}` prints their plain name without a ping, and `{{server}}` inserts your server's name. Combine them to write a warm, personal welcome — for example, `Welcome {{user}}! Tell {{server}} a bit about yourself.`
+
+**Dedicated role menu publishing** — `/welcome setup` and the dashboard now publish the rules and role menu panels independently, with per-panel status feedback. Publish a single panel without touching the other, and see clear success, warning, or failure messages for each.
+
+## Improvements
+
+**More reliable welcome publishing** — Welcome publish routes are rate-limited and validate channels per guild, so misconfigured publishes fail fast with a useful error. The bot also surfaces persistence warnings on the dashboard when Discord delivery succeeds but state can't be saved, so you know to retry.
+</Update>
+
 <Update label="2026-05-07" description="May 2026" tags={["Improvements", "Fixes"]}>
 ## Improvements
 
