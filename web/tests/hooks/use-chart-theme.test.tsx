@@ -15,10 +15,10 @@ describe('useChartTheme', () => {
     mockResolvedTheme = undefined;
   });
 
-  it('returns light palette by default (before mount)', () => {
-    mockResolvedTheme = 'light';
+  it('returns dark palette by default when the theme is not resolved', () => {
+    mockResolvedTheme = undefined;
     const { result } = renderHook(() => useChartTheme());
-    expect(result.current.primary).toBe('#5865F2');
+    expect(result.current.primary).toBe('#818CF8');
   });
 
   it('returns light palette when theme is light after mount', async () => {
@@ -41,11 +41,11 @@ describe('useChartTheme', () => {
     expect(result.current.palette).toHaveLength(5);
   });
 
-  it('returns light palette when resolvedTheme is undefined after mount', async () => {
+  it('returns dark palette when resolvedTheme is undefined after mount', async () => {
     mockResolvedTheme = undefined;
     const { result } = renderHook(() => useChartTheme());
     await act(async () => {});
-    expect(result.current.primary).toBe('#5865F2');
+    expect(result.current.primary).toBe('#818CF8');
   });
 
   it('palette has 5 hex colors in light mode', async () => {

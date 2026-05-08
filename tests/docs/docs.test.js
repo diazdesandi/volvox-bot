@@ -108,6 +108,13 @@ describe('docs/docs.json', () => {
     expect(config.$schema).toContain('mintlify');
   });
 
+  it('defaults the docs appearance to dark mode', () => {
+    const config = getConfig();
+
+    expect(config).toHaveProperty('appearance');
+    expect(config.appearance).toHaveProperty('default', 'dark');
+  });
+
   it('has navigation.tabs array', () => {
     const config = getConfig();
 

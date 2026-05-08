@@ -6,8 +6,8 @@ import type * as React from 'react';
 /**
  * Theme provider wrapper for next-themes.
  *
- * Provides system-aware dark/light mode support with CSS variable theming.
- * Defaults to system preference on first load.
+ * Provides dark/light mode support with CSS variable theming.
+ * Defaults to dark mode on first load while still allowing system preference.
  */
 export function ThemeProvider({
   children,

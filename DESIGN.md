@@ -14,6 +14,7 @@ Avoid returning to the older neon-green/purple marketing style. The app now uses
 
 - Next.js App Router with Tailwind CSS v4.
 - Theme switching is class-based through `next-themes` and the `.dark` class on `<html>`.
+- Website first load defaults to dark mode, while users can still switch to light or system preference.
 - Fonts are loaded in `web/src/app/layout.tsx`.
 - Shared tokens live in `web/src/app/globals.css`.
 - Use `lucide-react` for interface icons.

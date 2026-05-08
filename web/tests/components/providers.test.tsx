@@ -47,8 +47,22 @@ vi.mock('@/hooks/use-guild-selection', () => ({
 }));
 
 vi.mock('@/components/theme-provider', () => ({
-  ThemeProvider: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="theme-provider">{children}</div>
+  ThemeProvider: ({
+    children,
+    defaultTheme,
+    enableSystem,
+  }: {
+    children: React.ReactNode;
+    defaultTheme?: string;
+    enableSystem?: boolean;
+  }) => (
+    <div
+      data-enable-system={String(enableSystem)}
+      data-default-theme={defaultTheme}
+      data-testid="theme-provider"
+    >
+      {children}
+    </div>
   ),
 }));
 
@@ -80,10 +94,12 @@ describe('Providers', () => {
     const child = screen.getByTestId('child');
 
     expect(sessionProvider).toContainElement(child);
+    expect(screen.getByTestId('theme-provider')).toHaveAttribute('data-default-theme', 'dark');
+    expect(screen.getByTestId('theme-provider')).toHaveAttribute('data-enable-system', 'true');
     expect(screen.getByTestId('toaster')).toHaveAttribute('data-theme', 'dark');
   });
 
-  it('falls back to the system theme when no resolved theme exists', () => {
+  it('falls back to the dark theme when no resolved theme exists', () => {
     mockUseTheme.mockReturnValue({ resolvedTheme: undefined });
 
     render(
@@ -92,7 +108,7 @@ describe('Providers', () => {
       </Providers>,
     );
 
-    expect(screen.getByTestId('toaster')).toHaveAttribute('data-theme', 'system');
+    expect(screen.getByTestId('toaster')).toHaveAttribute('data-theme', 'dark');
   });
 
   it('sets Sentry route and guild context tags for authenticated dashboard routes', () => {

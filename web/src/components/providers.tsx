@@ -72,14 +72,14 @@ function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
 /**
  * Render a global Toaster that follows the resolved application theme.
  *
- * @returns A React element mounting a Toaster at the bottom-right with its theme set to 'light' or 'dark' when available, otherwise 'system'; `richColors` enabled.
+ * @returns A React element mounting a Toaster at the bottom-right with its theme set to 'light' or 'dark' when available, otherwise 'dark'; `richColors` enabled.
  */
 function ThemedToaster() {
   const { resolvedTheme } = useTheme();
   return (
     <Toaster
       position="bottom-right"
-      theme={(resolvedTheme as 'light' | 'dark') ?? 'system'}
+      theme={(resolvedTheme as 'light' | 'dark') ?? 'dark'}
       richColors
     />
   );
@@ -169,7 +169,7 @@ function AmplitudeContextBridge() {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
         <SentryContextBridge />
         <AmplitudeContextBridge />
         {children}

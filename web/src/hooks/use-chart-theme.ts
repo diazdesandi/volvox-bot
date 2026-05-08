@@ -67,7 +67,7 @@ const DARK_THEME: ChartTheme = {
  * Returns a theme-aware color palette for use in recharts components.
  *
  * Handles hydration safely by deferring until after mount. Returns the
- * light theme on first render to avoid a flash of incorrect colors.
+ * dark theme on first render to match the application default.
  *
  * @example
  * const chart = useChartTheme();
@@ -82,8 +82,8 @@ export function useChartTheme(): ChartTheme {
     setMounted(true);
   }, []);
 
-  // Before mount (SSR / hydration): use light theme to match default
-  if (!mounted) return LIGHT_THEME;
+  // Before mount (SSR / hydration): use dark theme to match default
+  if (!mounted) return DARK_THEME;
 
-  return resolvedTheme === 'dark' ? DARK_THEME : LIGHT_THEME;
+  return resolvedTheme === 'light' ? LIGHT_THEME : DARK_THEME;
 }
