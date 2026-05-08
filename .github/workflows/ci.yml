@@ -220,4 +220,4 @@ jobs:
         run: docker build --tag volvox-bot-ci:${{ github.sha }} --file Dockerfile .
 
       - name: Build web Docker image
-        run: docker build --tag volvox-web-ci:${{ github.sha }} --file web/Dockerfile web
+        run: docker build --tag volvox-web-ci:${{ github.sha }} --file web/Dockerfile .
