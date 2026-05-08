@@ -84,5 +84,40 @@
   },
   "appearance": {
     "default": "dark"
+  },
+  "description": "Volvox.Bot Docs",
+  "navbar": {
+    "links": [
+      {
+        "label": "Home",
+        "href": "https://volvox.bot/"
+      },
+      {
+        "label": "Dashboard",
+        "href": "https://volvox.bot/dashboard"
+      },
+      {
+        "label": "Discord Server",
+        "href": "https://discord.gg/8ahXACdamN"
+      }
+    ]
+  },
+  "integrations": {
+    "amplitude": {
+      "apiKey": "79eb88beb56ef55eb7cabd0aa26118bb"
+    }
+  },
+  "interaction": {
+    "drilldown": true
+  },
+  "seo": {
+    "indexing": "all"
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "fonts": {
+    "family": "Open Sans",
+    "weight": 400
   }
 }
