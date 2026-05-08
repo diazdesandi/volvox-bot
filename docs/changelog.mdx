@@ -7,7 +7,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-07" description="May 2026" tags={["Improvements", "Fixes"]}>
 ## Improvements
 
-**Dark mode by default** — The [dashboard](/dashboard) and the documentation site now load in dark mode on first visit, matching the rest of the Volvox.Bot brand. You can still switch to light mode or follow your system preference from the theme toggle — your choice is remembered across sessions. Charts, toasts, and other themed surfaces pick up the new default automatically.
+**Dark mode by default** — The [dashboard](/dashboard) and the documentation site now load in dark mode on first visit, matching the rest of the Volvox.Bot brand. You can still switch to light mode or follow your system preference from the theme toggle — we remember your choice across sessions. Charts, toasts, and other themed surfaces pick up the new default automatically.
 
 ## Fixes
 
@@ -83,7 +83,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Welcome publish reliability** — We resolved several welcome-panel publishing edge cases — split payloads, status mismatches, persistence gaps, channel-change cleanup, and rate-limited publish routes — and now handle them more gracefully.
 
-**AI auto-mod stability** — We hardened prompt handling, action reporting, and case/flag log writes so AI auto-moderation behaves predictably under unusual server conditions.
+**AI auto-moderation stability** — We hardened prompt handling, action reporting, and case/flag log writes so AI auto-moderation behaves predictably under unusual server conditions.
 </Update>
 
 <Update label="2026-04-26" description="April 2026" tags={["Features", "Improvements"]}>
@@ -113,7 +113,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Faster dashboard selectors** — Role and channel pickers across the dashboard load faster and refresh without a full page reload when Discord updates. New roles and channels appear sooner, and switching between pages reuses cached data.
 
-**Starboard moved to Community Tools** — Starboard settings now live under **Community Tools** in the [dashboard](/dashboard) instead of **Moderation & Safety**, grouping it with other member-facing utilities.
+**We moved Starboard to Community Tools** — Starboard settings now live under **Community Tools** in the [dashboard](/dashboard) instead of **Moderation & Safety**, grouping it with other member-facing utilities.
 
 **Version label in the dashboard** — The dashboard sidebar and landing footer now display the current Volvox.Bot version, making it easier to confirm which build you're on.
 </Update>
@@ -163,7 +163,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Fixes
 
-**More reliable bot responses** — Reminders, moderation, reaction roles, and other features now handle command-response failures gracefully (e.g., blocked DMs or deleted channels) instead of failing silently.
+**More reliable bot responses** — Reminders, moderation, reaction roles, and other features now handle command-response failures gracefully (for example, blocked DMs or deleted channels) instead of failing silently.
 
 **Bot owners setting removed** — We removed the "Bot Owners" editor from dashboard Permissions settings. You now manage bot ownership via environment configuration only.
 </Update>
