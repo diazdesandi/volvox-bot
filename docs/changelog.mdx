@@ -11,13 +11,13 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Owner access level** — Server owners now consistently get full admin access on the dashboard, regardless of role permissions. The dashboard and API access enum is now `[owner, admin, moderator, viewer]`. See [Permissions](/configuration/permissions) for the role breakdown.
 
-**Real engagement metrics on Analytics** — The Analytics overview replaced reaction counts with metrics tied to live activity: **Active Users**, **Avg messages per user**, **AI response rate**, and **Peak activity hour**. The page also adds a **Recent events** feed (last 10 messages and slash command uses) and a per-model **AI usage** breakdown showing requests, prompt and completion tokens, and cost in USD when usage data is available. See [Analytics](/features/analytics).
+**Real engagement metrics on Analytics** — The Analytics overview replaced reaction counts with metrics tied to live activity: **Active Users**, **Avg messages per user**, **AI response rate**, and **Peak activity hour**. The page also adds a **Recent events** feed (last 10 messages and slash command uses) and a per-model **AI usage** breakdown. The breakdown shows requests, prompt and completion tokens, and cost in USD when usage data is available. See [Analytics](/features/analytics).
 
 ## Improvements
 
-**Clearer welcome personalization toggle** — The "Engine Intelligence" toggle on **Config → Onboarding & Growth** is now labeled **AI-Powered Personalization** and explains that it lets the bot use server context like active channels and member milestones to personalize welcome messages. Highlight and Exclude channel pickers also stop showing the same channel in both lists, so the two settings can't conflict.
+**Clearer welcome personalization toggle** — The "Engine Intelligence" toggle on **Config → Onboarding & Growth** is now labeled **AI-Powered Personalization**. The new label explains that the bot uses server context — active channels, member milestones — to personalize welcome messages. Highlight and Exclude channel pickers also stop showing the same channel in both lists, so the two settings can't conflict.
 
-**Tidier dashboard chrome** — The configuration search closes automatically when you click outside it or pick a result, the **Variables** lists in welcome and XP-level editors collapse to save vertical space, and the **AI Chat** entry was removed from the sidebar (use **Conversations** for AI history).
+**Tidier dashboard chrome** — The configuration search now closes automatically when you click outside it or select a result. The **Variables** lists in welcome and XP-level editors collapse to save vertical space, and the **AI Chat** entry no longer appears in the sidebar — use **Conversations** for AI history.
 </Update>
 
 <Update label="2026-05-08" description="May 2026" tags={["Features", "Improvements"]}>
