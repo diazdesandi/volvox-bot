@@ -20,6 +20,9 @@ describe('Railway build config', () => {
     expect(webDockerfile).toContain('COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./');
     expect(webDockerfile).toContain('COPY web/package.json ./web/package.json');
     expect(webDockerfile).toContain('--filter volvox-bot-web');
+    expect(webDockerfile).toContain('CMD ["node", "web/server.js"]');
+    expect(webDockerfile).toContain('/app/web/.next/static ./web/.next/static');
+    expect(webDockerfile).not.toContain('flattening');
     expect(webDockerfile).not.toContain('pnpm install --lockfile-only');
     expect(webDockerfile).not.toContain('printf "packages:');
     expect(webRailwayConfig).toContain('dockerfilePath = "web/Dockerfile"');

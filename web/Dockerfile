@@ -29,19 +29,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 RUN pnpm build
-
-# Flatten standalone output if nested
-RUN if [ -f .next/standalone/server.js ]; then \
-      echo "server.js at root"; \
-    elif [ -f .next/standalone/web/server.js ]; then \
-      echo "server.js nested under web/, flattening..."; \
-      cp -a .next/standalone/web/* .next/standalone/; \
-      rm -rf .next/standalone/web; \
-    else \
-      echo "ERROR: server.js not found in standalone output"; \
-      find .next/standalone -name server.js; \
-      exit 1; \
-    fi
+RUN test -f .next/standalone/web/server.js
 
 # --- Runner ---
 FROM node:22-alpine AS runner
@@ -54,22 +42,22 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/web/public ./web/public
 
 # Runtime image serves static build output only; keep copied artifacts read-only.
-RUN for path in server.js package.json node_modules; do \
+RUN for path in package.json node_modules web/server.js web/package.json web/node_modules; do \
       if [ -e "$path" ]; then chmod -R a-w "$path"; fi; \
     done && \
-    find .next -path .next/cache -prune -o -type d -exec chmod 0555 {} + && \
-    find .next -path .next/cache -prune -o -type f -exec chmod 0444 {} + && \
-    chmod u+w .next && \
-    mkdir -p .next/cache && \
-    chown -R nextjs:nodejs .next/cache && \
-    chmod -R u+rwX,go-rwx .next/cache && \
-    chmod 0555 .next && \
-    find public -type d -exec chmod 0555 {} + && \
-    find public -type f -exec chmod 0444 {} +
+    find web/.next -path web/.next/cache -prune -o -type d -exec chmod 0555 {} + && \
+    find web/.next -path web/.next/cache -prune -o -type f -exec chmod 0444 {} + && \
+    chmod u+w web/.next && \
+    mkdir -p web/.next/cache && \
+    chown -R nextjs:nodejs web/.next/cache && \
+    chmod -R u+rwX,go-rwx web/.next/cache && \
+    chmod 0555 web/.next && \
+    find web/public -type d -exec chmod 0555 {} + && \
+    find web/public -type f -exec chmod 0444 {} +
 
 USER nextjs
 
@@ -80,4 +68,4 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider "http://localhost:${PORT:-3000}/api/health" || exit 1
 
-CMD ["node", "server.js"]
+CMD ["node", "web/server.js"]
