@@ -6,13 +6,11 @@ RUN apk add --no-cache libc6-compat
 RUN corepack enable
 WORKDIR /app
 
-# Railway context is web/ — only package.json is available
-COPY package.json ./
-# Keep pnpm 11 build-script approvals local to the isolated web build context.
-RUN printf "packages:\n  - .\nallowBuilds:\n  '@sentry/cli': true\n  sharp: true\n" > pnpm-workspace.yaml
-# Generate lockfile from package.json (eliminates lockfile drift entirely)
-RUN pnpm install --lockfile-only
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY web/package.json ./web/package.json
+RUN pnpm config set store-dir /tmp/pnpm-store && \
+    pnpm install --frozen-lockfile --prod=false --filter volvox-bot-web... && \
+    rm -rf /tmp/pnpm-store
 
 # --- Builder ---
 FROM node:22-alpine AS builder
@@ -20,7 +18,10 @@ RUN corepack enable
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY --from=deps /app/web/node_modules ./web/node_modules
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY web ./web
+WORKDIR /app/web
 
 ARG NEXT_PUBLIC_DISCORD_CLIENT_ID
 ENV NEXT_PUBLIC_DISCORD_CLIENT_ID=$NEXT_PUBLIC_DISCORD_CLIENT_ID
@@ -52,9 +53,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/web/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/web/public ./public
 
 # Runtime image serves static build output only; keep copied artifacts read-only.
 RUN for path in server.js package.json node_modules; do \
