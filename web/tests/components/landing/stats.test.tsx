@@ -88,6 +88,7 @@ describe('Stats', () => {
       'href',
       SUPPORT_DISCORD_URL,
     );
+    expect(screen.queryByText(/No placeholder reviews/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Alex Rivers/i)).not.toBeInTheDocument();
   });
 
