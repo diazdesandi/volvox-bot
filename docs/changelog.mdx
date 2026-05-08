@@ -10,6 +10,14 @@ description: Release notes for Volvox.Bot covering new features, dashboard impro
 **New member counts that actually update** — Analytics on the [dashboard](/dashboard) now refresh new-member counts on every load, instead of holding onto stale numbers from a cached payload. Welcome the newcomers, count them properly, and stop wondering why your "new this week" tile looked suspiciously frozen.
 </Update>
 
+<Update label="2026-05-04" description="May 2026" tags={["Improvements"]}>
+## Improvements
+
+**Global admin access for ops pages** — Only global admins (configured via `BOT_OWNER_IDS`) can now access the dashboard's **Logs** and **Performance** pages. Server admins and moderators continue to manage their servers as usual, while operators keep infrastructure-level views to themselves. See [Permissions](/configuration/permissions) for the full role breakdown.
+
+**Cleaner access levels** — Server access roles are now consistently `admin`, `moderator`, or `viewer` across the dashboard and API. The dashboard surfaces global admin status separately, so sidebar navigation and protected pages reflect the correct permissions for every user.
+</Update>
+
 <Update label="2026-05-03" description="May 2026" tags={["Fixes"]}>
 ## Fixes
 
@@ -28,14 +36,6 @@ description: Release notes for Volvox.Bot covering new features, dashboard impro
 ## Fixes
 
 **More reliable AI auto-moderation** — [AI auto-moderation](/features/moderation) now parses provider responses correctly, even when they arrive wrapped in extra text or nested braces. Unparseable responses route to "needs review" instead of slipping through. Fewer missed flags, fewer surprises.
-</Update>
-
-<Update label="2026-05-08" description="May 2026" tags={["Improvements"]}>
-## Improvements
-
-**Global admin access for ops pages** — Only global admins (configured via `BOT_OWNER_IDS`) can now access the dashboard's **Logs** and **Performance** pages. Server admins and moderators continue to manage their servers as usual, while operators keep infrastructure-level views to themselves. See [Permissions](/configuration/permissions) for the full role breakdown.
-
-**Cleaner access levels** — Server access roles are now consistently `admin`, `moderator`, or `viewer` across the dashboard and API. The dashboard surfaces global admin status separately, so sidebar navigation and protected pages reflect the correct permissions for every user.
 </Update>
 
 <Update label="2026-05-01" description="May 2026" tags={["Features", "Improvements", "Fixes"]}>
