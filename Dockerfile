@@ -5,7 +5,7 @@ FROM node:22-alpine AS deps
 RUN corepack enable
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm config set store-dir /tmp/pnpm-store && \
     pnpm install --frozen-lockfile --prod --ignore-scripts && \
     rm -rf /tmp/pnpm-store

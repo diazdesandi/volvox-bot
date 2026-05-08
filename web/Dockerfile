@@ -8,6 +8,8 @@ WORKDIR /app
 
 # Railway context is web/ — only package.json is available
 COPY package.json ./
+# Keep pnpm 11 build-script approvals local to the isolated web build context.
+RUN printf "packages:\n  - .\nallowBuilds:\n  '@sentry/cli': true\n  sharp: true\n" > pnpm-workspace.yaml
 # Generate lockfile from package.json (eliminates lockfile drift entirely)
 RUN pnpm install --lockfile-only
 RUN pnpm install --frozen-lockfile
