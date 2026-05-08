@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { expectJsonErrorContaining, expectJsonResponse, expectStatus } from "./test-utils";
 
-const { mockGetToken, mockGetMutualGuilds } = vi.hoisted(() => ({
+const { mockFetchBotGuildAccess, mockGetToken, mockGetMutualGuilds } = vi.hoisted(() => ({
+  mockFetchBotGuildAccess: vi.fn(),
   mockGetToken: vi.fn(),
   mockGetMutualGuilds: vi.fn(),
 }));
@@ -12,6 +13,7 @@ vi.mock("next-auth/jwt", () => ({
 }));
 
 vi.mock("@/lib/discord.server", () => ({
+  fetchBotGuildAccess: mockFetchBotGuildAccess,
   getMutualGuilds: mockGetMutualGuilds,
 }));
 
@@ -39,6 +41,7 @@ describe("GET /api/guilds/[guildId]/analytics", () => {
     vi.clearAllMocks();
     process.env.BOT_API_URL = "http://bot.internal:3001";
     process.env.BOT_API_SECRET = "bot-secret";
+    mockFetchBotGuildAccess.mockResolvedValue(null);
     mockGetMutualGuilds.mockResolvedValue([
       {
         id: "guild-1",

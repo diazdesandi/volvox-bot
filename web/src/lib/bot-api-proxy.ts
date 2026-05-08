@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { getBotApiBaseUrl } from '@/lib/bot-api';
-import { getMutualGuilds } from '@/lib/discord.server';
+import { fetchBotGuildAccess, getMutualGuilds } from '@/lib/discord.server';
 import { logger } from '@/lib/logger';
 import { trimTrailingSlashes } from '@/lib/url';
 
@@ -20,7 +20,6 @@ type AuthToken = {
   id?: string;
   sub?: string;
 };
-const GUILD_ACCESS_LEVELS = new Set<GuildAccessLevel>(['viewer', 'moderator', 'admin']);
 
 /**
  * Determines whether a Discord permission bitfield includes the administrator permission.
@@ -74,9 +73,20 @@ function getUserIdFromToken(token: AuthToken): string {
 async function resolveGuildAccess(
   token: AuthToken,
   guildId: string,
-  logPrefix: string,
   signal: AbortSignal,
 ): Promise<{ access: GuildAccessLevel; present: boolean }> {
+  const userId = getUserIdFromToken(token);
+  const botAccessEntries = await fetchBotGuildAccess(userId, [guildId], signal);
+  const botAccessEntry = botAccessEntries?.find((entry) => entry.id === guildId);
+  const hasUnconfirmedViewerBotAccess =
+    botAccessEntry?.access === 'viewer' && botAccessEntry.present === undefined;
+  if (botAccessEntry && !hasUnconfirmedViewerBotAccess) {
+    return {
+      access: botAccessEntry.access,
+      present: botAccessEntry.present ?? true,
+    };
+  }
+
   const mutualGuilds = await getMutualGuilds(token.accessToken, signal);
   const targetGuild = mutualGuilds.find((guild) => guild.id === guildId);
 
@@ -85,50 +95,7 @@ async function resolveGuildAccess(
   }
 
   const fallbackAccess = getFallbackGuildAccess(targetGuild);
-  const userId = getUserIdFromToken(token);
-  const botApiBaseUrl = getBotApiBaseUrl();
-  const botApiSecret = process.env.BOT_API_SECRET;
-
-  if (!userId || !botApiBaseUrl || !botApiSecret) {
-    return { access: fallbackAccess, present: true };
-  }
-
-  try {
-    const url = new URL(`${botApiBaseUrl}/guilds/access`);
-    url.searchParams.set('userId', userId);
-    url.searchParams.set('guildIds', guildId);
-
-    const response = await fetch(url.toString(), {
-      headers: {
-        'x-api-secret': botApiSecret,
-      },
-      signal,
-      cache: 'no-store',
-    });
-
-    if (!response.ok) {
-      return { access: fallbackAccess, present: true };
-    }
-
-    const entries: unknown = await response.json();
-    if (!Array.isArray(entries)) {
-      return { access: fallbackAccess, present: true };
-    }
-
-    const entry = entries.find(
-      (item): item is { id: string; access: GuildAccessLevel } =>
-        typeof item === 'object' &&
-        item !== null &&
-        (item as { id?: unknown }).id === guildId &&
-        typeof (item as { access?: unknown }).access === 'string' &&
-        GUILD_ACCESS_LEVELS.has((item as { access: GuildAccessLevel }).access),
-    );
-
-    return { access: entry?.access ?? fallbackAccess, present: true };
-  } catch (error) {
-    logger.error(`${logPrefix} Failed to resolve guild access:`, error);
-    return { access: fallbackAccess, present: true };
-  }
+  return { access: fallbackAccess, present: true };
 }
 
 async function authorizeGuildAccess(
@@ -159,7 +126,7 @@ async function authorizeGuildAccess(
     controller.abort(new DOMException('Timed out', 'TimeoutError'));
   }, REQUEST_TIMEOUT_MS);
   try {
-    resolved = await resolveGuildAccess(authToken, guildId, logPrefix, controller.signal);
+    resolved = await resolveGuildAccess(authToken, guildId, controller.signal);
   } catch (error) {
     logger.error(`${logPrefix} Failed to verify guild permissions:`, error);
     return NextResponse.json({ error: 'Failed to verify guild permissions' }, { status: 502 });

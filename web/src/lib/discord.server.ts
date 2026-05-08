@@ -18,8 +18,30 @@ const DEFAULT_TOTAL_RETRY_BUDGET_MS = 8_000;
 
 /** Discord returns at most 200 guilds per page. */
 const GUILDS_PER_PAGE = 200;
+export const USER_GUILDS_REQUEST_TIMEOUT_MS = 10_000;
+export const BOT_GUILD_ACCESS_FALLBACK_TIMEOUT_MS = 2_500;
+const MAX_ACCESS_LOOKUP_GUILDS = 100;
+const BOT_GUILD_ACCESS_FALLBACK_MAX_GUILDS = MAX_ACCESS_LOOKUP_GUILDS;
 const DISCORD_CDN = 'https://cdn.discordapp.com';
 const inFlightUserGuildRequests = new Map<string, Promise<DiscordGuild[]>>();
+const BOT_GUILD_ACCESS_LEVELS = new Set<BotGuildAccessLevel>(['viewer', 'moderator', 'admin']);
+const ADMINISTRATOR_PERMISSION = 0x8n;
+const MANAGE_GUILD_PERMISSION = 0x20n;
+const KICK_MEMBERS_PERMISSION = 0x2n;
+const BAN_MEMBERS_PERMISSION = 0x4n;
+const MODERATE_MEMBERS_PERMISSION = 0x10000000000n;
+
+export type BotGuildAccessLevel = 'viewer' | 'moderator' | 'admin';
+
+export interface BotGuildAccessEntry {
+  id: string;
+  access: BotGuildAccessLevel;
+  present?: boolean;
+}
+
+interface GetMutualGuildsOptions {
+  userId?: string;
+}
 
 interface FetchWithRateLimitOptions extends RequestInit {
   rateLimit?: {
@@ -27,6 +49,16 @@ interface FetchWithRateLimitOptions extends RequestInit {
     maxRetryDelayMs?: number;
     totalRetryBudgetMs?: number;
   };
+}
+
+class DiscordUserGuildFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+    this.name = 'DiscordUserGuildFetchError';
+  }
 }
 
 function parseRetryAfterMs(response: Response): number {
@@ -58,6 +90,31 @@ function getGuildIconUrl(guildId: string, iconHash: string | null, size = 128): 
   return `${DISCORD_CDN}/icons/${guildId}/${iconHash}.${ext}?size=${size}`;
 }
 
+function getDiscordGuildAccess(guild: DiscordGuild): NonNullable<MutualGuild['access']> {
+  if (guild.owner) return 'owner';
+
+  try {
+    const permissions = BigInt(guild.permissions);
+
+    if ((permissions & ADMINISTRATOR_PERMISSION) === ADMINISTRATOR_PERMISSION) {
+      return 'admin';
+    }
+
+    if (
+      (permissions & MANAGE_GUILD_PERMISSION) === MANAGE_GUILD_PERMISSION ||
+      (permissions & KICK_MEMBERS_PERMISSION) === KICK_MEMBERS_PERMISSION ||
+      (permissions & BAN_MEMBERS_PERMISSION) === BAN_MEMBERS_PERMISSION ||
+      (permissions & MODERATE_MEMBERS_PERMISSION) === MODERATE_MEMBERS_PERMISSION
+    ) {
+      return 'moderator';
+    }
+  } catch {
+    return 'viewer';
+  }
+
+  return 'viewer';
+}
+
 function mapDiscordGuildToMutualGuild(guild: DiscordGuild): MutualGuild {
   const iconHash = guild.icon;
   return {
@@ -68,9 +125,66 @@ function mapDiscordGuildToMutualGuild(guild: DiscordGuild): MutualGuild {
   };
 }
 
+function mapBotGuildToMutualGuild(guild: BotGuild, access: BotGuildAccessLevel): MutualGuild {
+  const iconHash = guild.iconHash ?? null;
+  return {
+    id: guild.id,
+    name: guild.name,
+    icon: guild.icon ?? getGuildIconUrl(guild.id, iconHash),
+    iconHash,
+    // Bot-backed fallback cannot know Discord owner/permission bitfields;
+    // `access` from the bot API is authoritative for dashboard authorization.
+    owner: false,
+    permissions: '0',
+    features: [],
+    botPresent: true as const,
+    access,
+    config: guild.config,
+  };
+}
+
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw getAbortReason(signal);
+  }
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  return (
+    error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')
+  );
+}
+
+function isTransientUserGuildFetchError(error: unknown): boolean {
+  if (isAbortLikeError(error) || error instanceof TypeError) {
+    return true;
+  }
+
+  if (error instanceof DiscordUserGuildFetchError && typeof error.status === 'number') {
+    return error.status === 408 || error.status === 429 || error.status >= 500;
+  }
+
+  return false;
+}
+
+function isDiscordUserGuildAuthFailure(error: unknown): boolean {
+  return (
+    error instanceof DiscordUserGuildFetchError && (error.status === 401 || error.status === 403)
+  );
+}
+
+async function withBotGuildAccessLookupTimeout<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(new DOMException('Timed out', 'TimeoutError'));
+  }, BOT_GUILD_ACCESS_FALLBACK_TIMEOUT_MS);
+
+  try {
+    return await operation(controller.signal);
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -101,12 +215,17 @@ function waitForPromiseOrAbort<T>(promise: Promise<T>, signal?: AbortSignal): Pr
   });
 }
 
-async function fetchAllUserGuildPages(accessToken: string): Promise<DiscordGuild[]> {
+async function fetchAllUserGuildPages(
+  accessToken: string,
+  signal?: AbortSignal,
+): Promise<DiscordGuild[]> {
   const allGuilds: DiscordGuild[] = [];
   let after: string | undefined;
   let hasMore = true;
 
   do {
+    throwIfAborted(signal);
+
     const url = new URL(`${DISCORD_API_BASE}/users/@me/guilds`);
     url.searchParams.set('limit', String(GUILDS_PER_PAGE));
     if (after) {
@@ -117,6 +236,7 @@ async function fetchAllUserGuildPages(accessToken: string): Promise<DiscordGuild
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+      signal,
       cache: 'no-store',
       rateLimit: {
         maxRetryDelayMs: 2_000,
@@ -125,7 +245,10 @@ async function fetchAllUserGuildPages(accessToken: string): Promise<DiscordGuild
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch user guilds: ${response.status} ${response.statusText}`);
+      throw new DiscordUserGuildFetchError(
+        `Failed to fetch user guilds: ${response.status} ${response.statusText}`,
+        response.status,
+      );
     }
 
     let data: unknown;
@@ -231,8 +354,14 @@ export async function fetchUserGuilds(
     return waitForPromiseOrAbort(existingRequest, signal);
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort(new DOMException('Timed out', 'TimeoutError'));
+  }, USER_GUILDS_REQUEST_TIMEOUT_MS);
+
   let requestPromise: Promise<DiscordGuild[]>;
-  requestPromise = fetchAllUserGuildPages(accessToken).finally(() => {
+  requestPromise = fetchAllUserGuildPages(accessToken, controller.signal).finally(() => {
+    clearTimeout(timeout);
     if (inFlightUserGuildRequests.get(requestKey) === requestPromise) {
       inFlightUserGuildRequests.delete(requestKey);
     }
@@ -241,6 +370,95 @@ export async function fetchUserGuilds(
   inFlightUserGuildRequests.set(requestKey, requestPromise);
 
   return waitForPromiseOrAbort(requestPromise, signal);
+}
+
+function parseBotGuildAccessEntries(data: unknown): BotGuildAccessEntry[] | null {
+  if (!Array.isArray(data)) {
+    return null;
+  }
+
+  return data.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) {
+      return [];
+    }
+
+    const { id, access, present } = entry as Record<string, unknown>;
+    if (
+      typeof id !== 'string' ||
+      typeof access !== 'string' ||
+      !BOT_GUILD_ACCESS_LEVELS.has(access as BotGuildAccessLevel)
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        id,
+        access: access as BotGuildAccessLevel,
+        ...(typeof present === 'boolean' ? { present } : {}),
+      },
+    ];
+  });
+}
+
+export async function fetchBotGuildAccess(
+  userId: string,
+  guildIds: string[],
+  signal?: AbortSignal,
+): Promise<BotGuildAccessEntry[] | null> {
+  const botApiBaseUrl = getBotApiBaseUrl();
+  const botApiSecret = process.env.BOT_API_SECRET;
+
+  if (!userId || !botApiBaseUrl || !botApiSecret || guildIds.length === 0) {
+    return null;
+  }
+
+  const entries: BotGuildAccessEntry[] = [];
+
+  try {
+    for (let start = 0; start < guildIds.length; start += MAX_ACCESS_LOOKUP_GUILDS) {
+      const guildIdChunk = guildIds.slice(start, start + MAX_ACCESS_LOOKUP_GUILDS);
+      const url = new URL(`${botApiBaseUrl}/guilds/access`);
+      url.searchParams.set('userId', userId);
+      url.searchParams.set('guildIds', guildIdChunk.join(','));
+
+      const response = await fetchWithRateLimit(url.toString(), {
+        headers: {
+          'x-api-secret': botApiSecret,
+        },
+        signal,
+        cache: 'no-store',
+        rateLimit: {
+          maxRetries: 1,
+          maxRetryDelayMs: 250,
+          totalRetryBudgetMs: 500,
+        },
+      });
+
+      if (!response.ok) {
+        logger.warn('[discord] Bot API guild access lookup failed', {
+          status: response.status,
+          statusText: response.statusText,
+          guildCount: guildIdChunk.length,
+        });
+        return null;
+      }
+
+      const data: unknown = await response.json();
+      const parsedEntries = parseBotGuildAccessEntries(data);
+      if (!parsedEntries) {
+        logger.warn('[discord] Bot API guild access lookup returned an invalid response shape.');
+        return null;
+      }
+
+      entries.push(...parsedEntries);
+    }
+  } catch (error) {
+    logger.warn('[discord] Bot API guild access lookup is unreachable.', error);
+    return null;
+  }
+
+  return entries;
 }
 
 /**
@@ -315,6 +533,32 @@ export async function fetchBotGuilds(signal?: AbortSignal): Promise<BotGuildResu
   }
 }
 
+function canExposeBotGuildAccess(entry: BotGuildAccessEntry): boolean {
+  if (entry.present === false) {
+    return false;
+  }
+
+  // Older bot API deployments did not include `present`; avoid exposing
+  // member-only viewer guilds unless membership was explicitly confirmed.
+  return entry.present === true || entry.access !== 'viewer';
+}
+
+function mapBotAccessEntriesToMutualGuilds(
+  botGuilds: BotGuild[],
+  accessEntries: BotGuildAccessEntry[],
+): MutualGuild[] {
+  const botGuildsById = new Map(botGuilds.map((guild) => [guild.id, guild]));
+
+  return accessEntries.flatMap((entry) => {
+    const botGuild = botGuildsById.get(entry.id);
+    if (!botGuild || !canExposeBotGuildAccess(entry)) {
+      return [];
+    }
+
+    return [mapBotGuildToMutualGuild(botGuild, entry.access)];
+  });
+}
+
 /**
  * Get guilds where both the user and the bot are present.
  * If bot guilds can't be determined (BOT_API_URL unset), returns all user
@@ -323,17 +567,65 @@ export async function fetchBotGuilds(signal?: AbortSignal): Promise<BotGuildResu
 export async function getMutualGuilds(
   accessToken: string,
   signal?: AbortSignal,
+  options: GetMutualGuildsOptions = {},
 ): Promise<MutualGuild[]> {
-  const [userGuilds, botResult] = await Promise.all([
-    fetchUserGuilds(accessToken, signal),
-    // Defensive catch: even though fetchBotGuilds handles errors internally,
-    // wrap at the Promise.all level so an unexpected throw can never break
-    // the entire guild fetch — gracefully degrade to showing all user guilds.
-    fetchBotGuilds(signal).catch((err) => {
-      logger.warn('[discord] Unexpected error fetching bot guilds — degrading gracefully.', err);
-      return { available: false, guilds: [] } as BotGuildResult;
-    }),
-  ]);
+  const botResultPromise = fetchBotGuilds(signal).catch((err) => {
+    logger.warn('[discord] Unexpected error fetching bot guilds — degrading gracefully.', err);
+    return { available: false, guilds: [] } as BotGuildResult;
+  });
+
+  let userGuilds: DiscordGuild[];
+  try {
+    userGuilds = await fetchUserGuilds(accessToken, signal);
+  } catch (error) {
+    // Never recover Discord auth failures with bot-backed guild data.
+    // Only transient user-guild failures are eligible for fallback.
+    if (isDiscordUserGuildAuthFailure(error)) {
+      throw error;
+    }
+
+    // Preserve caller cancellation semantics: bot-backed fallback is only for
+    // Discord-side transient failures/timeouts, not abandoned requests.
+    if (signal?.aborted) {
+      throw error;
+    }
+
+    const userId = options.userId;
+    if (userId && isTransientUserGuildFetchError(error)) {
+      const botResult = await botResultPromise;
+      if (botResult.available) {
+        if (botResult.guilds.length > BOT_GUILD_ACCESS_FALLBACK_MAX_GUILDS) {
+          logger.warn(
+            '[discord] User guild fetch failed, but bot-backed guild access fallback was skipped because the bot guild list is too large.',
+            {
+              botGuildCount: botResult.guilds.length,
+              maxFallbackGuilds: BOT_GUILD_ACCESS_FALLBACK_MAX_GUILDS,
+            },
+          );
+          throw error;
+        }
+
+        const accessEntries = await withBotGuildAccessLookupTimeout((accessSignal) =>
+          fetchBotGuildAccess(
+            userId,
+            botResult.guilds.map((guild) => guild.id),
+            accessSignal,
+          ),
+        );
+        if (accessEntries) {
+          const fallbackGuilds = mapBotAccessEntriesToMutualGuilds(botResult.guilds, accessEntries);
+          logger.warn(
+            '[discord] User guild fetch failed — using bot-backed guild access fallback.',
+            error,
+          );
+          return fallbackGuilds;
+        }
+      }
+    }
+    throw error;
+  }
+
+  const botResult = await botResultPromise;
 
   // If the bot API was unavailable, return all user guilds unfiltered so
   // the UI can still be useful. If the API was available but the bot is
@@ -343,8 +635,7 @@ export async function getMutualGuilds(
   }
 
   const botGuildsById = new Map(botResult.guilds.map((guild) => [guild.id, guild]));
-
-  return userGuilds.flatMap((guild) => {
+  const mutualGuilds = userGuilds.flatMap((guild) => {
     const botGuild = botGuildsById.get(guild.id);
     if (!botGuild) return [];
 
@@ -360,4 +651,32 @@ export async function getMutualGuilds(
       },
     ];
   });
+
+  const userId = options.userId;
+  if (!userId || mutualGuilds.length === 0) {
+    return mutualGuilds;
+  }
+
+  const accessEntries = await withBotGuildAccessLookupTimeout((accessSignal) =>
+    fetchBotGuildAccess(
+      userId,
+      mutualGuilds.map((guild) => guild.id),
+      accessSignal,
+    ),
+  );
+  if (!accessEntries) {
+    return mutualGuilds.map((guild) => ({
+      ...guild,
+      access: getDiscordGuildAccess(guild),
+    }));
+  }
+
+  const botAccessById = new Map<string, BotGuildAccessLevel>(
+    accessEntries.filter(canExposeBotGuildAccess).map((entry) => [entry.id, entry.access]),
+  );
+
+  return mutualGuilds.map((guild) => ({
+    ...guild,
+    access: botAccessById.get(guild.id) ?? getDiscordGuildAccess(guild),
+  }));
 }

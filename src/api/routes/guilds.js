@@ -325,6 +325,19 @@ async function mapWithConcurrency(items, concurrency, iteratee) {
  * @returns {Promise<'admin'|'moderator'|'viewer'>}
  */
 async function getGuildAccessLevel(guild, userId) {
+  return (await resolveGuildAccessLevel(guild, userId)).access;
+}
+
+/**
+ * Resolve dashboard access and membership presence for a guild member.
+ *
+ * @param {import('discord.js').Guild} guild
+ * @param {string} userId
+ * @returns {Promise<{access: 'admin'|'moderator'|'viewer', present: boolean}>} `present: true`
+ * means the bot confirmed the user is a guild member; `present: false` means the user is not a
+ * member, with conservative viewer access returned for response-shape consistency.
+ */
+async function resolveGuildAccessLevel(guild, userId) {
   const config = getConfig(guild.id);
 
   let member = guild.members.cache.get(userId) || null;
@@ -341,18 +354,18 @@ async function getGuildAccessLevel(guild, userId) {
   }
 
   if (!member) {
-    return 'viewer';
+    return { access: 'viewer', present: false };
   }
 
   if (isAdmin(member, config)) {
-    return 'admin';
+    return { access: 'admin', present: true };
   }
 
   if (isModerator(member, config)) {
-    return 'moderator';
+    return { access: 'moderator', present: true };
   }
 
-  return 'viewer';
+  return { access: 'viewer', present: true };
 }
 
 /**
@@ -634,8 +647,8 @@ router.get('/access', async (req, res) => {
         const guild = client.guilds.cache.get(guildId);
         if (!guild) return null;
 
-        const access = await getGuildAccessLevel(guild, userId);
-        return { id: guildId, access };
+        const { access, present } = await resolveGuildAccessLevel(guild, userId);
+        return { id: guildId, access, present };
       },
     );
 

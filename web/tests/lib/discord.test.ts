@@ -5,6 +5,8 @@ import {
   fetchBotGuilds,
   getMutualGuilds,
   fetchWithRateLimit,
+  BOT_GUILD_ACCESS_FALLBACK_TIMEOUT_MS,
+  USER_GUILDS_REQUEST_TIMEOUT_MS,
 } from "@/lib/discord.server";
 
 describe("getGuildIconUrl", () => {
@@ -392,6 +394,64 @@ describe("fetchUserGuilds", () => {
     await expect(fetchUserGuilds("test-token", controller.signal)).rejects.toThrow();
   });
 
+  it("uses a dedicated timeout signal for the shared in-flight guild fetch", async () => {
+    vi.useFakeTimers();
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    try {
+      let sharedSignal: AbortSignal | undefined;
+      fetchSpy.mockImplementation((_url: string | URL | Request, init?: RequestInit) => {
+        const signal = init?.signal;
+        if (!(signal instanceof AbortSignal)) {
+          return Promise.reject(
+            new Error("Expected shared guild fetch to receive an abort signal"),
+          );
+        }
+
+        sharedSignal = signal;
+        return new Promise<Response>((_resolve, reject) => {
+          signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        });
+      });
+
+      const timedOutRequest = fetchUserGuilds("shared-timeout-token");
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(sharedSignal).toBeInstanceOf(AbortSignal);
+      expect(sharedSignal?.aborted).toBe(false);
+
+      const timeoutExpectation = expect(timedOutRequest).rejects.toThrow("Timed out");
+      await vi.advanceTimersByTimeAsync(10_000);
+      await timeoutExpectation;
+
+      expect(sharedSignal?.aborted).toBe(true);
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      const mockGuilds = [
+        {
+          id: "1",
+          name: "Retried Server",
+          icon: null,
+          owner: true,
+          permissions: "8",
+          features: [],
+        },
+      ];
+
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(mockGuilds),
+      } as Response);
+
+      await expect(fetchUserGuilds("shared-timeout-token")).resolves.toEqual(mockGuilds);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      clearTimeoutSpy.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
   it("deduplicates concurrent guild fetches for the same access token", async () => {
     const mockGuilds = [
       { id: "1", name: "Shared Server", icon: null, owner: true, permissions: "8", features: [] },
@@ -411,7 +471,6 @@ describe("fetchUserGuilds", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
     (resolveFetch as ((response: Response) => void) | null)?.({
-
       ok: true,
       status: 200,
       json: () => Promise.resolve(mockGuilds),
@@ -421,6 +480,44 @@ describe("fetchUserGuilds", () => {
       mockGuilds,
       mockGuilds,
     ]);
+  });
+
+  it("keeps a shared in-flight guild fetch alive when one caller aborts", async () => {
+    const mockGuilds = [
+      { id: "1", name: "Shared Server", icon: null, owner: true, permissions: "8", features: [] },
+    ];
+    const controller = new AbortController();
+
+    let resolveFetch: ((response: Response) => void) | null = null;
+    let sharedSignal: AbortSignal | undefined;
+    fetchSpy.mockImplementation((_url: string | URL | Request, init?: RequestInit) => {
+      const signal = init?.signal;
+      sharedSignal = signal instanceof AbortSignal ? signal : undefined;
+      return new Promise<Response>((resolve, reject) => {
+        resolveFetch = resolve;
+        signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    });
+
+    const abortingRequest = fetchUserGuilds("shared-token-abort", controller.signal);
+    const sharedRequest = fetchUserGuilds("shared-token-abort");
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(sharedSignal).toBeInstanceOf(AbortSignal);
+    expect(sharedSignal).not.toBe(controller.signal);
+
+    const abortExpectation = expect(abortingRequest).rejects.toThrow("Timed out");
+    controller.abort(new DOMException("Timed out", "TimeoutError"));
+    await abortExpectation;
+    expect(sharedSignal?.aborted).toBe(false);
+
+    (resolveFetch as ((response: Response) => void) | null)?.({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(mockGuilds),
+    } as Response);
+
+    await expect(sharedRequest).resolves.toEqual(mockGuilds);
   });
 });
 
@@ -621,6 +718,125 @@ describe("getMutualGuilds", () => {
     expect(mutualGuilds[0].config).toEqual({ communityHubs: { enabled: true } });
   });
 
+  it("looks up bot access only for healthy mutual guild IDs", async () => {
+    const userGuilds = [
+      { id: "1", name: "Server 1", icon: null, owner: true, permissions: "8", features: [] },
+      { id: "2", name: "User Only", icon: null, owner: false, permissions: "0", features: [] },
+      { id: "3", name: "Server 3", icon: null, owner: false, permissions: "32", features: [] },
+    ];
+    const botGuilds = [
+      { id: "1", name: "Server 1", icon: null },
+      { id: "3", name: "Server 3", icon: null },
+      { id: "4", name: "Bot Only", icon: null },
+    ];
+    let accessGuildIds: string[] | null = null;
+
+    process.env.BOT_API_URL = "http://localhost:3001";
+    process.env.BOT_API_SECRET = "test-secret";
+
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/users/@me/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(userGuilds) } as Response);
+      }
+      if (urlStr.includes("/api/v1/guilds/access")) {
+        accessGuildIds = new URL(urlStr).searchParams.get("guildIds")?.split(",") ?? [];
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve([
+              { id: "1", access: "admin", present: true },
+              { id: "3", access: "admin", present: false },
+            ]),
+        } as Response);
+      }
+      if (urlStr.endsWith("/api/v1/guilds")) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(botGuilds) } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+    });
+
+    const mutualGuilds = await getMutualGuilds("test-token", undefined, { userId: "user-1" });
+
+    expect(accessGuildIds).toEqual(["1", "3"]);
+    expect(mutualGuilds).toEqual([
+      expect.objectContaining({ id: "1", access: "admin" }),
+      expect.objectContaining({ id: "3", access: "moderator" }),
+    ]);
+  });
+
+  it("uses a fresh bounded signal for happy-path bot access lookups", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const userGuilds = [
+        { id: "1", name: "Server 1", icon: null, owner: true, permissions: "8", features: [] },
+      ];
+      const botGuilds = [{ id: "1", name: "Server 1", icon: null }];
+      const controller = new AbortController();
+      let accessSignal: AbortSignal | null = null;
+
+      process.env.BOT_API_URL = "http://localhost:3001";
+      process.env.BOT_API_SECRET = "test-secret";
+
+      fetchSpy.mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+        const urlStr = url.toString();
+        if (urlStr.includes("/users/@me/guilds")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(userGuilds),
+          } as Response);
+        }
+        if (urlStr.includes("/api/v1/guilds/access")) {
+          accessSignal = init?.signal instanceof AbortSignal ? init.signal : null;
+          controller.abort(new DOMException("Route budget expired", "TimeoutError"));
+
+          return new Promise<Response>((_, reject) => {
+            const signal = accessSignal;
+            const abortReason = () =>
+              signal?.reason ?? new DOMException("The operation was aborted.", "AbortError");
+            if (signal?.aborted) {
+              reject(abortReason());
+              return;
+            }
+            signal?.addEventListener("abort", () => reject(abortReason()), { once: true });
+          });
+        }
+        if (urlStr.endsWith("/api/v1/guilds")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(botGuilds),
+          } as Response);
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+      });
+
+      const guildsPromise = getMutualGuilds("happy-path-timeout-token", controller.signal, {
+        userId: "user-1",
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      const lookupSignal = accessSignal as AbortSignal | null;
+      expect(controller.signal.aborted).toBe(true);
+      expect(lookupSignal).toBeInstanceOf(AbortSignal);
+      expect(lookupSignal).not.toBe(controller.signal);
+      expect(lookupSignal?.aborted).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(BOT_GUILD_ACCESS_FALLBACK_TIMEOUT_MS);
+
+      await expect(guildsPromise).resolves.toEqual([
+        expect.objectContaining({ id: "1", access: "owner", botPresent: true }),
+      ]);
+      expect(lookupSignal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("returns all user guilds unfiltered when bot API fails", async () => {
     const userGuilds = [
       { id: "1", name: "Server 1", icon: null, owner: true, permissions: "8", features: [] },
@@ -665,6 +881,288 @@ describe("getMutualGuilds", () => {
 
     expect(mutualGuilds).toHaveLength(1);
     expect(mutualGuilds[0].botPresent).toBe(false);
+  });
+
+  it("falls back to bot guild access when Discord user guilds fail with transient 408", async () => {
+    process.env.BOT_API_URL = "http://localhost:3001";
+    process.env.BOT_API_SECRET = "test-secret";
+
+    const botGuilds = [
+      { id: "1", name: "Admin Server", icon: null, iconHash: "admin-icon-hash" },
+      {
+        id: "2",
+        name: "Viewer Hub",
+        icon: "https://cdn.example.com/viewer.webp",
+        config: { communityHubs: { enabled: true } },
+      },
+      { id: "3", name: "Not A Member", icon: null },
+    ];
+
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/users/@me/guilds")) {
+        return Promise.resolve({
+          ok: false,
+          status: 408,
+          statusText: "Request Timeout",
+        } as Response);
+      }
+      if (urlStr.endsWith("/api/v1/guilds")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(botGuilds),
+        } as Response);
+      }
+      if (urlStr.includes("/api/v1/guilds/access")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve([
+              { id: "1", access: "admin", present: true },
+              { id: "2", access: "viewer", present: true },
+              { id: "3", access: "admin", present: false },
+            ]),
+        } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+    });
+
+    const mutualGuilds = await getMutualGuilds("test-token", undefined, { userId: "user-1" });
+
+    expect(mutualGuilds).toEqual([
+      expect.objectContaining({
+        id: "1",
+        name: "Admin Server",
+        access: "admin",
+        botPresent: true,
+        owner: false,
+        permissions: "0",
+        icon: "https://cdn.discordapp.com/icons/1/admin-icon-hash.webp?size=128",
+        iconHash: "admin-icon-hash",
+      }),
+      expect.objectContaining({
+        id: "2",
+        name: "Viewer Hub",
+        access: "viewer",
+        botPresent: true,
+        config: { communityHubs: { enabled: true } },
+      }),
+    ]);
+  });
+
+  it("does not use bot guild access fallback when the caller signal aborts", async () => {
+    vi.useFakeTimers();
+
+    try {
+      process.env.BOT_API_URL = "http://localhost:3001";
+      process.env.BOT_API_SECRET = "test-secret";
+
+      const controller = new AbortController();
+      const abortReason = new DOMException("Client disconnected", "AbortError");
+      let accessLookupCount = 0;
+
+      fetchSpy.mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+        const urlStr = url.toString();
+        if (urlStr.includes("/users/@me/guilds")) {
+          const signal = init?.signal;
+          return new Promise<Response>((_, reject) => {
+            const timeoutReason = () =>
+              signal?.reason ?? new DOMException("The operation was aborted.", "AbortError");
+            if (signal?.aborted) {
+              reject(timeoutReason());
+              return;
+            }
+
+            signal?.addEventListener("abort", () => reject(timeoutReason()), { once: true });
+          });
+        }
+        if (urlStr.endsWith("/api/v1/guilds")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve([{ id: "1", name: "Recovered Server", icon: null }]),
+          } as Response);
+        }
+        if (urlStr.includes("/api/v1/guilds/access")) {
+          accessLookupCount++;
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve([{ id: "1", access: "admin", present: true }]),
+          } as Response);
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+      });
+
+      const guildsPromise = getMutualGuilds("caller-abort-token", controller.signal, {
+        userId: "user-1",
+      });
+
+      await vi.advanceTimersByTimeAsync(0);
+      controller.abort(abortReason);
+
+      await expect(guildsPromise).rejects.toBe(abortReason);
+      expect(accessLookupCount).toBe(0);
+
+      await vi.advanceTimersByTimeAsync(USER_GUILDS_REQUEST_TIMEOUT_MS);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("uses a fresh bot guild access fallback signal when Discord user guilds time out", async () => {
+    vi.useFakeTimers();
+
+    try {
+      process.env.BOT_API_URL = "http://localhost:3001";
+      process.env.BOT_API_SECRET = "test-secret";
+
+      const controller = new AbortController();
+      let accessSignal: AbortSignal | null = null;
+
+      fetchSpy.mockImplementation((url: string | URL | Request, init?: RequestInit) => {
+        const urlStr = url.toString();
+        if (urlStr.includes("/users/@me/guilds")) {
+          const signal = init?.signal;
+          return new Promise<Response>((_, reject) => {
+            const abortReason = () =>
+              signal?.reason ?? new DOMException("The operation was aborted.", "AbortError");
+            if (signal?.aborted) {
+              reject(abortReason());
+              return;
+            }
+
+            signal?.addEventListener("abort", () => reject(abortReason()), { once: true });
+          });
+        }
+        if (urlStr.endsWith("/api/v1/guilds")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve([{ id: "1", name: "Recovered Server", icon: null }]),
+          } as Response);
+        }
+        if (urlStr.includes("/api/v1/guilds/access")) {
+          accessSignal = init?.signal instanceof AbortSignal ? init.signal : null;
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve([{ id: "1", access: "admin", present: true }]),
+          } as Response);
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+      });
+
+      const guildsPromise = getMutualGuilds("timeout-token", controller.signal, {
+        userId: "user-1",
+      });
+
+      await vi.advanceTimersByTimeAsync(USER_GUILDS_REQUEST_TIMEOUT_MS);
+
+      await expect(guildsPromise).resolves.toEqual([
+        expect.objectContaining({
+          id: "1",
+          name: "Recovered Server",
+          access: "admin",
+          botPresent: true,
+        }),
+      ]);
+      const recoverySignal = accessSignal as AbortSignal | null;
+      expect(controller.signal.aborted).toBe(false);
+      expect(recoverySignal).toBeInstanceOf(AbortSignal);
+      expect(recoverySignal).not.toBe(controller.signal);
+      expect(recoverySignal?.aborted).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([401, 403])(
+    "does not use bot guild access fallback for Discord auth failure %s",
+    async (status) => {
+      process.env.BOT_API_URL = "http://localhost:3001";
+      process.env.BOT_API_SECRET = "test-secret";
+
+      let accessLookupCount = 0;
+
+      fetchSpy.mockImplementation((url: string | URL | Request) => {
+        const urlStr = url.toString();
+        if (urlStr.includes("/users/@me/guilds")) {
+          return Promise.resolve({
+            ok: false,
+            status,
+            statusText: status === 401 ? "Unauthorized" : "Forbidden",
+          } as Response);
+        }
+        if (urlStr.endsWith("/api/v1/guilds")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve([{ id: "1", name: "Bot Server", icon: null }]),
+          } as Response);
+        }
+        if (urlStr.includes("/api/v1/guilds/access")) {
+          accessLookupCount++;
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve([{ id: "1", access: "admin", present: true }]),
+          } as Response);
+        }
+        return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+      });
+
+      await expect(
+        getMutualGuilds("bad-token", undefined, { userId: "user-1" }),
+      ).rejects.toThrow(`Failed to fetch user guilds: ${status}`);
+      expect(accessLookupCount).toBe(0);
+    },
+  );
+
+  it("skips bot guild access fallback when the bot guild list is too large", async () => {
+    process.env.BOT_API_URL = "http://localhost:3001";
+    process.env.BOT_API_SECRET = "test-secret";
+
+    let accessLookupCount = 0;
+    const botGuilds = Array.from({ length: 101 }, (_, index) => ({
+      id: String(index + 1),
+      name: `Bot Server ${index + 1}`,
+      icon: null,
+    }));
+
+    fetchSpy.mockImplementation((url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.includes("/users/@me/guilds")) {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          statusText: "Internal Server Error",
+        } as Response);
+      }
+      if (urlStr.endsWith("/api/v1/guilds")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(botGuilds),
+        } as Response);
+      }
+      if (urlStr.includes("/api/v1/guilds/access")) {
+        accessLookupCount++;
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve([{ id: "1", access: "admin", present: true }]),
+        } as Response);
+      }
+      return Promise.reject(new Error(`Unexpected fetch URL: ${urlStr}`));
+    });
+
+    await expect(
+      getMutualGuilds("temporary-failure-token", undefined, { userId: "user-1" }),
+    ).rejects.toThrow("Failed to fetch user guilds: 500");
+    expect(accessLookupCount).toBe(0);
   });
 
   it("generates icon URL from bot guild iconHash when bot guild has no direct icon URL", async () => {

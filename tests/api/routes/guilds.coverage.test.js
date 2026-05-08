@@ -114,7 +114,7 @@ describe('guilds routes coverage', () => {
         .set('x-api-secret', SECRET);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual([{ id: 'guild1', access: 'moderator' }]);
+      expect(res.body).toEqual([{ id: 'guild1', access: 'moderator', present: true }]);
       expect(isModerator).toHaveBeenCalled();
     });
 
@@ -131,7 +131,7 @@ describe('guilds routes coverage', () => {
         .set('x-api-secret', SECRET);
 
       expect(res.status).toBe(200);
-      expect(res.body).toEqual([{ id: 'guild1', access: 'viewer' }]);
+      expect(res.body).toEqual([{ id: 'guild1', access: 'viewer', present: false }]);
 
       mockGuild.members.fetch = vi.fn().mockRejectedValueOnce(new Error('Discord timeout'));
       res = await request(app)
