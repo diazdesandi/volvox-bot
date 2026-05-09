@@ -198,6 +198,18 @@ describe('challengeScheduler', () => {
       const dayNY = getDayOfYear(utcJan2, 'America/New_York');
       expect(dayNY).toBe(1);
     });
+
+    it('should normalize GMT offset timezone aliases', () => {
+      // GMT+3 means 3 hours ahead of UTC
+      const utcDate = new Date('2024-01-01T23:00:00Z'); // 11pm UTC = 2am Jan 2 in GMT+3
+      const dayGmt3 = getDayOfYear(utcDate, 'GMT +3');
+      expect(dayGmt3).toBe(2);
+    });
+
+    it('should fall back instead of throwing for an invalid timezone config', () => {
+      const date = new Date('2024-01-01T12:00:00Z');
+      expect(() => getDayOfYear(date, 'Mars/Base')).not.toThrow();
+    });
   });
 
   describe('getLocalDateString', () => {
@@ -206,6 +218,18 @@ describe('challengeScheduler', () => {
       const str = getLocalDateString(date, 'UTC');
       expect(str).toBe('2024-03-15');
     });
+
+    it('should normalize GMT offset timezone aliases', () => {
+      // GMT+3: 2024-01-01T22:30:00Z is 2024-01-02T01:30:00 in GMT+3
+      const date = new Date('2024-01-01T22:30:00Z');
+      const str = getLocalDateString(date, 'GMT +3');
+      expect(str).toBe('2024-01-02');
+    });
+
+    it('should fall back instead of throwing for an invalid timezone config', () => {
+      const date = new Date('2024-03-15T12:00:00Z');
+      expect(() => getLocalDateString(date, 'Mars/Base')).not.toThrow();
+    });
   });
 
   describe('getLocalTimeString', () => {
@@ -213,6 +237,19 @@ describe('challengeScheduler', () => {
       const date = new Date('2024-01-01T14:30:00Z');
       const str = getLocalTimeString(date, 'UTC');
       expect(str).toBe('14:30');
+    });
+
+    it('should normalize GMT offset timezone aliases', () => {
+      const date = new Date('2024-01-01T14:30:00Z');
+      const str = getLocalTimeString(date, 'GMT +3');
+      expect(str).toBe('17:30');
+    });
+
+    it('should fall back instead of throwing for invalid timezone config', () => {
+      const date = new Date('2024-01-01T14:30:00Z');
+      expect(getLocalTimeString(date, 'Mars/Base')).toBe(
+        getLocalTimeString(date, 'America/New_York'),
+      );
     });
   });
 

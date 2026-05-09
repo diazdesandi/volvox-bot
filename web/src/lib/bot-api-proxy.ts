@@ -70,6 +70,16 @@ function getUserIdFromToken(token: AuthToken): string {
   return '';
 }
 
+/**
+ * Determines the caller's access level for a specific Discord guild.
+ *
+ * Attempts to resolve the user's guild access and whether the guild is present for the user. If a bot-managed access record exists for the user and guild, that value is used. If the user is not a member of the guild, returns `{ access: 'viewer', present: false }`. Otherwise returns a resolved access level and `present: true`; when upstream queries fail or bot configuration/user id is unavailable, returns a fallback access derived from the guild membership.
+ *
+ * @param token - Authentication token containing `accessToken` and optional `id`/`sub` used to identify the user and call Discord APIs
+ * @param guildId - The Discord guild ID to resolve access for
+ * @param signal - AbortSignal used to cancel network requests
+ * @returns An object with `access` set to the resolved `GuildAccessLevel` and `present` indicating whether the guild is present for the user (`false` when the user is not a member)
+ */
 async function resolveGuildAccess(
   token: AuthToken,
   guildId: string,

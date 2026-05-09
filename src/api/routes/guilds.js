@@ -319,11 +319,11 @@ async function mapWithConcurrency(items, concurrency, iteratee) {
 }
 
 /**
- * Resolve dashboard access for a guild member using the bot's configured role rules.
+ * Determine the dashboard access level for a guild member according to the bot's configured role rules.
  *
- * @param {import('discord.js').Guild} guild
- * @param {string} userId
- * @returns {Promise<'admin'|'moderator'|'viewer'>}
+ * @param {import('discord.js').Guild} guild - Target guild.
+ * @param {string} userId - Discord user ID to evaluate.
+ * @returns {Promise<'admin'|'moderator'|'viewer'>} `'admin'` if the member is an administrator, `'moderator'` if they have moderator privileges, `'viewer'` otherwise.
  */
 async function getGuildAccessLevel(guild, userId) {
   return (await resolveGuildAccessLevel(guild, userId)).access;
@@ -332,8 +332,8 @@ async function getGuildAccessLevel(guild, userId) {
 /**
  * Resolve dashboard access and membership presence for a guild member.
  *
- * @param {import('discord.js').Guild} guild
- * @param {string} userId
+ * @param {import('discord.js').Guild} guild - Discord guild to check.
+ * @param {string} userId - User ID to resolve access for.
  * @returns {Promise<{access: 'admin'|'moderator'|'viewer', present: boolean}>} `present: true`
  * means the bot confirmed the user is a guild member; `present: false` means the user is not a
  * member, with conservative viewer access returned for response-shape consistency.

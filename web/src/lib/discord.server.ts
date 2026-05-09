@@ -115,6 +115,11 @@ function getDiscordGuildAccess(guild: DiscordGuild): NonNullable<MutualGuild['ac
   return 'viewer';
 }
 
+/**
+ * Create a MutualGuild from a DiscordGuild with its icon URL resolved and bot presence set to absent.
+ *
+ * @returns A `MutualGuild` object derived from `guild` where `icon` is the CDN URL computed from the guild's `icon` hash, `iconHash` preserves the original hash, and `botPresent` is `false`.
+ */
 function mapDiscordGuildToMutualGuild(guild: DiscordGuild): MutualGuild {
   const iconHash = guild.icon;
   return {
@@ -125,6 +130,13 @@ function mapDiscordGuildToMutualGuild(guild: DiscordGuild): MutualGuild {
   };
 }
 
+/**
+ * Map a bot-managed guild record into a MutualGuild that reflects the bot's presence and access level.
+ *
+ * @param guild - BotGuild object returned by the bot API to convert
+ * @param access - The bot's access level for this guild
+ * @returns A MutualGuild with `botPresent` set to `true`, fields populated from `guild`, and `access` set to `access`
+ */
 function mapBotGuildToMutualGuild(guild: BotGuild, access: BotGuildAccessLevel): MutualGuild {
   const iconHash = guild.iconHash ?? null;
   return {
@@ -143,6 +155,12 @@ function mapBotGuildToMutualGuild(guild: BotGuild, access: BotGuildAccessLevel):
   };
 }
 
+/**
+ * Throw the abort reason if the provided AbortSignal is already aborted.
+ *
+ * @param signal - Optional AbortSignal to inspect
+ * @throws The signal's abort reason if present; otherwise throws an AbortError (a DOMException)
+ */
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) {
     throw getAbortReason(signal);
@@ -188,6 +206,13 @@ async function withBotGuildAccessLookupTimeout<T>(
   }
 }
 
+/**
+ * Races a promise against an AbortSignal, rejecting if the signal aborts.
+ *
+ * @param promise - The promise to await
+ * @param signal - Optional AbortSignal; if it is already aborted or aborts before `promise` settles, the returned promise rejects with the signal's abort reason
+ * @returns The fulfilled value of `promise` if it resolves first; rejects with the original promise error if it rejects first, or with the signal's abort reason if aborted first
+ */
 function waitForPromiseOrAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   throwIfAborted(signal);
 
@@ -215,6 +240,17 @@ function waitForPromiseOrAbort<T>(promise: Promise<T>, signal?: AbortSignal): Pr
   });
 }
 
+/**
+ * Fetches all Discord guilds for the user associated with the provided access token by iterating paginated API results.
+ *
+ * Respects the provided AbortSignal for early cancellation.
+ *
+ * @param accessToken - OAuth2 user access token used to authenticate the Discord API requests
+ * @param signal - Optional AbortSignal to cancel the fetch; when aborted the function will throw the abort reason
+ * @returns An array of `DiscordGuild` objects containing every guild the user belongs to
+ * @throws If the Discord API responds with a non-OK status
+ * @throws If the Discord API returns non-JSON or an unexpected (non-array) response shape
+ */
 async function fetchAllUserGuildPages(
   accessToken: string,
   signal?: AbortSignal,
@@ -337,9 +373,13 @@ export async function fetchWithRateLimit(
 }
 
 /**
- * Fetch ALL guilds a user belongs to from the Discord API.
- * Uses cursor-based pagination with the `after` parameter to handle
- * users in more than 200 guilds.
+ * Retrieve all Discord guilds the user is a member of.
+ *
+ * This call deduplicates concurrent identical requests so simultaneous calls with the same
+ * access token will share the in-flight fetch. It supports cancellation via an AbortSignal.
+ *
+ * @param signal - Optional AbortSignal to cancel the request
+ * @returns All Discord guild objects the user belongs to
  */
 export async function fetchUserGuilds(
   accessToken: string,
@@ -372,6 +412,12 @@ export async function fetchUserGuilds(
   return waitForPromiseOrAbort(requestPromise, signal);
 }
 
+/**
+ * Parse a parsed JSON value into validated bot guild access entries.
+ *
+ * @param data - The parsed JSON value returned by the bot API `/guilds/access` endpoint.
+ * @returns `null` if `data` is not an array; otherwise an array of well-formed `BotGuildAccessEntry` objects. Invalid or malformed entries are skipped.
+ */
 function parseBotGuildAccessEntries(data: unknown): BotGuildAccessEntry[] | null {
   if (!Array.isArray(data)) {
     return null;
@@ -401,6 +447,14 @@ function parseBotGuildAccessEntries(data: unknown): BotGuildAccessEntry[] | null
   });
 }
 
+/**
+ * Fetches bot access entries for a user across the provided guild IDs from the internal bot API.
+ *
+ * @param userId - The Discord user ID whose access is being queried
+ * @param guildIds - Array of guild IDs to look up; requests are chunked when large
+ * @param signal - Optional AbortSignal to cancel the network requests
+ * @returns An array of `BotGuildAccessEntry` for the requested guilds, or `null` if the lookup could not be performed, returned an unexpected shape, or required configuration is missing
+ */
 export async function fetchBotGuildAccess(
   userId: string,
   guildIds: string[],
@@ -560,9 +614,14 @@ function mapBotAccessEntriesToMutualGuilds(
 }
 
 /**
- * Get guilds where both the user and the bot are present.
- * If bot guilds can't be determined (BOT_API_URL unset), returns all user
- * guilds with botPresent=false so the UI can still be useful.
+ * Compute mutual guilds between the authenticated user and the bot.
+ *
+ * When the bot API is unavailable, returns all user guilds with `botPresent` set to `false`
+ * so the UI can still display guilds. If the user-guild fetch fails and `options.userId`
+ * is provided, the function may return a bot-backed fallback list derived from the bot API.
+ *
+ * @param options - Optional settings; if `options.userId` is provided the function will attempt to fetch per-guild bot access for that user to produce a bot-backed fallback when needed.
+ * @returns An array of MutualGuild objects representing guilds the user and bot share. If the bot API is unavailable, returns the user's guilds unfiltered with `botPresent: false`.
  */
 export async function getMutualGuilds(
   accessToken: string,

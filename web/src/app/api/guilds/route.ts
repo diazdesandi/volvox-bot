@@ -19,6 +19,13 @@ const REQUEST_TIMEOUT_BUFFER_MS = 1_000;
 const REQUEST_TIMEOUT_MS =
   USER_GUILDS_REQUEST_TIMEOUT_MS + BOT_GUILD_ACCESS_FALLBACK_TIMEOUT_MS + REQUEST_TIMEOUT_BUFFER_MS;
 
+/**
+ * Handle GET requests to return the authenticated user's mutual Discord guilds.
+ *
+ * Guild access enrichment and bot-backed fallback are handled inside `getMutualGuilds`.
+ *
+ * @returns A NextResponse containing mutual guilds, or a JSON error with status 401 or 500.
+ */
 export async function GET(request: NextRequest) {
   const token = await getToken({ req: request });
 

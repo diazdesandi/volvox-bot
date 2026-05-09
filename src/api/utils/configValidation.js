@@ -11,6 +11,7 @@ import {
   normalizeSupportedAiModel,
   SUPPORTED_AI_MODEL_TYPES,
 } from '../../utils/supportedAiModels.js';
+import { resolveTimeZone } from '../../utils/timezone.js';
 import { validateUrlForSsrfSync } from './ssrfProtection.js';
 
 /** Module-level cache for compiled regex patterns used during validation. */
@@ -193,6 +194,7 @@ const AI_AUTOMOD_ACTION_VALUE_SCHEMA = {
 };
 
 const AI_MODEL_VALUE_SCHEMA = { type: 'string', aiModel: true };
+const TIME_ZONE_VALUE_SCHEMA = { type: 'string', timeZone: true };
 
 const AI_AUTOMOD_THRESHOLD_SCHEMA = {
   type: 'object',
@@ -267,7 +269,7 @@ export const CONFIG_SCHEMA = {
         type: 'object',
         properties: {
           enabled: { type: 'boolean' },
-          timezone: { type: 'string' },
+          timezone: TIME_ZONE_VALUE_SCHEMA,
           activityWindowMinutes: { type: 'number', min: 1, max: 10080 },
           milestoneInterval: { type: 'number', min: 0, max: 10000 },
           highlightChannels: { type: 'array' },
@@ -299,6 +301,15 @@ export const CONFIG_SCHEMA = {
     type: 'object',
     properties: {
       enabled: { type: 'boolean' },
+    },
+  },
+  challenges: {
+    type: 'object',
+    properties: {
+      enabled: { type: 'boolean' },
+      channelId: { type: 'string', nullable: true },
+      postTime: { type: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
+      timezone: TIME_ZONE_VALUE_SCHEMA,
     },
   },
   moderation: {
@@ -615,6 +626,9 @@ export function validateValue(value, schema, path) {
         } else if (schema.enum && !schema.enum.includes(value)) {
           errors.push(`${path}: must be one of [${schema.enum.join(', ')}], got "${value}"`);
         }
+        if (schema.timeZone && !resolveTimeZone(value)) {
+          errors.push(`${path}: expected a valid IANA timezone or UTC/GMT offset, got "${value}"`);
+        }
         if (schema.maxLength != null && value.length > schema.maxLength) {
           errors.push(`${path}: exceeds max length of ${schema.maxLength}`);
         }
@@ -764,17 +778,20 @@ export function validateSingleValue(path, value) {
 }
 
 /**
- * Return the canonical runtime value for config leaves that support legacy aliases
- * or case-insensitive inputs. Unknown paths and ordinary values pass through.
+ * Normalize a single config value according to the resolved schema (e.g., normalize AI model names or time zones).
  *
- * @param {string} path
- * @param {*} value
- * @returns {*}
+ * @param {string} path - Dot-separated config path used to resolve the schema fragment.
+ * @param {*} value - The value to normalize.
+ * @returns {*} The normalized canonical value when the schema requires it (for example, normalized AI model identifiers or time zone strings); otherwise returns the original value unchanged.
  */
 export function normalizeSingleValue(path, value) {
   const resolved = resolveSchemaForPath(path);
   if (resolved.schema?.aiModel && isSupportedAiModel(value)) {
     return normalizeSupportedAiModel(value);
+  }
+  if (resolved.schema?.timeZone && typeof value === 'string') {
+    const resolvedTimeZone = resolveTimeZone(value);
+    return resolvedTimeZone ?? value;
   }
   return value;
 }

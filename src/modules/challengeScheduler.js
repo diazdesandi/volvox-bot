@@ -12,6 +12,7 @@ import { getPool } from '../db.js';
 import { info, error as logError, warn as logWarn } from '../logger.js';
 import { fetchChannelCached } from '../utils/discordCache.js';
 import { safeReply, safeSend } from '../utils/safeSend.js';
+import { normalizeTimeZone } from '../utils/timezone.js';
 import { getConfig } from './config.js';
 
 const require = createRequire(import.meta.url);
@@ -36,16 +37,17 @@ const DIFFICULTY_EMOJI = {
 const lastPostedDate = new Map();
 
 /**
- * Get the day-of-year (1-indexed) for a given date in a timezone.
+ * Return the 1-indexed day of year for a Date in the specified IANA timezone.
  *
- * @param {Date} now - Current date
- * @param {string} timezone - IANA timezone string
- * @returns {number} Day of year
+ * @param {Date} now - The date/time to evaluate.
+ * @param {string} timezone - IANA timezone identifier (e.g., "America/New_York").
+ * @returns {number} The day of the year where `1` represents January 1.
  */
 export function getDayOfYear(now, timezone) {
+  const resolvedTimezone = normalizeTimeZone(timezone);
   // Get the start of the year in the target timezone
   const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
+    timeZone: resolvedTimezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -66,15 +68,15 @@ export function getDayOfYear(now, timezone) {
 }
 
 /**
- * Get today's date string (YYYY-MM-DD) in the given timezone.
+ * Return the local date for the given time in the specified timezone as `YYYY-MM-DD`.
  *
- * @param {Date} now - Current date
- * @param {string} timezone - IANA timezone string
- * @returns {string} Date string YYYY-MM-DD
+ * @param {Date} now - Date to format.
+ * @param {string} timezone - IANA timezone identifier; the value will be normalized before use.
+ * @returns {string} A string in the form `YYYY-MM-DD` representing the local date in the resolved timezone.
  */
 export function getLocalDateString(now, timezone) {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
+    timeZone: normalizeTimeZone(timezone),
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -90,7 +92,7 @@ export function getLocalDateString(now, timezone) {
  */
 export function getLocalTimeString(now, timezone) {
   return new Intl.DateTimeFormat('en-GB', {
-    timeZone: timezone,
+    timeZone: normalizeTimeZone(timezone),
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,

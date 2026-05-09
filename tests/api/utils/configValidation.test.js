@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CONFIG_SCHEMA,
+  normalizeSingleValue,
   validateSingleValue,
   validateValue,
 } from '../../../src/api/utils/configValidation.js';
@@ -190,6 +191,16 @@ describe('configValidation', () => {
 
     it('should accept null welcome.introChannel', () => {
       expect(validateSingleValue('welcome.introChannel', null)).toEqual([]);
+    });
+
+    it('validates and normalizes challenge timezones', () => {
+      expect(validateSingleValue('challenges.timezone', 'America/New_York')).toEqual([]);
+      expect(validateSingleValue('challenges.timezone', 'GMT +3')).toEqual([]);
+      expect(normalizeSingleValue('challenges.timezone', 'GMT +3')).toBe('Etc/GMT-3');
+      expect(normalizeSingleValue('challenges.timezone', 'Mars/Base')).toBe('Mars/Base');
+      expect(validateSingleValue('challenges.timezone', 'Mars/Base')).toEqual([
+        'challenges.timezone: expected a valid IANA timezone or UTC/GMT offset, got "Mars/Base"',
+      ]);
     });
 
     it('should reject malformed roleMenu.options items', () => {
@@ -726,6 +737,133 @@ describe('configValidation', () => {
       const errors = validateSingleValue('xp', { enabled: true, badKey: 'nope' });
       expect(errors).toHaveLength(1);
       expect(errors[0]).toContain('unknown config key');
+    });
+  });
+
+  describe('challenges schema', () => {
+    it('accepts a valid enabled boolean', () => {
+      expect(validateSingleValue('challenges.enabled', true)).toEqual([]);
+      expect(validateSingleValue('challenges.enabled', false)).toEqual([]);
+    });
+
+    it('rejects a non-boolean for challenges.enabled', () => {
+      const errors = validateSingleValue('challenges.enabled', 1);
+      expect(errors.some((e) => e.includes('expected boolean'))).toBe(true);
+    });
+
+    it('accepts a valid channelId string', () => {
+      expect(validateSingleValue('challenges.channelId', '1234567890')).toEqual([]);
+    });
+
+    it('accepts null channelId', () => {
+      expect(validateSingleValue('challenges.channelId', null)).toEqual([]);
+    });
+
+    it('rejects a non-string channelId', () => {
+      const errors = validateSingleValue('challenges.channelId', 12345);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('accepts a valid postTime in HH:MM format', () => {
+      expect(validateSingleValue('challenges.postTime', '00:00')).toEqual([]);
+      expect(validateSingleValue('challenges.postTime', '09:30')).toEqual([]);
+      expect(validateSingleValue('challenges.postTime', '23:59')).toEqual([]);
+      expect(validateSingleValue('challenges.postTime', '12:00')).toEqual([]);
+    });
+
+    it('rejects an invalid postTime format', () => {
+      const errors = validateSingleValue('challenges.postTime', '9:30');
+      expect(errors.some((e) => e.includes('pattern'))).toBe(true);
+    });
+
+    it('rejects postTime with hour 24', () => {
+      const errors = validateSingleValue('challenges.postTime', '24:00');
+      expect(errors.some((e) => e.includes('pattern'))).toBe(true);
+    });
+
+    it('rejects postTime with minutes 60', () => {
+      const errors = validateSingleValue('challenges.postTime', '12:60');
+      expect(errors.some((e) => e.includes('pattern'))).toBe(true);
+    });
+
+    it('rejects postTime with seconds appended', () => {
+      const errors = validateSingleValue('challenges.postTime', '12:00:00');
+      expect(errors.some((e) => e.includes('pattern'))).toBe(true);
+    });
+
+    it('accepts valid IANA timezone for challenges.timezone', () => {
+      expect(validateSingleValue('challenges.timezone', 'Europe/Berlin')).toEqual([]);
+    });
+
+    it('normalizes a GMT offset for challenges.timezone', () => {
+      expect(normalizeSingleValue('challenges.timezone', 'GMT-5')).toBe('Etc/GMT+5');
+    });
+
+    it('rejects an invalid timezone string for challenges.timezone', () => {
+      const errors = validateSingleValue('challenges.timezone', 'Not/ATimezone');
+      expect(errors.some((e) => e.includes('expected a valid IANA timezone'))).toBe(true);
+    });
+  });
+
+  describe('welcome.dynamic.timezone', () => {
+    it('accepts a valid IANA timezone', () => {
+      expect(validateSingleValue('welcome.dynamic.timezone', 'America/Chicago')).toEqual([]);
+    });
+
+    it('accepts GMT offset strings', () => {
+      expect(validateSingleValue('welcome.dynamic.timezone', 'UTC+5')).toEqual([]);
+    });
+
+    it('normalizes a GMT offset for welcome.dynamic.timezone', () => {
+      expect(normalizeSingleValue('welcome.dynamic.timezone', 'UTC +2')).toBe('Etc/GMT-2');
+    });
+
+    it('rejects an invalid timezone', () => {
+      const errors = validateSingleValue('welcome.dynamic.timezone', 'Bad/Zone');
+      expect(errors.some((e) => e.includes('expected a valid IANA timezone'))).toBe(true);
+    });
+  });
+
+  describe('CONFIG_SCHEMA contains challenges', () => {
+    it('should have challenges as a top-level section', () => {
+      expect(Object.keys(CONFIG_SCHEMA)).toContain('challenges');
+    });
+
+    it('challenges schema has expected properties', () => {
+      expect(CONFIG_SCHEMA.challenges.properties).toMatchObject({
+        enabled: { type: 'boolean' },
+        channelId: expect.objectContaining({ type: 'string' }),
+        postTime: expect.objectContaining({ type: 'string' }),
+        timezone: expect.objectContaining({ type: 'string', timeZone: true }),
+      });
+    });
+  });
+
+  describe('validateValue with timeZone schema', () => {
+    it('validates a valid IANA timezone', () => {
+      const errors = validateValue('UTC', { type: 'string', timeZone: true }, 'test.timezone');
+      expect(errors).toEqual([]);
+    });
+
+    it('validates a GMT offset string', () => {
+      const errors = validateValue('GMT+5', { type: 'string', timeZone: true }, 'test.timezone');
+      expect(errors).toEqual([]);
+    });
+
+    it('rejects an invalid timezone string', () => {
+      const errors = validateValue(
+        'Fake/Zone',
+        { type: 'string', timeZone: true },
+        'test.timezone',
+      );
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('expected a valid IANA timezone');
+      expect(errors[0]).toContain('"Fake/Zone"');
+    });
+
+    it('validates non-timeZone strings normally without the timeZone check', () => {
+      const errors = validateValue('any-string', { type: 'string' }, 'test.field');
+      expect(errors).toEqual([]);
     });
   });
 });
