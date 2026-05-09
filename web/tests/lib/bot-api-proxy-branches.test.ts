@@ -226,6 +226,88 @@ describe('bot-api-proxy branch coverage', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it('falls back to discord permissions when userId cannot be derived from token', async () => {
+    // token has no id or sub → getUserIdFromToken returns '' → skip bot API
+    mockGetToken.mockResolvedValue({ accessToken: 'token' });
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+
+    // With administrator permission (8), fallback should grant admin access
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to discord permissions when bot api base url is missing', async () => {
+    mockGetBotApiBaseUrl.mockReturnValue(null);
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to discord permissions when bot api secret is missing', async () => {
+    delete process.env.BOT_API_SECRET;
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('falls back to discord permissions when bot api returns non-ok status', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    // viewer-only discord permissions → fallback would be 'viewer'
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '0' }]);
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+
+    // fallback is viewer → admin check should fail → 403
+    const response = await authorizeGuildAdmin(createRequest(), 'guild-1', '[test]');
+    expect(response?.status).toBe(403);
+  });
+
+  it('falls back to discord permissions when bot api returns non-array response', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({ error: 'not-an-array' }),
+    });
+
+    // fallback from permissions '8' is 'admin' → should be allowed
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+  });
+
+  it('falls back to discord permissions when bot api entry is not found in the response array', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      // entry for a different guild id
+      json: async () => [{ id: 'guild-999', access: 'viewer' }],
+    });
+
+    // fallback from permissions '8' is 'admin' → should be allowed
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+  });
+
+  it('logs error with logPrefix when bot api fetch throws during access resolution', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '0' }]);
+    mockFetchBotGuildAccess.mockRejectedValue(new Error('network failure'));
+
+    // Bot API access lookup throws → catch block logs with logPrefix
+    await authorizeGuildAdmin(createRequest(), 'guild-1', '[test-prefix]');
+
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      expect.stringContaining('[test-prefix]'),
+      expect.any(Error),
+    );
+  });
+
   it('returns config when the bot api base url and secret are present', () => {
     expect(getBotApiConfig('[test]')).toEqual({
       baseUrl: 'https://bot.internal',

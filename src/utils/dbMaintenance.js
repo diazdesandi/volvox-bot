@@ -12,22 +12,6 @@ import { info, error as logError, warn } from '../logger.js';
 import { purgeOldAuditLogs } from '../modules/auditLogger.js';
 import { getConfig } from '../modules/config.js';
 
-/** Track optional tables we've already warned about to avoid hourly log spam */
-const warnedMissingOptionalTables = new Set();
-
-/**
- * Warn once when an optional table is missing.
- *
- * @param {string} tableName - Table name
- */
-function warnMissingOptionalTableOnce(tableName) {
-  if (warnedMissingOptionalTables.has(tableName)) return;
-  warnedMissingOptionalTables.add(tableName);
-  warn(`DB maintenance: ${tableName} table does not exist, skipping`, {
-    source: 'db_maintenance',
-  });
-}
-
 /**
  * Parse and validate TICKET_RETENTION_DAYS.
  * - Valid non-negative integers (including 0) are used as-is.
@@ -78,60 +62,6 @@ async function purgeOldTickets(pool) {
 }
 
 /**
- * Purge expired sessions from the database (if sessions are stored in DB).
- *
- * @param {import('pg').Pool} pool - Database connection pool
- * @returns {Promise<number>} Number of sessions purged
- */
-async function purgeExpiredSessions(pool) {
-  try {
-    const result = await pool.query(`DELETE FROM sessions WHERE expire < NOW()`);
-    const count = result.rowCount ?? 0;
-    if (count > 0) {
-      info('DB maintenance: purged expired sessions', {
-        count,
-        source: 'db_maintenance',
-      });
-    }
-    return count;
-  } catch (err) {
-    if (err.code === '42P01') {
-      warnMissingOptionalTableOnce('sessions');
-      return 0;
-    }
-    throw err;
-  }
-}
-
-/**
- * Purge rate limit entries older than 24 hours (if rate limits are stored in DB).
- *
- * @param {import('pg').Pool} pool - Database connection pool
- * @returns {Promise<number>} Number of entries purged
- */
-async function purgeStaleRateLimits(pool) {
-  try {
-    const result = await pool.query(
-      `DELETE FROM rate_limits WHERE created_at < NOW() - INTERVAL '24 hours'`,
-    );
-    const count = result.rowCount ?? 0;
-    if (count > 0) {
-      info('DB maintenance: purged stale rate limit entries', {
-        count,
-        source: 'db_maintenance',
-      });
-    }
-    return count;
-  } catch (err) {
-    if (err.code === '42P01') {
-      warnMissingOptionalTableOnce('rate_limits');
-      return 0;
-    }
-    throw err;
-  }
-}
-
-/**
  * Run all maintenance tasks.
  *
  * @param {import('pg').Pool} pool - Database connection pool
@@ -146,12 +76,7 @@ export async function runMaintenance(pool) {
   const auditRetentionDays = getConfig()?.auditLog?.retentionDays ?? 90;
 
   try {
-    await Promise.all([
-      purgeOldTickets(pool),
-      purgeExpiredSessions(pool),
-      purgeStaleRateLimits(pool),
-      purgeOldAuditLogs(pool, auditRetentionDays),
-    ]);
+    await Promise.all([purgeOldTickets(pool), purgeOldAuditLogs(pool, auditRetentionDays)]);
     info('DB maintenance: cleanup complete', { source: 'db_maintenance' });
   } catch (err) {
     logError('DB maintenance: error during cleanup', {

@@ -198,6 +198,19 @@ describe('db module', () => {
       await dbModule.closeDb();
       // Should log error but not throw
     });
+
+    it('should not throw when a pool remove event fires after close clears the module pool', async () => {
+      await dbModule.initDb();
+      const removeHandler = pgMocks.poolOn.mock.calls.find(
+        ([eventName]) => eventName === 'remove',
+      )?.[1];
+
+      expect(removeHandler).toEqual(expect.any(Function));
+
+      await dbModule.closeDb();
+
+      expect(() => removeHandler()).not.toThrow();
+    });
   });
 
   describe('SSL configuration', () => {

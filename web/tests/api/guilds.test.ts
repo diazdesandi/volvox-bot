@@ -232,4 +232,237 @@ describe("GET /api/guilds", () => {
     );
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
+
+  it("skips bot api access lookup when guilds list is empty", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+    globalThis.fetch = vi.fn();
+
+    mockGetToken.mockResolvedValue({
+      sub: "123",
+      id: "discord-user-123",
+      accessToken: "valid-discord-token",
+    });
+    mockGetMutualGuilds.mockResolvedValue([]);
+
+    const response = await GET(createMockRequest());
+
+    await expectJsonResponse(response, 200, []);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("skips bot api access lookup when no guilds have botPresent set", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+    globalThis.fetch = vi.fn();
+
+    mockGetToken.mockResolvedValue({
+      sub: "123",
+      id: "discord-user-123",
+      accessToken: "valid-discord-token",
+    });
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: "1",
+        name: "User-only Server",
+        icon: null,
+        owner: false,
+        permissions: "0",
+        features: [],
+        botPresent: false,
+      },
+    ]);
+
+    const response = await GET(createMockRequest());
+
+    expectStatus(response, 200);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("falls back to original guilds when bot api returns non-array JSON", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ error: "unexpected shape" }),
+      status: 200,
+      statusText: "OK",
+    } as Response);
+
+    mockGetToken.mockResolvedValue({
+      sub: "123",
+      id: "discord-user-123",
+      accessToken: "valid-discord-token",
+    });
+    const guild = {
+      id: "1",
+      name: "Server 1",
+      icon: null,
+      owner: false,
+      permissions: "0",
+      features: [],
+      botPresent: true,
+      access: "viewer" as const,
+    };
+    mockGetMutualGuilds.mockResolvedValue([guild]);
+
+    const response = await GET(createMockRequest());
+
+    await expectJsonResponse(response, 200, [expect.objectContaining({ id: "1", access: "viewer" })]);
+  });
+
+  it("falls back to original guilds when bot api returns non-ok response", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: "Service Unavailable",
+    } as Response);
+
+    mockGetToken.mockResolvedValue({
+      sub: "123",
+      id: "discord-user-123",
+      accessToken: "valid-discord-token",
+    });
+    const guild = {
+      id: "1",
+      name: "Server 1",
+      icon: null,
+      owner: false,
+      permissions: "0",
+      features: [],
+      botPresent: true,
+      access: "viewer" as const,
+    };
+    mockGetMutualGuilds.mockResolvedValue([guild]);
+
+    const response = await GET(createMockRequest());
+
+    await expectJsonResponse(response, 200, [expect.objectContaining({ id: "1", access: "viewer" })]);
+  });
+
+  it("falls back to original guilds when bot api fetch throws", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error("network failure"));
+
+    mockGetToken.mockResolvedValue({
+      sub: "123",
+      id: "discord-user-123",
+      accessToken: "valid-discord-token",
+    });
+    const guild = {
+      id: "1",
+      name: "Server 1",
+      icon: null,
+      owner: false,
+      permissions: "0",
+      features: [],
+      botPresent: true,
+      access: "admin" as const,
+    };
+    mockGetMutualGuilds.mockResolvedValue([guild]);
+
+    const response = await GET(createMockRequest());
+
+    await expectJsonResponse(response, 200, [expect.objectContaining({ id: "1", access: "admin" })]);
+  });
+
+  it("skips bot api access lookup when BOT_API_SECRET is not configured", async () => {
+    delete process.env.BOT_API_SECRET;
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+    globalThis.fetch = vi.fn();
+
+    mockGetToken.mockResolvedValue({
+      sub: "123",
+      id: "discord-user-123",
+      accessToken: "valid-discord-token",
+    });
+    const guild = {
+      id: "1",
+      name: "Server 1",
+      icon: null,
+      owner: false,
+      permissions: "0",
+      features: [],
+      botPresent: true,
+      access: "moderator" as const,
+    };
+    mockGetMutualGuilds.mockResolvedValue([guild]);
+
+    const response = await GET(createMockRequest());
+
+    await expectJsonResponse(response, 200, [expect.objectContaining({ id: "1", access: "moderator" })]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("uses token.sub as userId fallback when token.id is absent", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ id: "1", access: "admin" }],
+      status: 200,
+      statusText: "OK",
+    } as Response);
+
+    // token has sub but not id
+    mockGetToken.mockResolvedValue({
+      sub: "discord-sub-456",
+      accessToken: "valid-discord-token",
+    });
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: "1",
+        name: "Server 1",
+        icon: null,
+        owner: false,
+        permissions: "0",
+        features: [],
+        botPresent: true,
+      },
+    ]);
+
+    const response = await GET(createMockRequest());
+
+    await expectJsonResponse(response, 200, [expect.objectContaining({ id: "1" })]);
+    expect(mockGetMutualGuilds).toHaveBeenCalledWith(
+      "valid-discord-token",
+      expect.any(AbortSignal),
+      { userId: "discord-sub-456" },
+    );
+  });
+
+  it("skips bot api access lookup when userId cannot be determined from token", async () => {
+    process.env.BOT_API_SECRET = "bot-secret";
+    mockGetBotApiBaseUrl.mockReturnValue("http://bot.internal/api/v1");
+    globalThis.fetch = vi.fn();
+
+    // token has neither id nor sub
+    mockGetToken.mockResolvedValue({
+      accessToken: "valid-discord-token",
+    });
+    const guild = {
+      id: "1",
+      name: "Server 1",
+      icon: null,
+      owner: false,
+      permissions: "0",
+      features: [],
+      botPresent: true,
+      access: "viewer" as const,
+    };
+    mockGetMutualGuilds.mockResolvedValue([guild]);
+
+    const response = await GET(createMockRequest());
+
+    // Returns guilds unchanged since userId is empty
+    await expectJsonResponse(response, 200, [expect.objectContaining({ id: "1", access: "viewer" })]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
 });

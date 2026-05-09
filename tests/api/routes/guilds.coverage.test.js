@@ -161,6 +161,32 @@ describe('guilds routes coverage', () => {
       expect(res.status).toBe(400);
       expect(res.body.error).toContain('at most 100');
     });
+
+    it('returns admin access for users matching the admin role check', async () => {
+      isAdmin.mockReset().mockReturnValue(true);
+      isModerator.mockReset().mockReturnValue(false);
+
+      const res = await request(app)
+        .get('/api/v1/guilds/access?userId=user1&guildIds=guild1')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([{ id: 'guild1', access: 'admin', present: true }]);
+      expect(isAdmin).toHaveBeenCalled();
+    });
+
+    it('returns viewer access and includes present for existing members', async () => {
+      isAdmin.mockReset().mockReturnValue(false);
+      isModerator.mockReset().mockReturnValue(false);
+
+      // User is in the cache (member exists) but has neither admin nor moderator role
+      const res = await request(app)
+        .get('/api/v1/guilds/access?userId=user1&guildIds=guild1')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([{ id: 'guild1', access: 'viewer', present: true }]);
+    });
   });
 
   afterEach(() => {

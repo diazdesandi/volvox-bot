@@ -12,7 +12,7 @@ vi.mock('../../src/modules/config.js', () => ({
   getConfig: vi.fn().mockReturnValue({ auditLog: { enabled: true, retentionDays: 90 } }),
 }));
 
-// Mock purgeOldAuditLogs so dbMaintenance tests stay focused on ticket/session/rate-limit logic.
+// Mock purgeOldAuditLogs so dbMaintenance tests stay focused on ticket cleanup.
 // The auditLogger module has its own dedicated test suite.
 vi.mock('../../src/modules/auditLogger.js', () => ({
   purgeOldAuditLogs: vi.fn().mockResolvedValue(0),
@@ -42,15 +42,42 @@ describe('runMaintenance', () => {
     vi.restoreAllMocks();
   });
 
-  it('runs all three maintenance tasks without throwing', async () => {
+  it('runs ticket maintenance without throwing', async () => {
     await expect(runMaintenance(mockPool)).resolves.toBeUndefined();
-    // tickets, sessions, rate_limits — 3 queries total (auditLogger is mocked separately)
-    expect(mockPool.query).toHaveBeenCalledTimes(3);
+    // tickets only — auditLogger is mocked separately
+    expect(mockPool.query).toHaveBeenCalledTimes(1);
   });
 
   it('calls purgeOldAuditLogs with configured retentionDays', async () => {
     await runMaintenance(mockPool);
     expect(auditLogger.purgeOldAuditLogs).toHaveBeenCalledWith(mockPool, 90);
+  });
+
+  it('falls back to 90 retention days when getConfig returns null', async () => {
+    const { getConfig } = await import('../../src/modules/config.js');
+    getConfig.mockReturnValueOnce(null);
+
+    await runMaintenance(mockPool);
+
+    expect(auditLogger.purgeOldAuditLogs).toHaveBeenCalledWith(mockPool, 90);
+  });
+
+  it('does not query the legacy sessions table during maintenance', async () => {
+    await runMaintenance(mockPool);
+    const sessionQueries = mockPool.query.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && /\bsessions\b/.test(sql),
+    );
+
+    expect(sessionQueries).toHaveLength(0);
+  });
+
+  it('does not query the legacy rate_limits table during maintenance', async () => {
+    await runMaintenance(mockPool);
+    const rateLimitQueries = mockPool.query.mock.calls.filter(
+      ([sql]) => typeof sql === 'string' && /\brate_limits\b/.test(sql),
+    );
+
+    expect(rateLimitQueries).toHaveLength(0);
   });
 
   it('logs start and completion messages', async () => {
@@ -80,36 +107,6 @@ describe('runMaintenance', () => {
     );
   });
 
-  it('logs info when sessions are purged', async () => {
-    mockPool.query.mockImplementation((sql) => {
-      if (typeof sql === 'string' && sql.includes('sessions')) {
-        return Promise.resolve({ rowCount: 12 });
-      }
-      return Promise.resolve({ rowCount: 0 });
-    });
-
-    await runMaintenance(mockPool);
-    expect(logger.info).toHaveBeenCalledWith(
-      'DB maintenance: purged expired sessions',
-      expect.objectContaining({ count: 12 }),
-    );
-  });
-
-  it('logs info when rate limits are purged', async () => {
-    mockPool.query.mockImplementation((sql) => {
-      if (typeof sql === 'string' && sql.includes('rate_limits')) {
-        return Promise.resolve({ rowCount: 3 });
-      }
-      return Promise.resolve({ rowCount: 0 });
-    });
-
-    await runMaintenance(mockPool);
-    expect(logger.info).toHaveBeenCalledWith(
-      'DB maintenance: purged stale rate limit entries',
-      expect.objectContaining({ count: 3 }),
-    );
-  });
-
   describe('missing table handling (42P01)', () => {
     it('skips gracefully when tickets table is missing', async () => {
       const tableError = Object.assign(new Error('relation "tickets" does not exist'), {
@@ -130,87 +127,13 @@ describe('runMaintenance', () => {
       );
     });
 
-    it('skips gracefully when sessions table is missing', async () => {
-      const tableError = Object.assign(new Error('relation "sessions" does not exist'), {
-        code: '42P01',
-      });
-
-      mockPool.query.mockImplementation((sql) => {
-        if (typeof sql === 'string' && sql.includes('sessions')) {
-          return Promise.reject(tableError);
-        }
-        return Promise.resolve({ rowCount: 0 });
-      });
-
-      await expect(runMaintenance(mockPool)).resolves.toBeUndefined();
-      expect(logger.warn).toHaveBeenCalledWith(
-        'DB maintenance: sessions table does not exist, skipping',
-        expect.objectContaining({ source: 'db_maintenance' }),
-      );
-    });
-
-    it('skips gracefully when rate_limits table is missing', async () => {
-      const tableError = Object.assign(new Error('relation "rate_limits" does not exist'), {
-        code: '42P01',
-      });
-
-      mockPool.query.mockImplementation((sql) => {
-        if (typeof sql === 'string' && sql.includes('rate_limits')) {
-          return Promise.reject(tableError);
-        }
-        return Promise.resolve({ rowCount: 0 });
-      });
-
-      await expect(runMaintenance(mockPool)).resolves.toBeUndefined();
-      expect(logger.warn).toHaveBeenCalledWith(
-        'DB maintenance: rate_limits table does not exist, skipping',
-        expect.objectContaining({ source: 'db_maintenance' }),
-      );
-    });
-
-    it('warns once per optional missing table across multiple runs', async () => {
-      const sessionsTableError = Object.assign(new Error('relation "sessions" does not exist'), {
-        code: '42P01',
-      });
-      const rateLimitsTableError = Object.assign(
-        new Error('relation "rate_limits" does not exist'),
-        {
-          code: '42P01',
-        },
-      );
-
-      mockPool.query.mockImplementation((sql) => {
-        if (typeof sql === 'string' && sql.includes('sessions')) {
-          return Promise.reject(sessionsTableError);
-        }
-        if (typeof sql === 'string' && sql.includes('rate_limits')) {
-          return Promise.reject(rateLimitsTableError);
-        }
-        return Promise.resolve({ rowCount: 0 });
-      });
-
-      await runMaintenance(mockPool);
-      await runMaintenance(mockPool);
-
-      const sessionsWarnings = logger.warn.mock.calls.filter(
-        ([message]) => message === 'DB maintenance: sessions table does not exist, skipping',
-      );
-      const rateLimitWarnings = logger.warn.mock.calls.filter(
-        ([message]) => message === 'DB maintenance: rate_limits table does not exist, skipping',
-      );
-
-      expect(sessionsWarnings).toHaveLength(1);
-      expect(rateLimitWarnings).toHaveLength(1);
-    });
-
-    it('handles all three tables missing simultaneously', async () => {
+    it('handles the cleanup table missing', async () => {
       const tableError = Object.assign(new Error('relation does not exist'), { code: '42P01' });
       mockPool.query.mockRejectedValue(tableError);
 
       await expect(runMaintenance(mockPool)).resolves.toBeUndefined();
-      // tickets warn + sessions warn-once + rate_limits warn-once = 3
       // (auditLogger.purgeOldAuditLogs is mocked at module level)
-      expect(logger.warn).toHaveBeenCalledTimes(3);
+      expect(logger.warn).toHaveBeenCalledTimes(1);
     });
   });
 

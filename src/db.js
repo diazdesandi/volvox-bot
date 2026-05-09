@@ -270,54 +270,55 @@ export async function initDb() {
     const idleTimeoutMs = parsePositiveInt(process.env.PG_IDLE_TIMEOUT_MS, 30000);
     const connectionTimeoutMs = parsePositiveInt(process.env.PG_CONNECTION_TIMEOUT_MS, 10000);
 
-    pool = new Pool({
+    const poolInstance = new Pool({
       connectionString,
       max: poolSize,
       idleTimeoutMillis: idleTimeoutMs,
       connectionTimeoutMillis: connectionTimeoutMs,
       ssl: getSslConfig(connectionString),
     });
+    pool = poolInstance;
 
     // Prevent unhandled pool errors from crashing the process
-    pool.on('error', (err) => {
+    poolInstance.on('error', (err) => {
       logError('Unexpected database pool error', { error: err.message, source: 'database_pool' });
     });
 
     // Pool event listeners for observability
-    pool.on('connect', () => {
+    poolInstance.on('connect', () => {
       debug('Database pool: new client connected', {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
+        total: poolInstance.totalCount,
+        idle: poolInstance.idleCount,
+        waiting: poolInstance.waitingCount,
         source: 'pool_events',
       });
     });
 
-    pool.on('acquire', () => {
+    poolInstance.on('acquire', () => {
       debug('Database pool: client acquired', {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
+        total: poolInstance.totalCount,
+        idle: poolInstance.idleCount,
+        waiting: poolInstance.waitingCount,
         source: 'pool_events',
       });
     });
 
-    pool.on('remove', () => {
+    poolInstance.on('remove', () => {
       debug('Database pool: client removed', {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
+        total: poolInstance.totalCount,
+        idle: poolInstance.idleCount,
+        waiting: poolInstance.waitingCount,
         source: 'pool_events',
       });
     });
 
     // Wrap query with slow query logging
     const slowQueryThresholdMs = parsePositiveInt(process.env.PG_SLOW_QUERY_MS, 100);
-    wrapPoolQuery(pool, slowQueryThresholdMs);
+    wrapPoolQuery(poolInstance, slowQueryThresholdMs);
 
     try {
       // Test connection
-      const client = await pool.connect();
+      const client = await poolInstance.connect();
       try {
         await client.query('SELECT NOW()');
         info('Database connected');
@@ -331,15 +332,17 @@ export async function initDb() {
       info('Database schema initialized');
     } catch (err) {
       // Clean up the pool so getPool() doesn't return an unusable instance
-      await pool.end().catch(() => {});
-      pool = null;
+      await poolInstance.end().catch(() => {});
+      if (pool === poolInstance) {
+        pool = null;
+      }
       throw err;
     }
 
     // Start connection leak detection
-    startLeakDetection(pool, poolSize);
+    startLeakDetection(poolInstance, poolSize);
 
-    return pool;
+    return poolInstance;
   } finally {
     initializing = false;
   }
