@@ -59,6 +59,7 @@ import { getPool } from '../../src/db.js';
 import { error as loggerError, warn as loggerWarn } from '../../src/logger.js';
 import { getConfig } from '../../src/modules/config.js';
 import {
+  ACTION_COLORS,
   checkEscalation,
   checkHierarchy,
   createCase,
@@ -257,13 +258,16 @@ describe('moderation module', () => {
   });
 
   describe('sendDmNotification', () => {
-    it('should send DM embed to member', async () => {
+    it('should send DM embed to member with default title and action color', async () => {
       const mockSend = vi.fn().mockResolvedValue(undefined);
       const member = { send: mockSend };
 
       await sendDmNotification(member, 'warn', 'test reason', 'Test Server');
 
       expect(mockSend).toHaveBeenCalledWith(expect.objectContaining({ embeds: expect.any(Array) }));
+      const embed = mockSend.mock.calls[0][0].embeds[0].toJSON();
+      expect(embed.title).toBe('You have been warned in Test Server');
+      expect(embed.color).toBe(ACTION_COLORS.warn);
     });
 
     it('should use fallback reason when none provided', async () => {
@@ -275,6 +279,21 @@ describe('moderation module', () => {
       const embed = mockSend.mock.calls[0][0].embeds[0];
       const fields = embed.toJSON().fields;
       expect(fields[0].value).toBe('No reason provided');
+    });
+
+    it('should support custom title and color action options', async () => {
+      const mockSend = vi.fn().mockResolvedValue(undefined);
+      const member = { send: mockSend };
+
+      await sendDmNotification(member, 'timeout', 'cool down', 'Test Server', {
+        title: 'Custom moderation notice',
+        colorAction: 'ban',
+      });
+
+      const embed = mockSend.mock.calls[0][0].embeds[0].toJSON();
+      expect(embed.title).toBe('Custom moderation notice');
+      expect(embed.color).toBe(ACTION_COLORS.ban);
+      expect(embed.fields[0].value).toBe('cool down');
     });
 
     it('should silently catch DM failures', async () => {

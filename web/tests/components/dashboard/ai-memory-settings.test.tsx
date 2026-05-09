@@ -50,13 +50,13 @@ describe('AiMemorySettings', () => {
   it('renders the maxContextMemories input with its default value of 10', () => {
     renderMemorySettings();
 
-    expect(screen.getByLabelText('max-context-memories')).toHaveValue(10);
+    expect(screen.getByRole('spinbutton', { name: /Retrieval Depth/i })).toHaveValue(10);
   });
 
   it('renders the maxContextMemories input with a configured value', () => {
     renderMemorySettings({ memory: { enabled: true, maxContextMemories: 25 } });
 
-    expect(screen.getByLabelText('max-context-memories')).toHaveValue(25);
+    expect(screen.getByRole('spinbutton', { name: /Retrieval Depth/i })).toHaveValue(25);
   });
 
   it('renders the Autonomous Extraction toggle', () => {
@@ -86,7 +86,7 @@ describe('AiMemorySettings', () => {
   it('calls onFieldChange with "maxContextMemories" and numeric value when input changes', () => {
     const { onFieldChange } = renderMemorySettings();
 
-    fireEvent.change(screen.getByLabelText('max-context-memories'), {
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Retrieval Depth/i }), {
       target: { value: '15' },
     });
 
@@ -112,7 +112,7 @@ describe('AiMemorySettings', () => {
   it('disables the maxContextMemories input when saving=true', () => {
     renderMemorySettings({}, vi.fn(), true);
 
-    expect(screen.getByLabelText('max-context-memories')).toBeDisabled();
+    expect(screen.getByRole('spinbutton', { name: /Retrieval Depth/i })).toBeDisabled();
   });
 
   it('disables the Auto-Extract toggle when saving=true', () => {
@@ -124,7 +124,7 @@ describe('AiMemorySettings', () => {
   it('does not call onFieldChange when input has a non-numeric value', () => {
     const { onFieldChange } = renderMemorySettings();
 
-    fireEvent.change(screen.getByLabelText('max-context-memories'), {
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Retrieval Depth/i }), {
       target: { value: 'abc' },
     });
 
