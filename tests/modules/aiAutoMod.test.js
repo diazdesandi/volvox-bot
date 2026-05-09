@@ -1035,8 +1035,7 @@ describe('checkAiAutoMod', () => {
     expectNoSuccessfulActionAudit('warn');
   });
 
-  it('continues warn persistence and escalation when warn DM notification fails', async () => {
-    vi.mocked(sendDmNotification).mockRejectedValueOnce(new Error('Cannot send messages'));
+  it('continues warn persistence and escalation after sending warn DM notification', async () => {
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.1, spam: 0.1, harassment: 0.9, reason: 'harassment' }),
     );

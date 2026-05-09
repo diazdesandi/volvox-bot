@@ -69,12 +69,8 @@ let fileConfigCache = null;
  */
 let globalAiAutoModDmNotificationsExplicit = false;
 
-function hasOwn(object, key) {
-  return Object.hasOwn(object, key);
-}
-
 function getExplicitAiAutoModDmNotifications(configSection) {
-  if (!isPlainObject(configSection) || !hasOwn(configSection, 'dmNotifications')) {
+  if (!isPlainObject(configSection) || !Object.hasOwn(configSection, 'dmNotifications')) {
     return undefined;
   }
   return isPlainObject(configSection.dmNotifications) ? configSection.dmNotifications : undefined;
@@ -87,7 +83,7 @@ function hasExplicitAiAutoModDmNotifications(configSection) {
 function shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(rowValue, fileAiDmExplicit) {
   if (hasExplicitAiAutoModDmNotifications(rowValue)) return true;
 
-  return isPlainObject(rowValue) && !hasOwn(rowValue, 'dmNotifications') && fileAiDmExplicit;
+  return isPlainObject(rowValue) && !Object.hasOwn(rowValue, 'dmNotifications') && fileAiDmExplicit;
 }
 
 function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
@@ -130,7 +126,7 @@ function stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
     writesAiDmNotifications ||
     globalAiAutoModDmNotificationsExplicit ||
     !isPlainObject(sectionValue) ||
-    !hasOwn(sectionValue, 'dmNotifications')
+    !Object.hasOwn(sectionValue, 'dmNotifications')
   ) {
     return sectionValue;
   }
