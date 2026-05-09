@@ -379,6 +379,43 @@ describe('AiAutomationCategory', () => {
     expect(nextConfig.aiAutoMod?.actions?.hateSpeech).toEqual(['timeout']);
   });
 
+  it('falls back to legacy moderation DM notifications before the first AI override', () => {
+    const updateDraftConfig = vi.fn();
+    const draftConfig = createDraftConfig({
+      moderation: {
+        dmNotifications: {
+          warn: false,
+          timeout: false,
+          kick: true,
+          ban: false,
+        },
+      },
+      aiAutoMod: {
+        dmNotifications: undefined,
+      },
+    });
+    mockAiAutoModContext(updateDraftConfig, draftConfig);
+
+    render(<AiAutomationCategory />);
+
+    expect(screen.getByLabelText('DM notifications for Warnings')).not.toBeChecked();
+    expect(screen.getByLabelText('DM notifications for Timeouts')).not.toBeChecked();
+    expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
+    expect(screen.getByLabelText('DM notifications for Bans')).not.toBeChecked();
+
+    fireEvent.click(screen.getByLabelText('DM notifications for Timeouts'));
+
+    const updater = updateDraftConfig.mock.calls[0]?.[0] as (config: GuildConfig) => GuildConfig;
+    const nextConfig = updater(draftConfig);
+
+    expect(nextConfig.aiAutoMod?.dmNotifications).toEqual({
+      warn: false,
+      timeout: true,
+      kick: true,
+      ban: false,
+    });
+  });
+
   it('preserves unknown saved models in the detection model dropdown', () => {
     const unsupportedModel = 'anthropic:claude-3-5-haiku';
     const updateDraftConfig = vi.fn();

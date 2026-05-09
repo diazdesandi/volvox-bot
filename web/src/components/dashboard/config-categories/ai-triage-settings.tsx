@@ -1,0 +1,222 @@
+import { AiModelSelect } from '@/components/dashboard/ai-model-select';
+import {
+  type GuildConfig,
+  inputClasses,
+  parseNumberInput,
+} from '@/components/dashboard/config-editor-utils';
+import { ChannelSelector } from '@/components/ui/channel-selector';
+import { RoleSelector } from '@/components/ui/role-selector';
+import { ToggleSwitch } from '../toggle-switch';
+
+export function AiTriageSettings({
+  draftConfig,
+  saving,
+  guildId,
+  classifyModelValue,
+  respondModelValue,
+  onFieldChange,
+}: Readonly<{
+  draftConfig: GuildConfig;
+  saving: boolean;
+  guildId: string;
+  classifyModelValue: string;
+  respondModelValue: string;
+  onFieldChange: (field: string, value: unknown) => void;
+}>) {
+  return (
+    <div className="space-y-6">
+      <div className="p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
+        <div className="mb-6 space-y-1">
+          <h3 className="text-sm font-semibold tracking-wide text-foreground/90">Engine Setup</h3>
+          <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
+            Model selection and log destination
+          </p>
+        </div>
+        <div className="grid gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <AiModelSelect
+              id="classify-model"
+              label="Classifier Engine"
+              value={classifyModelValue}
+              onChange={(value) => onFieldChange('classifyModel', value)}
+              disabled={saving}
+              wrapperClassName="space-y-2"
+              labelClassName="ml-1 text-[11px] uppercase tracking-wider text-muted-foreground"
+            />
+            <AiModelSelect
+              id="respond-model"
+              label="Response Engine"
+              value={respondModelValue}
+              onChange={(value) => onFieldChange('respondModel', value)}
+              disabled={saving}
+              wrapperClassName="space-y-2"
+              labelClassName="ml-1 text-[11px] uppercase tracking-wider text-muted-foreground"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="moderation-log-channel"
+              className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+            >
+              Triage Audit Log
+            </label>
+            <ChannelSelector
+              id="moderation-log-channel"
+              guildId={guildId}
+              selected={
+                draftConfig.triage?.moderationLogChannel
+                  ? [draftConfig.triage.moderationLogChannel]
+                  : []
+              }
+              onChange={(selected) => onFieldChange('moderationLogChannel', selected[0] ?? null)}
+              disabled={saving}
+              placeholder="Select a channel for triage history..."
+              maxSelections={1}
+              filter="text"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
+        <div className="mb-6 space-y-1">
+          <h3 className="text-sm font-semibold tracking-wide text-foreground/90">Role Filtering</h3>
+          <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
+            Control which users the AI responds to
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label
+              htmlFor="triage-allowed-roles"
+              className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+            >
+              Allowed Roles
+            </label>
+            <p className="text-[10px] text-muted-foreground/60 ml-1">
+              Only triage messages from users with these roles. Empty = everyone allowed.
+            </p>
+            <RoleSelector
+              id="triage-allowed-roles"
+              guildId={guildId}
+              selected={draftConfig.triage?.allowedRoles ?? []}
+              onChange={(selected) => onFieldChange('allowedRoles', selected)}
+              disabled={saving}
+              placeholder="Select allowed roles..."
+            />
+          </div>
+          <div className="space-y-2">
+            <label
+              htmlFor="triage-excluded-roles"
+              className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground ml-1"
+            >
+              Excluded Roles
+            </label>
+            <p className="text-[10px] text-muted-foreground/60 ml-1">
+              Never triage messages from users with these roles. Takes precedence over allowed.
+            </p>
+            <RoleSelector
+              id="triage-excluded-roles"
+              guildId={guildId}
+              selected={draftConfig.triage?.excludedRoles ?? []}
+              onChange={(selected) => onFieldChange('excludedRoles', selected)}
+              disabled={saving}
+              placeholder="Select excluded roles..."
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
+          <div className="mb-6 space-y-1">
+            <h3 className="text-sm font-semibold tracking-wide text-foreground/90">Daily Limits</h3>
+            <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
+              Budget boundaries
+            </p>
+          </div>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="classify-budget" className="text-xs font-bold text-foreground/80">
+                Classify Budget ($)
+              </label>
+              <input
+                id="classify-budget"
+                type="number"
+                step="0.01"
+                min={0}
+                value={draftConfig.triage?.classifyBudget ?? 0}
+                onChange={(event) => {
+                  const num = parseNumberInput(event.target.value, 0);
+                  if (num !== undefined) onFieldChange('classifyBudget', num);
+                }}
+                onFocus={(event) => event.target.select()}
+                disabled={saving}
+                className={inputClasses}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="respond-budget" className="text-xs font-bold text-foreground/80">
+                Response Budget ($)
+              </label>
+              <input
+                id="respond-budget"
+                type="number"
+                step="0.01"
+                min={0}
+                value={draftConfig.triage?.respondBudget ?? 0}
+                onChange={(event) => {
+                  const num = parseNumberInput(event.target.value, 0);
+                  if (num !== undefined) onFieldChange('respondBudget', num);
+                }}
+                onFocus={(event) => event.target.select()}
+                disabled={saving}
+                className={inputClasses}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
+          <div className="mb-6 space-y-1">
+            <h3 className="text-sm font-semibold tracking-wide text-foreground/90">
+              Operational Modes
+            </h3>
+            <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
+              Behavior toggles
+            </p>
+          </div>
+          <div className="space-y-2">
+            {[
+              {
+                id: 'moderationResponse',
+                label: 'Enforce Safety Guardrails',
+                key: 'moderationResponse',
+              },
+              { id: 'debugFooter', label: 'Show Debug Metadata', key: 'debugFooter' },
+              { id: 'statusReactions', label: 'Visual Status Feedback', key: 'statusReactions' },
+            ].map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-border/30 shadow-inner"
+              >
+                <span className="text-sm font-semibold text-foreground/80">{item.label}</span>
+                <ToggleSwitch
+                  checked={
+                    (draftConfig.triage?.[
+                      item.key as keyof typeof draftConfig.triage
+                    ] as boolean) ?? false
+                  }
+                  onChange={(value) => onFieldChange(item.key, value)}
+                  disabled={saving}
+                  label={item.label}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
