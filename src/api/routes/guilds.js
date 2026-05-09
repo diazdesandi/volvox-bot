@@ -52,6 +52,7 @@ export function parsePagination(query) {
 const MAX_ANALYTICS_RANGE_DAYS = 90;
 const ACTIVE_CONVERSATION_WINDOW_MINUTES = 15;
 const AI_USAGE_UNAVAILABLE_SOURCE = 'unavailable';
+const ANALYTICS_CACHE_SCHEMA_VERSION = 'v2';
 
 class AnalyticsRangeValidationError extends Error {
   constructor(message) {
@@ -1500,7 +1501,7 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
     range === 'custom'
       ? `${from.toISOString().slice(0, 16)}_${to.toISOString().slice(0, 16)}`
       : new Date().toISOString().slice(0, 13);
-  const analyticsCacheKey = `analytics:${req.params.id}:${range}:${interval}:${compareMode ? '1' : '0'}:${activeChannelFilter || ''}:${hourBucket}`;
+  const analyticsCacheKey = `analytics:${ANALYTICS_CACHE_SCHEMA_VERSION}:${req.params.id}:${range}:${interval}:${compareMode ? '1' : '0'}:${activeChannelFilter || ''}:${hourBucket}`;
   const analyticsTtl = range === 'today' ? TTL.LEADERBOARD : TTL.ANALYTICS;
 
   try {
@@ -1638,21 +1639,40 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
             }),
           dbPool
             .query(
-              `SELECT
-               COUNT(DISTINCT CASE
-                 WHEN role = 'user' THEN COALESCE('id:' || NULLIF(user_id, ''), 'name:' || NULLIF(username, ''))
-               END)::int AS tracked_users,
-               COUNT(*) FILTER (WHERE role = 'user')::int AS user_messages
-             FROM conversations
-             WHERE ${engagementWhere}`,
+              // Reactions still live in lifetime user_stats; conversations provides the
+              // range-aware active user and message counts for this dashboard card.
+              `WITH range_engagement AS (
+                 SELECT
+                   COUNT(DISTINCT CASE
+                     WHEN role = 'user' THEN COALESCE('id:' || NULLIF(user_id, ''), 'name:' || NULLIF(username, ''))
+                   END)::int AS tracked_users,
+                   COUNT(*) FILTER (WHERE role = 'user')::int AS user_messages
+                 FROM conversations
+                 WHERE ${engagementWhere}
+               ),
+               lifetime_reactions AS (
+                 SELECT
+                   COALESCE(SUM(reactions_given), 0)::bigint AS lifetime_reactions_given,
+                   COALESCE(SUM(reactions_received), 0)::bigint AS lifetime_reactions_received
+                 FROM user_stats
+                 WHERE guild_id = $1
+               )
+               SELECT
+                 range_engagement.tracked_users,
+                 range_engagement.user_messages,
+                 lifetime_reactions.lifetime_reactions_given,
+                 lifetime_reactions.lifetime_reactions_received
+               FROM range_engagement
+               CROSS JOIN lifetime_reactions`,
               engagementValues,
             )
+            .then((result) => ({ rows: result.rows, available: true }))
             .catch((err) => {
               warn('Engagement query failed; returning empty engagement dataset', {
                 guild: req.params.id,
                 error: err.message,
               });
-              return { rows: [] };
+              return { rows: [], available: false };
             }),
           dbPool
             .query(
@@ -1724,6 +1744,8 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
         const engagementRow = userEngagementResult.rows[0] || {
           tracked_users: 0,
           user_messages: 0,
+          lifetime_reactions_given: 0,
+          lifetime_reactions_received: 0,
         };
 
         const peakHourRow = peakHourResult.rows[0] || {
@@ -1788,6 +1810,12 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
           command: row.command_name,
           uses: Number(row.uses || 0),
         }));
+        const engagementAvailable = userEngagementResult.available !== false;
+        const trackedUsers = Number(engagementRow.tracked_users || 0);
+        const userMessages = Number(engagementRow.user_messages || 0);
+        const lifetimeReactionsGiven = Number(engagementRow.lifetime_reactions_given || 0);
+        const lifetimeReactionsReceived = Number(engagementRow.lifetime_reactions_received || 0);
+        const hasLifetimeReactions = lifetimeReactionsGiven > 0 || lifetimeReactionsReceived > 0;
 
         return {
           guildId: req.params.id,
@@ -1833,19 +1861,18 @@ router.get('/:id/analytics', requireGuildAdmin, validateGuild, async (req, res) 
             : null,
           heatmap,
           userEngagement:
-            engagementRow.tracked_users > 0
+            engagementAvailable && (trackedUsers > 0 || hasLifetimeReactions)
               ? {
-                  trackedUsers: Number(engagementRow.tracked_users),
-                  avgMessagesPerUser: Number(
-                    (engagementRow.user_messages / engagementRow.tracked_users).toFixed(1),
-                  ),
+                  trackedUsers,
+                  avgMessagesPerUser:
+                    trackedUsers > 0 ? Number((userMessages / trackedUsers).toFixed(1)) : 0,
                   aiResponseRate:
-                    engagementRow.user_messages > 0
-                      ? Number(
-                          ((kpiRow.ai_requests / engagementRow.user_messages) * 100).toFixed(1),
-                        )
+                    userMessages > 0
+                      ? Number(((kpiRow.ai_requests / userMessages) * 100).toFixed(1))
                       : 0,
                   peakHour: peakHourRow.peak_hour,
+                  lifetimeReactionsGiven,
+                  lifetimeReactionsReceived,
                 }
               : null,
           xpEconomy: xpEconomyResult.rows[0]

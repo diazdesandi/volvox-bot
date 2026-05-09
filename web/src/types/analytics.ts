@@ -54,6 +54,8 @@ export interface UserEngagementMetrics {
   avgMessagesPerUser: number;
   aiResponseRate: number;
   peakHour: number | null;
+  lifetimeReactionsGiven: number;
+  lifetimeReactionsReceived: number;
 }
 
 export interface ActivityEvent {

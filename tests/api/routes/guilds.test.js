@@ -1125,6 +1125,8 @@ describe('guilds routes', () => {
             {
               tracked_users: 25,
               user_messages: 100,
+              lifetime_reactions_given: 240,
+              lifetime_reactions_received: 180,
             },
           ],
         }) // userEngagementResult
@@ -1191,6 +1193,11 @@ describe('guilds routes', () => {
       expect(res.body.kpis.aiCostUsd).toBe(0.05);
       expect(res.body.kpis.newMembers).toBeTypeOf('number');
       expect(res.body.realtime.activeAiConversations).toBe(3);
+      expect(cacheGetOrSet).toHaveBeenCalledWith(
+        expect.stringMatching(/^analytics:v2:guild1:/),
+        expect.any(Function),
+        expect.any(Number),
+      );
       const peakHourQuery = mockPool.query.mock.calls.find(([sql]) =>
         String(sql).includes('AS peak_hour'),
       )?.[0];
@@ -1200,6 +1207,9 @@ describe('guilds routes', () => {
       )?.[0];
       expect(engagementQuery).toContain("COALESCE('id:' || NULLIF(user_id, '')");
       expect(engagementQuery).toContain("'name:' || NULLIF(username, '')");
+      expect(engagementQuery).toContain('lifetime_reactions_given');
+      expect(engagementQuery).toContain('lifetime_reactions_received');
+      expect(engagementQuery.match(/FROM user_stats/g) ?? []).toHaveLength(1);
       const aiUsageQuery = mockPool.query.mock.calls.find(([sql]) =>
         String(sql).includes('FROM ai_usage'),
       )?.[0];
@@ -1263,6 +1273,8 @@ describe('guilds routes', () => {
         avgMessagesPerUser: 4,
         aiResponseRate: 40,
         peakHour: 14,
+        lifetimeReactionsGiven: 240,
+        lifetimeReactionsReceived: 180,
       });
       // New: XP economy
       expect(res.body.xpEconomy).toEqual({
@@ -1672,6 +1684,47 @@ describe('guilds routes', () => {
         'Peak hour query failed; returning empty peak hour dataset',
         expect.objectContaining({ guild: 'guild1', error: 'peak hour unavailable' }),
       );
+    });
+
+    it('should keep lifetime reaction engagement visible when the selected range has no active users', async () => {
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('AS total_messages')) {
+          return Promise.resolve({
+            rows: [{ total_messages: 0, ai_requests: 0, active_users: 0 }],
+          });
+        }
+        if (query.includes('AS tracked_users')) {
+          return Promise.resolve({
+            rows: [
+              {
+                tracked_users: 0,
+                user_messages: 0,
+                lifetime_reactions_given: 15,
+                lifetime_reactions_received: 8,
+              },
+            ],
+          });
+        }
+        if (query.includes('COUNT(DISTINCT channel_id)')) {
+          return Promise.resolve({ rows: [{ count: 0 }] });
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/analytics?range=week')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.userEngagement).toEqual({
+        trackedUsers: 0,
+        avgMessagesPerUser: 0,
+        aiResponseRate: 0,
+        peakHour: null,
+        lifetimeReactionsGiven: 15,
+        lifetimeReactionsReceived: 8,
+      });
     });
 
     it('should mark command usage source unavailable when command query fails', async () => {

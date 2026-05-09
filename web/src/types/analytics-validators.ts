@@ -173,6 +173,19 @@ function isValidHeatmap(heatmap: unknown): boolean {
   return Array.isArray(heatmap) && heatmap.every(isValidHeatmapEntry);
 }
 
+/**
+ * Checks whether `ue` is a valid user engagement payload or is omitted.
+ *
+ * @param ue - The value to validate; may be `undefined`, `null`, or an object containing user engagement metrics
+ *   Expected object shape when present:
+ *   - `trackedUsers`: finite number
+ *   - `avgMessagesPerUser`: finite number
+ *   - `aiResponseRate`: finite number
+ *   - `peakHour`: finite number or `null`
+ *   - `lifetimeReactionsGiven`: finite number
+ *   - `lifetimeReactionsReceived`: finite number
+ * @returns `true` if `ue` is `undefined` or `null`, or an object matching the expected shape above, `false` otherwise.
+ */
 function isValidUserEngagement(ue: unknown): boolean {
   if (ue === undefined || ue === null) return true;
   return (
@@ -180,7 +193,9 @@ function isValidUserEngagement(ue: unknown): boolean {
     isFiniteNumber(ue.trackedUsers) &&
     isFiniteNumber(ue.avgMessagesPerUser) &&
     isFiniteNumber(ue.aiResponseRate) &&
-    isFiniteNumberOrNull(ue.peakHour)
+    isFiniteNumberOrNull(ue.peakHour) &&
+    isFiniteNumber(ue.lifetimeReactionsGiven) &&
+    isFiniteNumber(ue.lifetimeReactionsReceived)
   );
 }
 

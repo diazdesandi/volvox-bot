@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardAnalytics } from '@/types/analytics';
 
-const { analyticsPayload } = vi.hoisted(() => ({
-  analyticsPayload: {
+const { analyticsPayload } = vi.hoisted(() => {
+  const analyticsPayload: DashboardAnalytics = {
     guildId: 'guild-1',
     range: {
       type: 'week',
@@ -88,8 +88,10 @@ const { analyticsPayload } = vi.hoisted(() => ({
     ],
     userEngagement: null,
     xpEconomy: null,
-  } satisfies DashboardAnalytics,
-}));
+  } satisfies DashboardAnalytics;
+
+  return { analyticsPayload };
+});
 
 vi.mock('recharts', () => {
   const Wrapper = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -142,6 +144,7 @@ describe('AnalyticsDashboard overview', () => {
 
   afterEach(() => {
     analyticsPayload.kpis.activeUsers = 88;
+    analyticsPayload.userEngagement = null;
     if (analyticsPayload.comparison) {
       analyticsPayload.comparison.kpis.activeUsers = 70;
       analyticsPayload.comparison.kpis.newMembers = 6;
@@ -160,6 +163,29 @@ describe('AnalyticsDashboard overview', () => {
     expect(screen.queryByText('AI cost (est.)')).not.toBeInTheDocument();
     expect(screen.queryByText('AI Cost Analysis')).not.toBeInTheDocument();
     expect(screen.getByText('AI Usage Analysis')).toBeInTheDocument();
+  });
+
+  it('renders community engagement with active users, average messages, and reaction metrics', async () => {
+    analyticsPayload.userEngagement = {
+      trackedUsers: 30,
+      avgMessagesPerUser: 13.3,
+      aiResponseRate: 20.5,
+      peakHour: 15,
+      lifetimeReactionsGiven: 240,
+      lifetimeReactionsReceived: 180,
+    };
+
+    const { AnalyticsDashboard } = await import('@/components/dashboard/analytics-dashboard');
+
+    render(<AnalyticsDashboard />);
+
+    expect(screen.getByText('Community Engagement')).toBeInTheDocument();
+    expect(screen.getByText('Active Users')).toBeInTheDocument();
+    expect(screen.getByText('Avg msgs / user')).toBeInTheDocument();
+    expect(screen.getByText('Lifetime reactions given')).toBeInTheDocument();
+    expect(screen.getByText('Lifetime reactions received')).toBeInTheDocument();
+    expect(screen.queryByText('AI Response Rate')).not.toBeInTheDocument();
+    expect(screen.queryByText('Peak Activity')).not.toBeInTheDocument();
   });
 
   it('does not show a comparison delta when a KPI value is unavailable', async () => {

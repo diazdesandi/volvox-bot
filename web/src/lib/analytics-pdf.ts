@@ -82,6 +82,12 @@ function buildCommandTable(analytics: DashboardAnalytics): string {
     </table>`;
 }
 
+/**
+ * Render the "User Engagement" HTML section from the provided analytics.
+ *
+ * @param analytics - Analytics payload containing `userEngagement` data
+ * @returns An HTML string for a section titled "User Engagement" containing a table of engagement metrics (`Active users`, `Avg messages / user`, `Lifetime reactions given`, `Lifetime reactions received`); returns an empty string if `userEngagement` is not present
+ */
 function buildEngagementSection(analytics: DashboardAnalytics): string {
   const ue = analytics.userEngagement;
   if (!ue) return '';
@@ -89,8 +95,8 @@ function buildEngagementSection(analytics: DashboardAnalytics): string {
   const rows = [
     ['Active users', formatNumber(ue.trackedUsers)],
     ['Avg messages / user', ue.avgMessagesPerUser.toFixed(1)],
-    ['AI Response Rate', `${ue.aiResponseRate.toFixed(1)}%`],
-    ['Peak Activity', ue.peakHour !== null ? `${String(ue.peakHour).padStart(2, '0')}:00` : 'N/A'],
+    ['Lifetime reactions given', formatNumber(ue.lifetimeReactionsGiven)],
+    ['Lifetime reactions received', formatNumber(ue.lifetimeReactionsReceived)],
   ];
 
   const rowsHtml = rows

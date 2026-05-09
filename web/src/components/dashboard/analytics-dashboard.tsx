@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowUp,
   Bot,
+  Heart,
   type LucideIcon,
   MessageSquare,
   Minus,
@@ -313,15 +314,9 @@ function AnimatedValue({ value, format }: { value: number; format: (n: number) =
 }
 
 /**
- * Render the analytics dashboard UI showing workspace metrics, charts, and interactive filters.
+ * Display the analytics dashboard containing KPI cards, realtime metrics, charts, tables, filters, and an activity heatmap.
  *
- * Renders KPI cards with optional comparison deltas, realtime metrics and activity feed, message
- * volume and AI usage charts, top channels and command telemetry tables, community engagement and
- * XP economy summaries, and an activity heatmap. Handles loading,
- * empty, and error states based on analytics data and exposes channel filtering and refresh actions
- * via hooks.
- *
- * @returns A React element representing the complete analytics dashboard interface
+ * @returns A React element containing the complete analytics dashboard UI
  */
 export function AnalyticsDashboard() {
   const chart = useChartTheme();
@@ -420,17 +415,14 @@ export function AnalyticsDashboard() {
           accentClassName: 'text-primary',
         },
         {
-          label: 'AI Response Rate',
-          value: `${analytics.userEngagement.aiResponseRate.toFixed(1)}%`,
-          icon: Zap,
+          label: 'Lifetime reactions given',
+          value: formatNumber(analytics.userEngagement.lifetimeReactionsGiven),
+          icon: Heart,
           accentClassName: 'text-primary',
         },
         {
-          label: 'Peak Activity',
-          value:
-            analytics.userEngagement.peakHour !== null
-              ? `${String(analytics.userEngagement.peakHour).padStart(2, '0')}:00`
-              : 'N/A',
+          label: 'Lifetime reactions received',
+          value: formatNumber(analytics.userEngagement.lifetimeReactionsReceived),
           icon: Activity,
           accentClassName: 'text-primary',
         },

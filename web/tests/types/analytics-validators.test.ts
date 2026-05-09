@@ -62,6 +62,8 @@ describe('isDashboardAnalyticsPayload', () => {
           avgMessagesPerUser: 2.5,
           aiResponseRate: 40,
           peakHour: 14,
+          lifetimeReactionsGiven: 12,
+          lifetimeReactionsReceived: 9,
         },
         recentEvents: [
           { id: '1', text: 'Event 1', timestamp: '2026-02-01T12:00:00Z' },
@@ -116,7 +118,71 @@ describe('isDashboardAnalyticsPayload', () => {
           trackedUsers: 5,
           avgMessagesPerUser: 2.5,
           peakHour: 14,
+          lifetimeReactionsGiven: 12,
+          lifetimeReactionsReceived: 9,
           // aiResponseRate is missing
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects userEngagement missing lifetimeReactionsGiven', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 40,
+          peakHour: 14,
+          lifetimeReactionsReceived: 9,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects userEngagement missing lifetimeReactionsReceived', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 40,
+          peakHour: 14,
+          lifetimeReactionsGiven: 12,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects userEngagement where lifetimeReactionsGiven is not a number', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 40,
+          peakHour: 14,
+          lifetimeReactionsGiven: 'many',
+          lifetimeReactionsReceived: 9,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('rejects userEngagement where lifetimeReactionsReceived is not a number', () => {
+    expect(
+      isDashboardAnalyticsPayload({
+        ...basePayload,
+        userEngagement: {
+          trackedUsers: 5,
+          avgMessagesPerUser: 2.5,
+          aiResponseRate: 40,
+          peakHour: 14,
+          lifetimeReactionsGiven: 12,
+          lifetimeReactionsReceived: 'many',
         },
       }),
     ).toBe(false);
@@ -131,6 +197,8 @@ describe('isDashboardAnalyticsPayload', () => {
           avgMessagesPerUser: 2.5,
           aiResponseRate: 'high',
           peakHour: 14,
+          lifetimeReactionsGiven: 12,
+          lifetimeReactionsReceived: 9,
         },
       }),
     ).toBe(false);
@@ -145,6 +213,8 @@ describe('isDashboardAnalyticsPayload', () => {
           avgMessagesPerUser: 2.5,
           aiResponseRate: 33.3,
           peakHour: null,
+          lifetimeReactionsGiven: 12,
+          lifetimeReactionsReceived: 9,
         },
       }),
     ).toBe(true);
@@ -159,6 +229,8 @@ describe('isDashboardAnalyticsPayload', () => {
           avgMessagesPerUser: 2.5,
           aiResponseRate: 33.3,
           peakHour: '14',
+          lifetimeReactionsGiven: 12,
+          lifetimeReactionsReceived: 9,
         },
       }),
     ).toBe(false);

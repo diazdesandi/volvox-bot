@@ -54,6 +54,8 @@ function makeAnalytics(overrides: Partial<DashboardAnalytics> = {}): DashboardAn
       avgMessagesPerUser: 13.3,
       aiResponseRate: 20.5,
       peakHour: 15,
+      lifetimeReactionsGiven: 240,
+      lifetimeReactionsReceived: 180,
     },
     xpEconomy: {
       totalUsers: 20,
@@ -145,57 +147,22 @@ describe('exportAnalyticsPdf', () => {
     expect(html).toContain('Avg messages / user');
   });
 
-  it('HTML output includes AI Response Rate in user engagement section', () => {
+  it('HTML output includes reaction totals in user engagement section', () => {
     exportAnalyticsPdf(makeAnalytics());
 
     const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
-    expect(html).toContain('AI Response Rate');
-    expect(html).toContain('20.5%');
+    expect(html).toContain('Lifetime reactions given');
+    expect(html).toContain('240');
+    expect(html).toContain('Lifetime reactions received');
+    expect(html).toContain('180');
   });
 
-  it('HTML output includes Peak Activity formatted as HH:00', () => {
+  it('HTML output does not include AI response or peak activity in user engagement section', () => {
     exportAnalyticsPdf(makeAnalytics());
 
     const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
-    expect(html).toContain('Peak Activity');
-    expect(html).toContain('15:00');
-  });
-
-  it('HTML output shows N/A for Peak Activity when peakHour is null', () => {
-    exportAnalyticsPdf(
-      makeAnalytics({
-        userEngagement: {
-          trackedUsers: 10,
-          avgMessagesPerUser: 5.0,
-          aiResponseRate: 30.0,
-          peakHour: null,
-        },
-      }),
-    );
-
-    const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
-    const peakActivityRow = html.match(
-      /<tr><td>Peak Activity<\/td><td class="num">(?<value>[^<]+)<\/td><\/tr>/,
-    );
-
-    expect(peakActivityRow?.groups?.value).toBe('N/A');
-    expect(peakActivityRow?.[0]).not.toMatch(/\d{2}:\d{2}/);
-  });
-
-  it('HTML output formats single-digit peak hours with leading zero', () => {
-    exportAnalyticsPdf(
-      makeAnalytics({
-        userEngagement: {
-          trackedUsers: 10,
-          avgMessagesPerUser: 5.0,
-          aiResponseRate: 30.0,
-          peakHour: 9,
-        },
-      }),
-    );
-
-    const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
-    expect(html).toContain('09:00');
+    expect(html).not.toContain('AI Response Rate');
+    expect(html).not.toContain('Peak Activity');
   });
 
   it('omits user engagement section when null', () => {
