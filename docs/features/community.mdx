@@ -6,7 +6,7 @@ description: 'Boost Discord engagement with Volvox.Bot community features: XP le
 
 # Community
 
-Community features help your server members engage and show off their activity. You can toggle every feature from the dashboard.
+Community features help your server members engage and show off their activity. Leaderboards, XP, and member showcases are on by default — you can toggle every feature from the dashboard.
 
 ## What it does
 
@@ -17,10 +17,10 @@ Community features help your server members engage and show off their activity. 
 
 ## How to use
 
-1. Enable community features in **Config → Community**
-2. Your members earn XP through activity (messages, events, etc.)
-3. Leaderboards update automatically
-4. View public profiles at `https://volvox.bot/community/{guildId}`
+1. Members earn XP through activity (messages, reactions, events) as soon as the bot joins
+2. Leaderboards update automatically
+3. View public profiles at `https://volvox.bot/community/{guildId}`
+4. Open **Config → Community** to fine-tune XP rates, badges, or turn features off
 
 <Callout type="tip">
 Community hubs let non-members see your server's public face — great for recruitment.
@@ -34,10 +34,11 @@ Servers without Community Hubs enabled stay hidden from members who lack managem
 
 ## Configuration
 
-| Setting | Description |
-|---------|-------------|
-| Community enabled | Toggle all community features |
-| Leaderboard visibility | Public or members-only |
-| XP system | Configure how members earn XP |
-| Showcases | Which stats to highlight |
-| Public profiles | Allow members to have public pages |
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Engagement tracking | Track messages and reactions for XP and badges | On |
+| Reputation (XP) | Award XP per message, reaction, and event | On |
+| Leaderboard visibility | Public or members-only | Public |
+| XP system | Configure how members earn XP | Built-in defaults |
+| Showcases | Which stats to highlight | Top members |
+| Public profiles | Allow members to have public pages | On |
