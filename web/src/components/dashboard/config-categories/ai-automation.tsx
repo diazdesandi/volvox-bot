@@ -16,8 +16,8 @@ import {
   toggleAiAutoModCategoryAction,
 } from './ai-automod-settings';
 import { AiChatSettings } from './ai-chat-settings';
-import { AiMemorySettings } from './ai-memory-settings';
-import { AiTriageSettings } from './ai-triage-settings';
+import { AiMemorySettings, type MemoryConfigField } from './ai-memory-settings';
+import { AiTriageSettings, type TriageConfigField } from './ai-triage-settings';
 import { ConfigCategoryLayout } from './config-category-layout';
 
 const hasVisibleModelOptions = VISIBLE_PROVIDER_MODEL_OPTIONS.length > 0;
@@ -35,8 +35,8 @@ function getFeatureToggle(
       field: K,
       value: AiAutoModFieldUpdater<K>,
     ) => void;
-    updateTriageField: (field: string, value: unknown) => void;
-    updateMemoryField: (field: string, value: unknown) => void;
+    updateTriageField: (field: TriageConfigField, value: unknown) => void;
+    updateMemoryField: (field: MemoryConfigField, value: unknown) => void;
   },
 ) {
   switch (activeTab) {
@@ -220,7 +220,7 @@ export function AiAutomationCategory() {
   );
 
   const updateTriageField = useCallback(
-    (field: string, value: unknown) => {
+    (field: TriageConfigField, value: unknown) => {
       updateDraftConfig((prev) => ({
         ...prev,
         triage: { ...prev.triage, [field]: value },
@@ -230,7 +230,7 @@ export function AiAutomationCategory() {
   );
 
   const updateMemoryField = useCallback(
-    (field: string, value: unknown) => {
+    (field: MemoryConfigField, value: unknown) => {
       updateDraftConfig((prev) => ({
         ...prev,
         memory: { ...prev.memory, [field]: value },

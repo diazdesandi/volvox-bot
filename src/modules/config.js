@@ -1024,6 +1024,9 @@ export async function resetConfig(section, guildId = 'global') {
     );
   }
 
+  const explicitFileAiDmNotifications = getExplicitAiAutoModDmNotifications(fileConfig.aiAutoMod);
+  const fileAiAutoModDmNotificationsExplicit = explicitFileAiDmNotifications !== undefined;
+
   let pool = null;
   try {
     pool = getPool();
@@ -1130,7 +1133,7 @@ export async function resetConfig(section, guildId = 'global') {
   }
 
   if (!section || section === 'aiAutoMod') {
-    globalAiAutoModDmNotificationsExplicit = false;
+    globalAiAutoModDmNotificationsExplicit = fileAiAutoModDmNotificationsExplicit;
   }
   if (
     !globalAiAutoModDmNotificationsExplicit &&

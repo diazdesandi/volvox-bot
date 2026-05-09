@@ -936,6 +936,60 @@ describe('modules/config', () => {
       expect(configModule.getConfig().ai.model).toBe('test-model');
     });
 
+    it('should preserve explicit file-level AI AutoMod DM defaults on section reset', async () => {
+      const explicitDefaults = {
+        moderation: {
+          dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+        },
+        aiAutoMod: {
+          enabled: true,
+          dmNotifications: { warn: true, timeout: false, kick: true, ban: false },
+        },
+      };
+      const mod = await importConfigWithMocks({
+        fileContents: JSON.stringify(explicitDefaults),
+        getPool: vi.fn(() => {
+          throw new Error('no db');
+        }),
+      });
+
+      await mod.loadConfig();
+      await mod.setConfigValue('aiAutoMod.dmNotifications.warn', 'false');
+      await mod.resetConfig('aiAutoMod');
+
+      expect(mod.getConfig().aiAutoMod.dmNotifications).toEqual(
+        explicitDefaults.aiAutoMod.dmNotifications,
+      );
+    });
+
+    it('should preserve explicit file-level AI AutoMod DM defaults on full reset', async () => {
+      const explicitDefaults = {
+        ai: { enabled: true, model: 'test-model' },
+        moderation: {
+          dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+        },
+        aiAutoMod: {
+          enabled: true,
+          dmNotifications: { warn: true, timeout: false, kick: true, ban: false },
+        },
+      };
+      const mod = await importConfigWithMocks({
+        fileContents: JSON.stringify(explicitDefaults),
+        getPool: vi.fn(() => {
+          throw new Error('no db');
+        }),
+      });
+
+      await mod.loadConfig();
+      await mod.setConfigValue('ai.model', 'changed');
+      await mod.setConfigValue('aiAutoMod.dmNotifications.warn', 'false');
+      await mod.resetConfig();
+
+      expect(mod.getConfig().aiAutoMod.dmNotifications).toEqual(
+        explicitDefaults.aiAutoMod.dmNotifications,
+      );
+    });
+
     it('should throw if section not found in file defaults', async () => {
       await mockNoDb();
 

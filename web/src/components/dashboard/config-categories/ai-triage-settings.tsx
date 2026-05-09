@@ -8,6 +8,28 @@ import { ChannelSelector } from '@/components/ui/channel-selector';
 import { RoleSelector } from '@/components/ui/role-selector';
 import { ToggleSwitch } from '../toggle-switch';
 
+type TriageConfigDraft = NonNullable<GuildConfig['triage']>;
+export type TriageConfigField = keyof TriageConfigDraft;
+type TriageConfigFieldValue = TriageConfigDraft[TriageConfigField];
+type TriageBooleanField = Extract<
+  TriageConfigField,
+  'moderationResponse' | 'debugFooter' | 'statusReactions'
+>;
+
+const TRIAGE_BOOLEAN_TOGGLES = [
+  {
+    id: 'moderationResponse',
+    label: 'Enforce Safety Guardrails',
+    key: 'moderationResponse',
+  },
+  { id: 'debugFooter', label: 'Show Debug Metadata', key: 'debugFooter' },
+  { id: 'statusReactions', label: 'Visual Status Feedback', key: 'statusReactions' },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  label: string;
+  key: TriageBooleanField;
+}>;
+
 export function AiTriageSettings({
   draftConfig,
   saving,
@@ -21,7 +43,7 @@ export function AiTriageSettings({
   guildId: string;
   classifyModelValue: string;
   respondModelValue: string;
-  onFieldChange: (field: string, value: unknown) => void;
+  onFieldChange: (field: TriageConfigField, value: TriageConfigFieldValue) => void;
 }>) {
   return (
     <div className="space-y-6">
@@ -188,26 +210,14 @@ export function AiTriageSettings({
             </p>
           </div>
           <div className="space-y-2">
-            {[
-              {
-                id: 'moderationResponse',
-                label: 'Enforce Safety Guardrails',
-                key: 'moderationResponse',
-              },
-              { id: 'debugFooter', label: 'Show Debug Metadata', key: 'debugFooter' },
-              { id: 'statusReactions', label: 'Visual Status Feedback', key: 'statusReactions' },
-            ].map((item) => (
+            {TRIAGE_BOOLEAN_TOGGLES.map((item) => (
               <div
                 key={item.id}
                 className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-border/30 shadow-inner"
               >
                 <span className="text-sm font-semibold text-foreground/80">{item.label}</span>
                 <ToggleSwitch
-                  checked={
-                    (draftConfig.triage?.[
-                      item.key as keyof typeof draftConfig.triage
-                    ] as boolean) ?? false
-                  }
+                  checked={draftConfig.triage?.[item.key] ?? false}
                   onChange={(value) => onFieldChange(item.key, value)}
                   disabled={saving}
                   label={item.label}

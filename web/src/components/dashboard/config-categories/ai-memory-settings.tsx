@@ -6,6 +6,10 @@ import {
 import { cn } from '@/lib/utils';
 import { ToggleSwitch } from '../toggle-switch';
 
+type MemoryConfigDraft = NonNullable<GuildConfig['memory']>;
+export type MemoryConfigField = keyof MemoryConfigDraft;
+type MemoryConfigFieldValue = MemoryConfigDraft[MemoryConfigField];
+
 export function AiMemorySettings({
   draftConfig,
   saving,
@@ -13,7 +17,7 @@ export function AiMemorySettings({
 }: Readonly<{
   draftConfig: GuildConfig;
   saving: boolean;
-  onFieldChange: (field: string, value: unknown) => void;
+  onFieldChange: (field: MemoryConfigField, value: MemoryConfigFieldValue) => void;
 }>) {
   return (
     <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl space-y-6">
