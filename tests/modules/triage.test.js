@@ -920,23 +920,23 @@ describe('triage module', () => {
       );
     });
 
-    it('should warn and clear buffer for unknown classification type', async () => {
+    it('should warn and clear buffer for unknown classification type (Zod rejects)', async () => {
       const classResult = {
         classification: 'unknown-type',
         reasoning: 'test',
         targetMessageIds: ['msg-default'],
       };
-      const respondResult = {
-        responses: [{ targetMessageId: 'msg-default', targetUser: 'testuser', response: 'hi' }],
-      };
       mockGenerate.mockResolvedValue(mockClassifyResult(classResult));
-      mockStream.mockResolvedValue(mockRespondResult(respondResult));
 
       accumulateMessage(makeMessage('ch1', 'test'), config);
       await evaluateNow('ch1', config, client, healthMonitor);
 
-      // Unknown classification with responses should still send them
-      expect(safeSend).toHaveBeenCalled();
+      // Zod rejects unknown classification → parseClassifyResult returns null → no response
+      expect(safeSend).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Classifier result failed schema validation',
+        expect.objectContaining({ channelId: 'ch1', classification: 'unknown-type' }),
+      );
     });
   });
 
@@ -1702,30 +1702,31 @@ describe('triage module', () => {
     });
   });
 
-  describe('truncated classification confidence', () => {
-    it('should get confidence 0.5 from truncated JSON recovery and be dropped by threshold', async () => {
-      // Simulate a truncated JSON response that parseSDKResult recovers via regex.
-      // The recovered object gets confidence: 0.5, which is below the default threshold of 0.6.
-      const truncatedJson = '{"classification":"respond","reasoning":"partial respon';
+  describe('classification confidence threshold', () => {
+    it('should drop respond classification when confidence is below threshold', async () => {
+      // Valid JSON with low confidence (0.3 < default threshold 0.6).
+      // Uses a non-empty targetMessageIds to avoid the respond→ignore downgrade.
+      const lowConfidenceJson =
+        '{"classification":"respond","reasoning":"low confidence test","targetMessageIds":["msg-conf"],"confidence":0.3}';
       mockGenerate.mockResolvedValue({
-        text: truncatedJson,
+        text: lowConfidenceJson,
         costUsd: 0.0005,
         usage: { inputTokens: 100, outputTokens: 50 },
         durationMs: 50,
-        finishReason: 'length',
+        finishReason: 'stop',
         sources: [],
         providerMetadata: { anthropic: {} },
       });
 
-      accumulateMessage(makeMessage('ch1', 'test message'), config);
+      accumulateMessage(makeMessage('ch1', 'test message', { id: 'msg-conf' }), config);
       await evaluateNow('ch1', config, client, healthMonitor);
 
-      // With confidence 0.5 (< default threshold 0.6), the respond classification
+      // With confidence 0.3 (< default threshold 0.6), the respond classification
       // should be skipped, so the responder (stream) should NOT be called.
       expect(mockStream).not.toHaveBeenCalled();
       expect(info).toHaveBeenCalledWith(
         'Triage: confidence below threshold, skipping',
-        expect.objectContaining({ confidence: 0.5 }),
+        expect.objectContaining({ confidence: 0.3 }),
       );
     });
   });

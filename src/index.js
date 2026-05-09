@@ -354,26 +354,6 @@ async function initializeDatabaseForStartup() {
   }
 }
 
-async function initializePostgresLogging(dbPool, currentConfig) {
-  if (!dbPool || !currentConfig.logging?.database?.enabled) {
-    return;
-  }
-
-  try {
-    const transport = addPostgresTransport(dbPool, currentConfig.logging.database);
-    setInitialTransport(transport);
-    info('PostgreSQL logging transport enabled');
-
-    const retentionDays = currentConfig.logging.database.retentionDays ?? 30;
-    const pruned = await pruneOldLogs(dbPool, retentionDays);
-    if (pruned > 0) {
-      info('Pruned old log entries', { pruned, retentionDays });
-    }
-  } catch (err) {
-    error('Failed to initialize PostgreSQL logging transport', { error: err.message });
-  }
-}
-
 async function checkMemoryAvailability() {
   const healthAbort = new AbortController();
   try {
@@ -433,7 +413,6 @@ async function startup() {
   if (dbPool) {
     setPool(dbPool);
   }
-  await initializePostgresLogging(dbPool, config);
 
   // DEPRECATED: loadState() seeds conversation history from data/state.json for
   // non-DB environments. When a database is configured, initConversationHistory()

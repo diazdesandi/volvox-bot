@@ -1,4 +1,5 @@
 import type { Event, EventHint } from '@sentry/nextjs';
+import { isSensitiveKey, redactInlineSecrets } from './redaction';
 
 type SentryInitOptions = Parameters<typeof import('@sentry/nextjs').init>[0];
 type SentrySpan = Parameters<NonNullable<SentryInitOptions['beforeSendSpan']>>[0];
@@ -9,63 +10,6 @@ const DEFAULT_REPLAYS_SESSION_SAMPLE_RATE = 0;
 const DEFAULT_REPLAYS_ON_ERROR_SAMPLE_RATE = 0.1;
 const CIRCULAR_REFERENCE_SENTINEL = '[Circular]';
 
-const INLINE_SECRET_REPLACEMENTS: ReadonlyArray<{
-  pattern: RegExp;
-  replacement: string;
-}> = [
-  { pattern: /\bBearer\s+[\w.~+/=-]+/gi, replacement: '[REDACTED]' },
-  { pattern: /\bsk-\w[\w-]{10,}/g, replacement: '[REDACTED]' },
-  {
-    pattern: /\b(?:xox[baprs]|gh[pousr])_[\w/-]{10,}/g,
-    replacement: '[REDACTED]',
-  },
-  { pattern: /\bgithub_pat_\w{10,}/g, replacement: '[REDACTED]' },
-  {
-    pattern:
-      /([?&#]\s*(?:access[-_]?token|refresh[-_]?token|api[-_]?key|token|secret|password)\s*=)\s*[^\s&#]+/gi,
-    replacement: '$1[REDACTED]',
-  },
-  {
-    pattern:
-      /(^|[\s,;])((?:access[-_]?token|refresh[-_]?token|api[-_]?key|token|secret|password)\s*=)\s*[^\s,;&#]+/gi,
-    replacement: '$1$2[REDACTED]',
-  },
-];
-
-/**
- * Redact inline secrets from string values (Bearer tokens, API keys, etc.).
- *
- * @param value - String that may contain inline secrets.
- * @returns String with secrets replaced by `[REDACTED]`.
- */
-function redactInlineSecrets(value: string): string {
-  return INLINE_SECRET_REPLACEMENTS.reduce(
-    (scrubbed, { pattern, replacement }) => scrubbed.replace(pattern, replacement),
-    value,
-  );
-}
-const SENSITIVE_KEY_FRAGMENTS = [
-  'authorization',
-  'cookie',
-  'csrf',
-  'e-mail',
-  'email',
-  'secret',
-  'password',
-  'token',
-  'session',
-  'stack',
-] as const;
-const SENSITIVE_COMPACT_KEYS = new Set(['ip', 'ipaddress', 'xforwardedfor', 'apikey', 'xapikey']);
-const SENSITIVE_IP_KEY_PREFIXES = new Set(
-  'actor client destination external forwarded host internal lastlogin local origin peer private public real remote request response server socket source user visitor'.split(
-    ' ',
-  ),
-);
-const SENSITIVE_KEY_SEPARATOR_PATTERN = /[\s._-]+/g;
-const SENSITIVE_KEY_FRAGMENT_COMPACTS = SENSITIVE_KEY_FRAGMENTS.map((fragment) =>
-  fragment.replaceAll(SENSITIVE_KEY_SEPARATOR_PATTERN, ''),
-);
 const URL_METADATA_KEY_PATTERN = /url/i;
 const URL_HEADER_KEY_PATTERN = /^(?:referer|referrer|origin)$/i;
 const ABSOLUTE_URL_CREDENTIALS_PATTERN = /^([a-z][a-z\d+.-]*:\/\/)([^/?#@]*@)/i;
@@ -220,29 +164,6 @@ function scrubBreadcrumbString(value: string): string {
   return scrubbedValue.replaceAll(
     RELATIVE_URL_IN_TEXT_PATTERN,
     (_match, prefix: string, url: string) => `${prefix}${stripUrlMetadata(url)}`,
-  );
-}
-
-/**
- * Determines whether an object key may contain sensitive telemetry data.
- *
- * @param key - Object key to inspect.
- * @returns True when the key should be removed from telemetry payloads.
- */
-function isSensitiveKey(key: string): boolean {
-  const normalizedKey = key.toLowerCase();
-  const compactKey = normalizedKey.replaceAll(SENSITIVE_KEY_SEPARATOR_PATTERN, '');
-
-  if (
-    SENSITIVE_KEY_FRAGMENTS.some((fragment) => normalizedKey.includes(fragment)) ||
-    SENSITIVE_KEY_FRAGMENT_COMPACTS.some((fragment) => compactKey.includes(fragment))
-  ) {
-    return true;
-  }
-
-  return (
-    SENSITIVE_COMPACT_KEYS.has(compactKey) ||
-    (compactKey.endsWith('ip') && SENSITIVE_IP_KEY_PREFIXES.has(compactKey.slice(0, -2)))
   );
 }
 

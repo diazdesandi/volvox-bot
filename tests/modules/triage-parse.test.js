@@ -134,7 +134,7 @@ describe('parseClassifyResult', () => {
 
   it('should return parsed classification on success', () => {
     const sdkMessage = {
-      text: '{"classification":"spam","reasoning":"it is spam","targetMessageIds":["m1"],"needsThinking":true,"needsSearch":true}',
+      text: '{"classification":"moderate","reasoning":"it is spam","targetMessageIds":["m1"],"needsThinking":true,"needsSearch":true}',
       finishReason: 'stop',
       costUsd: 0.001,
       durationMs: 50,
@@ -144,7 +144,7 @@ describe('parseClassifyResult', () => {
     };
     const result = parseClassifyResult(sdkMessage, 'ch1');
     expect(result).not.toBeNull();
-    expect(result.classification).toBe('spam');
+    expect(result.classification).toBe('moderate');
     expect(result.targetMessageIds).toEqual(['m1']);
     expect(result.needsThinking).toBe(true);
     expect(result.needsSearch).toBe(true);
@@ -221,7 +221,7 @@ describe('parseRespondResult', () => {
 
   it('should return parsed result on success', () => {
     const sdkMessage = {
-      text: '{"responses":[{"target_message_id":"m1","response":"Help text"}]}',
+      text: '{"responses":[{"targetMessageId":"m1","targetUser":"testuser","response":"Help text"}]}',
       finishReason: 'stop',
       costUsd: 0.005,
       durationMs: 200,
@@ -234,7 +234,7 @@ describe('parseRespondResult', () => {
     expect(result.responses).toHaveLength(1);
   });
 
-  it('should return result even without responses key (truthy parsed)', () => {
+  it('should default to empty responses array when responses key is missing', () => {
     const sdkMessage = {
       text: '{"something":"else"}',
       finishReason: 'stop',
@@ -246,7 +246,7 @@ describe('parseRespondResult', () => {
     };
     const result = parseRespondResult(sdkMessage, 'ch1');
     expect(result).not.toBeNull();
-    expect(result.something).toBe('else');
+    expect(result.responses).toEqual([]);
   });
 
   it('should return null when text is empty string', () => {

@@ -6,7 +6,9 @@ export const SUPPORTED_AI_MODEL_TYPES = Object.freeze(
   listProviderModelTypes({ visibleOnly: true }),
 );
 
-export const DEFAULT_AI_MODEL = SUPPORTED_AI_MODEL_TYPES[0] ?? FALLBACK_AI_MODEL;
+export const DEFAULT_AI_MODEL = SUPPORTED_AI_MODEL_TYPES.includes(FALLBACK_AI_MODEL)
+  ? FALLBACK_AI_MODEL
+  : (SUPPORTED_AI_MODEL_TYPES[0] ?? FALLBACK_AI_MODEL);
 
 const SUPPORTED_AI_MODEL_TYPE_BY_LOWERCASE = new Map(
   SUPPORTED_AI_MODEL_TYPES.map((modelType) => [modelType.toLowerCase(), modelType]),

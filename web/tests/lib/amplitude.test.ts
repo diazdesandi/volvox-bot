@@ -30,10 +30,9 @@ describe('dashboard Amplitude analytics', () => {
   it('does not initialize or track events without the public API key', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', '');
 
-    const { initDashboardAmplitude, isDashboardAmplitudeEnabled, trackDashboardEvent } =
+    const { initDashboardAmplitude, trackDashboardEvent } =
       await import('@/lib/amplitude');
 
-    expect(isDashboardAmplitudeEnabled()).toBe(false);
     expect(initDashboardAmplitude()).toBe(false);
     expect(trackDashboardEvent('dashboard_page_viewed', { route: '/' })).toBe(false);
     expect(mockInit).not.toHaveBeenCalled();
@@ -63,9 +62,8 @@ describe('dashboard Amplitude analytics', () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
     vi.stubGlobal('window', undefined);
 
-    const { initDashboardAmplitude, isDashboardAmplitudeEnabled } = await import('@/lib/amplitude');
+    const { initDashboardAmplitude } = await import('@/lib/amplitude');
 
-    expect(isDashboardAmplitudeEnabled()).toBe(false);
     expect(initDashboardAmplitude('discord-user-123')).toBe(false);
     expect(mockInit).not.toHaveBeenCalled();
   });

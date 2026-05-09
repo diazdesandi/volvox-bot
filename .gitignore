@@ -53,5 +53,24 @@ worktrees/
 TASK.md
 .superpowers/
 
+# IDE / editor config
+.obsidian/
+.vscode/
+
+# Tool caches and ephemeral output
+.playwright-mcp/
+
+# Claude Code
+.claude/
+
+# Changeset artifacts
+.changeset/
+
+# Serena config
+.serena/
+
+# Agent working documents
+.agents/
+
 # Next.js generated files
 web/next-env.d.ts

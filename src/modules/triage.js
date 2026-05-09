@@ -600,9 +600,12 @@ async function evaluateAndRespond(channelId, snapshot, evalConfig, evalClient, a
 
     const { classification, classifyMessage, context, memoryContext, wasMentioned } = classResult;
 
+    // Resolve triage config once for the entire evaluation cycle
+    const resolved = resolveTriageConfig(evalConfig.triage || {});
+
     // ── Response cooldown gate ───────────────────────────────────────────────
     // Prevent rapid-fire responses. @mentions and moderation bypass the cooldown.
-    const cooldownMs = evalConfig.triage?.responseCooldownMs ?? 10_000;
+    const cooldownMs = resolved.responseCooldownMs;
     if (
       buf?.lastResponseAt > 0 &&
       Date.now() - buf.lastResponseAt < cooldownMs &&
@@ -623,9 +626,6 @@ async function evaluateAndRespond(channelId, snapshot, evalConfig, evalClient, a
     if (statusReactions && triggerMessageId) {
       addReaction(evalClient, channelId, triggerMessageId, '\uD83D\uDC40');
     }
-
-    // Resolve triage config once for the entire evaluation cycle
-    const resolved = resolveTriageConfig(evalConfig.triage || {});
 
     // B3: Budget enforcement — warn if classifier cost exceeded its budget
     if (classifyMessage.costUsd > resolved.classifyBudget) {

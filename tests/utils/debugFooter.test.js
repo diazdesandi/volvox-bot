@@ -727,11 +727,26 @@ describe('logAiUsage', () => {
     });
 
     logAiUsage('guild-1', 'ch-1', {
-      classify: { model: 'claude-haiku-4-5', inputTokens: 10, outputTokens: 5, cost: 0.001, durationMs: 30 },
-      respond: { model: 'claude-sonnet-4-6', inputTokens: 100, outputTokens: 50, cost: 0.01, durationMs: 300 },
+      classify: {
+        model: 'claude-haiku-4-5',
+        inputTokens: 10,
+        outputTokens: 5,
+        cost: 0.001,
+        durationMs: 30,
+      },
+      respond: {
+        model: 'claude-sonnet-4-6',
+        inputTokens: 100,
+        outputTokens: 50,
+        cost: 0.01,
+        durationMs: 300,
+      },
     });
 
-    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_ai_usage_recorded', expect.any(Object));
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith(
+      'bot_ai_usage_recorded',
+      expect.any(Object),
+    );
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

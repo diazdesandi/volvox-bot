@@ -1,6 +1,7 @@
 'use client';
 
 import * as amplitude from '@amplitude/analytics-browser';
+import { isSensitiveKey, redactInlineSecrets } from './redaction';
 
 export const DASHBOARD_PAGE_VIEW_EVENT = 'dashboard_page_viewed';
 export const DASHBOARD_GUILD_SELECTED_EVENT = 'dashboard_guild_selected';
@@ -21,41 +22,6 @@ type BrowserAmplitudeOptions = NonNullable<Parameters<typeof amplitude.init>[2]>
 type BrowserAmplitudeProperties = Record<string, unknown>;
 
 const AMPLITUDE_MIN_ID_LENGTH = 5;
-const SENSITIVE_KEY_FRAGMENTS = [
-  'authorization',
-  'cookie',
-  'csrf',
-  'e-mail',
-  'email',
-  'secret',
-  'password',
-  'token',
-  'session',
-  'stack',
-] as const;
-const SENSITIVE_COMPACT_KEYS = new Set(['ip', 'ipaddress', 'xforwardedfor', 'apikey', 'xapikey']);
-const SENSITIVE_IP_KEY_PREFIXES = new Set(
-  'actor client destination external forwarded host internal lastlogin local origin peer private public real remote request response server socket source user visitor'.split(
-    ' ',
-  ),
-);
-const SENSITIVE_KEY_SEPARATOR_PATTERN = /[\s._-]+/g;
-const INLINE_SECRET_REPLACEMENTS: ReadonlyArray<{ pattern: RegExp; replacement: string }> = [
-  { pattern: /\bBearer\s+[\w.~+/=-]+/gi, replacement: '[REDACTED]' },
-  { pattern: /\bsk-[A-Za-z0-9][A-Za-z0-9_-]{10,}/g, replacement: '[REDACTED]' },
-  { pattern: /\b(?:xox[baprs]|gh[pousr])_[A-Za-z0-9_/-]{10,}/g, replacement: '[REDACTED]' },
-  { pattern: /\bgithub_pat_\w{10,}/g, replacement: '[REDACTED]' },
-  {
-    pattern:
-      /([?&#]\s*(?:access[-_]?token|refresh[-_]?token|api[-_]?key|token|secret|password)\s*=)\s*[^\s&#]+/gi,
-    replacement: '$1[REDACTED]',
-  },
-  {
-    pattern:
-      /(^|[\s,;])((?:access[-_]?token|refresh[-_]?token|api[-_]?key|token|secret|password)\s*=)\s*[^\s,;&#]+/gi,
-    replacement: '$1$2[REDACTED]',
-  },
-];
 
 let hasInitialized = false;
 let activeUserId: string | undefined;
@@ -107,42 +73,6 @@ function normalizeAmplitudeId(value: unknown): string | undefined {
 }
 
 /**
- * Redacts inline secret tokens and keys from a string.
- *
- * @param value - Input string potentially containing inline secrets (e.g., bearer tokens, API keys)
- * @returns The input string with matches of inline-secret patterns replaced by `"[REDACTED]"`
- */
-function scrubInlineSecrets(value: string): string {
-  return INLINE_SECRET_REPLACEMENTS.reduce(
-    (scrubbedValue, { pattern, replacement }) => scrubbedValue.replaceAll(pattern, replacement),
-    value,
-  );
-}
-
-/**
- * Determines whether an event property key may contain sensitive telemetry data.
- *
- * @param key - Property key to inspect.
- * @returns True when the key should be removed from analytics payloads.
- */
-function isSensitiveKey(key: string): boolean {
-  const normalizedKey = key.toLowerCase();
-
-  if (SENSITIVE_KEY_FRAGMENTS.some((fragment) => normalizedKey.includes(fragment))) {
-    return true;
-  }
-
-  const compactKey = normalizedKey.replaceAll(SENSITIVE_KEY_SEPARATOR_PATTERN, '');
-
-  return (
-    SENSITIVE_COMPACT_KEYS.has(compactKey) ||
-    /(?:^|[._\-\s])ip$/i.test(key) ||
-    /[a-z0-9]I[Pp]$/.test(key) ||
-    (compactKey.endsWith('ip') && SENSITIVE_IP_KEY_PREFIXES.has(compactKey.slice(0, -2)))
-  );
-}
-
-/**
  * Recursively prepares a value for Amplitude event properties by redacting sensitive data and normalizing types.
  *
  * Strings have inline secret patterns replaced with "[REDACTED]". Arrays and objects are processed recursively. Object keys that match the sensitive-key pattern are omitted. Circular references are replaced with the string "[Circular]". Date objects are converted to ISO strings. Error objects are converted to `{ message, name }` with the message redacted.
@@ -152,7 +82,7 @@ function isSensitiveKey(key: string): boolean {
  * @returns The scrubbed value, preserving the original structure where possible (primitive, array, or object) with sensitive data redacted or omitted.
  */
 function scrubAmplitudeProperties(value: unknown, seen = new WeakSet<object>()): unknown {
-  if (typeof value === 'string') return scrubInlineSecrets(value);
+  if (typeof value === 'string') return redactInlineSecrets(value);
   if (!value || typeof value !== 'object') return value;
   if (seen.has(value)) return '[Circular]';
 
@@ -164,7 +94,7 @@ function scrubAmplitudeProperties(value: unknown, seen = new WeakSet<object>()):
   } else if (value instanceof Date) {
     scrubbedValue = value.toISOString();
   } else if (value instanceof Error) {
-    scrubbedValue = { message: scrubInlineSecrets(value.message), name: value.name };
+    scrubbedValue = { message: redactInlineSecrets(value.message), name: value.name };
   } else {
     scrubbedValue = Object.entries(value).reduce<BrowserAmplitudeProperties>(
       (properties, [key, childValue]) => {
@@ -179,15 +109,6 @@ function scrubAmplitudeProperties(value: unknown, seen = new WeakSet<object>()):
 
   seen.delete(value);
   return scrubbedValue;
-}
-
-/**
- * Determines whether Amplitude analytics is available for the dashboard in the current environment.
- *
- * @returns `true` if running in a browser and a public Amplitude API key is configured, `false` otherwise.
- */
-export function isDashboardAmplitudeEnabled(): boolean {
-  return globalThis.window !== undefined && Boolean(getPublicApiKey());
 }
 
 /**

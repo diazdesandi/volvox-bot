@@ -22,3 +22,21 @@ logs
 .env.*
 web/.env
 web/.env.*
+
+# IDE / editor / tool artifacts
+.obsidian
+.playwright-mcp
+.claude
+.vscode
+.agents
+
+# CI, docs, tests (not needed in container)
+.github
+docs
+tests
+*.md
+sonar-project.properties
+scripts
+.specs
+turbo.json
+.hooks

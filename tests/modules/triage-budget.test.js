@@ -175,7 +175,6 @@ describe('triage budget gate', () => {
   let config;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
     vi.clearAllMocks();
     getPool.mockImplementation(() => {
       throw new Error('Database not initialized');
@@ -183,6 +182,7 @@ describe('triage budget gate', () => {
     client = makeClient();
     config = makeConfig();
     await startTriage(client, config);
+    vi.useFakeTimers();
     mockGlobalConfig = config;
     // Default: budget is fine (ok status)
     mockCheckGuildBudget.mockResolvedValue({ status: 'ok', spend: 2.0, budget: 10, pct: 0.2 });

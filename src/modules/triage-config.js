@@ -11,6 +11,7 @@ import {
   isSupportedAiModel,
   normalizeSupportedAiModel,
 } from '../utils/supportedAiModels.js';
+import { TRIAGE_NUMERIC_FIELDS } from './triage-config-fields.js';
 
 const DEFAULT_TRIAGE_MODEL = DEFAULT_AI_MODEL;
 const MAX_WARNED_MODEL_FALLBACKS = 100;
@@ -78,6 +79,19 @@ function firstValidSupportedModel(candidates) {
   return undefined;
 }
 
+/**
+ * Clamp a numeric triage config value to the min/max defined in TRIAGE_NUMERIC_FIELDS,
+ * falling back to the field's default when the value is missing or non-numeric.
+ * @param {string} fieldName - Key in TRIAGE_NUMERIC_FIELDS
+ * @param {unknown} value - Raw config value
+ * @returns {number}
+ */
+function clampNumericField(fieldName, value) {
+  const meta = TRIAGE_NUMERIC_FIELDS[fieldName];
+  if (typeof value !== 'number' || Number.isNaN(value)) return meta.default;
+  return Math.max(meta.min, Math.min(meta.max, value));
+}
+
 // ── Config resolution ───────────────────────────────────────────────────────
 
 /**
@@ -135,6 +149,14 @@ export function resolveTriageConfig(triageConfig) {
   const classifyApiKey = triageConfig.classifyApiKey ?? null;
   const respondApiKey = triageConfig.respondApiKey ?? null;
 
+  // Latency tuning fields — clamp to min/max from the shared field metadata
+  const responseCooldownMs = clampNumericField(
+    'responseCooldownMs',
+    triageConfig.responseCooldownMs,
+  );
+  const triageDebounceMs = clampNumericField('triageDebounceMs', triageConfig.triageDebounceMs);
+  const memoryTimeoutMs = clampNumericField('memoryTimeoutMs', triageConfig.memoryTimeoutMs);
+
   return {
     classifyModel,
     respondModel,
@@ -146,6 +168,9 @@ export function resolveTriageConfig(triageConfig) {
     respondBaseUrl,
     classifyApiKey,
     respondApiKey,
+    responseCooldownMs,
+    triageDebounceMs,
+    memoryTimeoutMs,
   };
 }
 

@@ -5,6 +5,8 @@
  */
 
 import { info, warn } from '../logger.js';
+import { normalizeClassifyResult } from './triage-classify-schema.js';
+import { normalizeRespondResult } from './triage-respond-schema.js';
 
 // ── Generic SDK result parser ────────────────────────────────────────────────
 
@@ -94,11 +96,18 @@ export function parseClassifyResult(sdkResult, channelId) {
     return null;
   }
 
-  // Normalize classifier hints (default false for backward compat / truncated responses)
-  parsed.needsThinking = parsed.needsThinking === true;
-  parsed.needsSearch = parsed.needsSearch === true;
+  // Validate and normalize through Zod schema (coerces booleans, enforces
+  // invariants like downgrading targetless respond/chime-in to ignore)
+  const normalized = normalizeClassifyResult(parsed);
+  if (!normalized) {
+    warn('Classifier result failed schema validation', {
+      channelId,
+      classification: parsed.classification,
+    });
+    return null;
+  }
 
-  return parsed;
+  return normalized;
 }
 
 // ── Responder result parser ──────────────────────────────────────────────────
@@ -129,5 +138,15 @@ export function parseRespondResult(sdkResult, channelId) {
     return null;
   }
 
-  return parsed;
+  // Validate through Zod schema for type safety
+  const normalized = normalizeRespondResult(parsed);
+  if (!normalized) {
+    warn('Responder result failed schema validation', {
+      channelId,
+      responseCount: parsed.responses?.length,
+    });
+    return null;
+  }
+
+  return normalized;
 }
