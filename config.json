@@ -43,13 +43,13 @@
     "excludedRoles": [],
     "debugFooter": true,
     "debugFooterLevel": "verbose",
-    "moderationLogChannel": "1473219285651292201",
+    "moderationLogChannel": null,
     "statusReactions": true,
     "dailyBudgetUsd": 10
   },
   "welcome": {
     "enabled": true,
-    "channelId": "1438631182379253814",
+    "channelId": null,
     "message": "{{greeting}}\n\n{{milestoneLine}}\n\n{{vibeLine}}\n\n{{ctaLine}}",
     "returningMessage": "Welcome back, {{user}}! Glad to see you again. Jump back in whenever you are ready.",
     "rulesMessage": "Read the server rules, then click below to verify your access.",
@@ -78,7 +78,7 @@
   },
   "moderation": {
     "enabled": true,
-    "alertChannelId": "1438665401243275284",
+    "alertChannelId": null,
     "autoDelete": false,
     "dmNotifications": {
       "warn": true,
@@ -239,7 +239,7 @@
     }
   },
   "tldr": {
-    "enabled": false,
+    "enabled": true,
     "model": "minimax:MiniMax-M2.7",
     "defaultMessages": 50,
     "maxMessages": 200,
@@ -249,7 +249,7 @@
     "enabled": false
   },
   "engagement": {
-    "enabled": false,
+    "enabled": true,
     "trackMessages": true,
     "trackReactions": true,
     "activityBadges": [
@@ -272,7 +272,7 @@
     ]
   },
   "reputation": {
-    "enabled": false,
+    "enabled": true,
     "xpPerMessage": [
       5,
       15
