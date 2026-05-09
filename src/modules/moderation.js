@@ -326,13 +326,16 @@ export async function scheduleAction(guildId, action, targetId, caseId, executeA
 }
 
 /**
- * Send a DM notification to a member before a moderation action.
- * Silently fails if the user has DMs disabled.
- * @param {import('discord.js').GuildMember} member - Target member
- * @param {string} action - Action type
- * @param {string|null} reason - Reason for the action
- * @param {string} guildName - Server name
- * @param {{ title?: string, colorAction?: string }} [options] - Optional embed title/color overrides
+ * Send a DM embed to a guild member notifying them of a moderation action.
+ *
+ * The embed includes the action (past-tense form), the provided reason, and a timestamp.
+ * Sending failures (for example, DMs disabled) are caught and ignored.
+ *
+ * @param {import('discord.js').GuildMember} member - Target guild member to message.
+ * @param {string} action - Moderation action key used to determine the embed title and default color.
+ * @param {string|null} reason - Reason shown in the embed; if null, displays "No reason provided".
+ * @param {string} guildName - Guild name used when composing the default title.
+ * @param {{ title?: string, colorAction?: string }} [options] - Optional overrides: `title` replaces the default DM title; `colorAction` selects the color key from action color mappings.
  */
 export async function sendDmNotification(member, action, reason, guildName, options = {}) {
   const pastTense = ACTION_PAST_TENSE[action] || action;

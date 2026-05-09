@@ -34,12 +34,12 @@ function shouldNormalizeSavedModel(value: unknown, normalizedValue: string): val
 }
 
 /**
- * Produce the toggle state and change handler for the configuration category specified by `activeTab`.
+ * Get the UI toggle state and change handler for the currently active configuration tab.
  *
  * @param activeTab - Identifier of the active configuration feature/tab
- * @param draftConfig - Current draft configuration object used to read the feature's enabled state
- * @param handlers - Updater functions used to persist changes to the corresponding feature section
- * @returns An object with `checked` set to whether the feature is enabled, and `onChange` a callback that updates the feature's `enabled` field; for unknown `activeTab` returns `checked: false` and a no-op `onChange`.
+ * @param draftConfig - Current draft configuration used to read the feature's `enabled` state
+ * @param handlers - Field updater functions used to persist changes for each feature section
+ * @returns An object where `checked` is `true` if the feature is enabled and `false` otherwise, and `onChange` is a callback that updates the feature's `enabled` field; for unknown `activeTab` returns `checked: false` and a no-op `onChange`
  */
 function getFeatureToggle(
   activeTab: ConfigFeatureId,

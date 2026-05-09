@@ -159,8 +159,10 @@ function normalizeActionList(value, fallback = []) {
 
 /**
  * Build a complete per-category action map from a raw configuration object.
+ * For each AI auto-mod category, resolves the configured actions using defaults
+ * and returns a validated, de-duplicated array of action types.
  * @param {Object} rawActions - Raw per-category action configuration; keys are category keys and values may be an action string, an array of actions, or falsy.
- * @returns {Object<string, string[]>} An object mapping each AI auto-mod category key to a normalized, de-duplicated array of valid action types.
+ * @returns {Object<string, string[]>} Mapping of each category key to a normalized, deduplicated array of valid action types.
  */
 function normalizeActionMap(rawActions = {}) {
   return Object.fromEntries(
@@ -200,13 +202,9 @@ function normalizeDmNotificationMap(rawNotifications = {}, fallbackNotifications
 }
 
 /**
- * Choose the highest-priority moderation action from a list of actions.
- *
- * Iterates the provided actions and returns the one with the greatest priority
- * according to ACTION_PRIORITY; returns `'none'` if the list is empty or no
- * known action has higher priority than the default.
- * @param {string[]} actions - Array of action keys to evaluate.
- * @returns {string} The action key with the highest priority, or `'none'` if none found.
+ * Determine the single highest-priority moderation action from a list.
+ * @param {string[]} actions - Action keys to evaluate.
+ * @returns {string} The action key with the highest priority, or `'none'` if no action with known priority is present.
  */
 function getPrimaryAction(actions) {
   let primaryAction = 'none';
@@ -219,9 +217,8 @@ function getPrimaryAction(actions) {
 }
 
 /**
- * Builds the merged AI auto-moderation configuration for a guild.
- * Merges guild-provided `aiAutoMod` settings with module defaults and normalizes fields.
- * @param {Object} config - Guild configuration object (may contain `aiAutoMod` and `moderation.dmNotifications`).
+ * Resolve a guild's AI auto-moderation configuration by merging guild settings with module defaults and normalizing fields.
+ * @param {Object} config - Guild configuration object; may include `aiAutoMod` and `moderation.dmNotifications`.
  * @returns {Object} The resolved AI auto-mod configuration with defaults applied and normalized `model`, `thresholds`, `actions`, and `dmNotifications`.
  */
 export function getAiAutoModConfig(config) {
@@ -660,6 +657,18 @@ function getExecutableActions(result, autoModConfig, message) {
   };
 }
 
+/**
+ * Sends a moderation flag embed to the configured review channel for a flagged message.
+ *
+ * @param {Object} options
+ * @param {'flag'|'delete'|'warn'|'timeout'|'kick'|'ban'} options.action - The action being audited (used in the embed context).
+ * @param {import('discord.js').Message} options.message - The Discord message to reference in the flag.
+ * @param {import('discord.js').Client} options.client - The bot client used to locate and send to the review channel.
+ * @param {Object} options.result - AI analysis result containing categories, scores, and reason.
+ * @param {Object} options.autoModConfig - Resolved guild auto-moderation configuration.
+ * @param {string[]} options.auditedActions - Ordered list of actions considered/audited for the message.
+ * @returns {{ success: boolean, caseData: null }} Indicates whether the flag embed was sent (`success`) and always `null` for `caseData`.
+ */
 async function executeFlagAction({
   action,
   message,
@@ -684,11 +693,11 @@ async function executeFlagAction({
  * Create and persist a warning case for the message author, send the moderation log embed, and trigger escalation checks.
  * @param {Object} options - Options object.
  * @param {import('discord.js').Message} options.message - The message whose author will be warned.
- * @param {string} options.reason - The reason to record on the warning case.
+ * @param {string} options.reason - The reason recorded on the warning case.
  * @param {Object} options.guildConfig - Guild moderation configuration used when creating the case.
  * @param {string} options.botId - The bot user's ID used as the moderator identity.
  * @param {string} options.botTag - The bot user's tag used as the moderator identity.
- * @returns {Promise<{success: boolean, caseData: Object|null}>} `success` is `true` when a warning case was created and associated actions completed; `caseData` contains the persisted case object on success or `null` on failure.
+ * @returns {Promise<{success: boolean, caseData: Object|null}>} `true` if a warning case was created and associated actions completed; `caseData` contains the persisted case object on success or `null` on failure.
  */
 async function executeWarnAction({ message, client, reason, guildConfig, botId, botTag }) {
   const { member, guild } = message;
@@ -866,10 +875,10 @@ function formatList(values) {
 }
 
 /**
- * Truncates a string to fit within a Discord embed field limit, appending a truncation suffix when necessary.
- * @param {string} value - The string to truncate.
+ * Ensure a string fits within an embed field by truncating and appending the module truncation suffix when needed.
+ * @param {string} value - The string to limit.
  * @param {number} [maxLength=DISCORD_EMBED_FIELD_VALUE_LIMIT] - Maximum allowed length for the returned string.
- * @returns {string} The original string if its length is less than or equal to `maxLength`, otherwise a truncated string with a truncation suffix appended.
+ * @returns {string} `value` unchanged if its length is less than or equal to `maxLength`, otherwise a truncated string with `TRUNCATION_SUFFIX` appended.
  */
 function truncateEmbedFieldValue(value, maxLength = DISCORD_EMBED_FIELD_VALUE_LIMIT) {
   if (value.length <= maxLength) return value;
@@ -927,11 +936,13 @@ function dedupeActions(actions) {
 }
 
 /**
- * Determine which DM notification actions should be sent based on config and executed actions.
+ * Selects DM-capable moderation actions that were executed and enabled in the auto-mod configuration.
  *
- * @param {Object} autoModConfig - Auto-mod configuration object; may include a `dmNotifications` map of action booleans.
- * @param {string[]} executedActions - List of moderation actions that were executed.
- * @returns {string[]} Array of DM-capable action names that are present in `executedActions` and enabled in the config.
+ * Only actions present in AI_AUTOMOD_DM_NOTIFICATION_ACTIONS are considered.
+ *
+ * @param {Object} autoModConfig - Auto-mod configuration; may include a `dmNotifications` map of action booleans.
+ * @param {string[]} executedActions - Moderation actions that were executed for the message.
+ * @returns {string[]} Array of action names that are both executed and enabled for DM notifications.
  */
 function getEnabledDmNotificationActions(autoModConfig, executedActions) {
   const configuredNotifications = autoModConfig.dmNotifications ?? DEFAULT_DM_NOTIFICATIONS;

@@ -70,9 +70,9 @@ let fileConfigCache = null;
 let globalAiAutoModDmNotificationsExplicit = false;
 
 /**
- * Extracts the explicit `dmNotifications` object from a config section when present.
- * @param {any} configSection - The config section to inspect (typically a plain object).
- * @returns {Object|undefined} The `dmNotifications` object if the section has an own `dmNotifications` property that is a plain object, otherwise `undefined`.
+ * Return the explicit `dmNotifications` object from a config section when one is defined.
+ * @param {any} configSection - The config section to inspect; typically a plain object.
+ * @returns {Object|undefined} The `dmNotifications` object if `configSection` owns a plain-object `dmNotifications`, `undefined` otherwise.
  */
 function getExplicitAiAutoModDmNotifications(configSection) {
   if (!isPlainObject(configSection) || !Object.hasOwn(configSection, 'dmNotifications')) {
@@ -82,20 +82,20 @@ function getExplicitAiAutoModDmNotifications(configSection) {
 }
 
 /**
- * Determine whether a config section explicitly defines `aiAutoMod.dmNotifications`.
- * @param {*} configSection - The config section value to inspect (typically a plain object).
- * @returns {boolean} `true` if the section contains an explicit `dmNotifications` object for `aiAutoMod`, `false` otherwise.
+ * Check whether the provided config section explicitly defines an `dmNotifications` object for `aiAutoMod`.
+ * @param {*} configSection - The value to inspect (expected to be a plain object representing a config section).
+ * @returns {boolean} `true` if `configSection` owns a plain-object `dmNotifications` property, `false` otherwise.
  */
 function hasExplicitAiAutoModDmNotifications(configSection) {
   return getExplicitAiAutoModDmNotifications(configSection) !== undefined;
 }
 
 /**
- * Determines whether the global `aiAutoMod.dmNotifications` setting should be considered explicitly set.
- * 
- * @param {*} rowValue - The DB row value for the `aiAutoMod` section (may be any JSON-parsable value).
+ * Decide whether the global `aiAutoMod.dmNotifications` setting should be treated as explicitly defined.
+ *
+ * @param {*} rowValue - The DB-stored value for the `aiAutoMod` section (any JSON value).
  * @param {boolean} fileAiDmExplicit - `true` if `config.json` explicitly defines `aiAutoMod.dmNotifications`.
- * @returns {boolean} `true` if `rowValue` contains an explicit `dmNotifications` object, or if `rowValue` is a plain object that lacks `dmNotifications` while `fileAiDmExplicit` is `true`; `false` otherwise.
+ * @returns {boolean} `true` if the DB value explicitly contains a `dmNotifications` object, or if the DB value is a plain object that omits `dmNotifications` while `fileAiDmExplicit` is `true`; `false` otherwise.
  */
 function shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(rowValue, fileAiDmExplicit) {
   if (hasExplicitAiAutoModDmNotifications(rowValue)) return true;
@@ -104,12 +104,10 @@ function shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(rowValue, fileAiDmE
 }
 
 /**
- * Merge a fallback notifications object with an override object, copying only safe boolean entries from the override.
- *
- * Produces a shallow-cloned copy of `fallbackNotifications` and applies entries from `overrideNotifications` when the key is not listed in `DANGEROUS_KEYS` and the value is strictly a boolean.
- * @param {Object|null|undefined} fallbackNotifications - Base notifications map to clone; may be null/undefined.
- * @param {Object|any} overrideNotifications - Candidate overrides; only own properties that are plain-object keys with boolean values are applied.
- * @returns {Object} A new notifications object combining the fallback with allowed boolean overrides.
+ * Create a notifications map by copying the fallback notifications and applying allowed boolean overrides.
+ * @param {Object|null|undefined} fallbackNotifications - Base notifications map; may be null/undefined and will be treated as the starting value.
+ * @param {Object|any} overrideNotifications - Candidate overrides; only own properties whose values are strictly boolean and whose keys are not in DANGEROUS_KEYS are applied.
+ * @returns {Object} The merged notifications object with boolean overrides applied for allowed keys.
  */
 function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
   const merged = structuredClone(fallbackNotifications);
@@ -125,14 +123,14 @@ function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
 }
 
 /**
- * Populate aiAutoMod.dmNotifications from moderation.dmNotifications when moderation settings exist.
+ * Ensure `aiAutoMod.dmNotifications` is populated from `moderation.dmNotifications` when present.
  *
- * If `config.moderation.dmNotifications` is a plain object, ensures `config.aiAutoMod` exists
- * and sets `config.aiAutoMod.dmNotifications` to the result of merging the moderation notifications
- * with `explicitAiDmNotifications` (used as overrides).
+ * When `config.moderation.dmNotifications` is a plain object, this function ensures `config.aiAutoMod`
+ * exists and sets `config.aiAutoMod.dmNotifications` to the merged result of the moderation notifications
+ * overlaid with `explicitAiDmNotifications`.
  *
- * @param {Object} config - Configuration object to modify; may be mutated in-place.
- * @param {Object|undefined} explicitAiDmNotifications - Explicit AI DM notification overrides to apply on top of moderation values.
+ * @param {Object} config - Configuration object to modify; mutated in place.
+ * @param {Object|undefined} explicitAiDmNotifications - Explicit AI DM notification overrides applied on top of moderation values.
  * @returns {Object} The same `config` object, with `aiAutoMod.dmNotifications` set when applicable.
  */
 function preserveLegacyAiAutoModDmFallback(config, explicitAiDmNotifications) {
@@ -668,11 +666,13 @@ function collectLeafValues(value, prefix, out) {
 }
 
 /**
- * Build path-level changed leaf events for a reset scope.
- * @param {Object} beforeConfig - Effective config before reset
- * @param {Object} afterConfig - Effective config after reset
- * @param {string|undefined} scopePath - Optional section path scope
- * @returns {Array<{path: string, newValue: *, oldValue: *}>}
+ * Compute leaf-level config change events within an optional scoped section.
+ * Compares flattened leaf values from `beforeConfig` and `afterConfig` (optionally limited to `scopePath`)
+ * and returns one entry per leaf whose value changed.
+ * @param {Object} beforeConfig - Effective configuration before the change.
+ * @param {Object} afterConfig - Effective configuration after the change.
+ * @param {string|undefined} scopePath - Optional dot-separated section path to restrict the comparison.
+ * @returns {Array<{path: string, newValue: *, oldValue: *}>} An array of change objects for each differing leaf.
  */
 function getChangedLeafEvents(beforeConfig, afterConfig, scopePath) {
   const scopeParts = scopePath ? scopePath.split('.') : [];
@@ -704,12 +704,14 @@ function getChangedLeafEvents(beforeConfig, afterConfig, scopePath) {
 }
 
 /**
- * Set a configuration value identified by a dot-path and update persistent storage and the in-memory cache.
+ * Update a single configuration leaf (identified by a dot-separated path) in both the in-memory cache and persistent storage.
+ *
+ * Applies module parsing rules to string inputs (converts "true"/"false"/"null", numeric literals, and JSON-like strings when possible) and writes the resulting value into the specified section/key path for the given guild or the global defaults. When a database is available the change is persisted inside a row-locking transaction; the in-memory cache is updated and appropriate merged-cache invalidation and change events are emitted.
  *
  * @param {string} path - Dot-notation path with at least a section and key (e.g., "ai.model" or "moderation.dmNotifications.alert").
- * @param {*} value - Value to set; string inputs are interpreted (e.g., "true"/"false"/"null", numeric literals, or JSON) via the module's parse rules.
+ * @param {*} value - Value to set; string inputs are interpreted per the module's parse rules (boolean/null literals, numeric literals with safety rules, or JSON for object/array/string forms).
  * @param {string} [guildId='global'] - Target guild ID, or `'global'` to modify global defaults.
- * @returns {Promise<Object>} The updated section object from the in-memory cache.
+ * @returns {Promise<Object>} The updated top-level section object from the in-memory cache (after mutation).
  * @throws {Error} If `path` does not include both a section and a key.
  * @throws {Error} If a database transaction fails (transaction errors are propagated).
  */
@@ -1020,12 +1022,12 @@ export async function setMultipleConfigValues(patches, guildId = 'global') {
 }
 
 /**
- * Reset configuration defaults for a specified section or the entire config, either globally or for a specific guild.
+ * Reset configuration defaults for either a top-level section or the entire configuration, applying the defaults from config.json for global resets or removing guild-specific overrides.
  *
- * @param {string} [section] - Top-level section to reset (e.g. "moderation"); omit to reset all sections.
+ * @param {string} [section] - Top-level section to reset (for example, "moderation"); omit to reset all sections.
  * @param {string} [guildId='global'] - Target guild ID, or `'global'` to reset global defaults from config.json.
- * @returns {Object} The resulting configuration: the global config object when `guildId === 'global'`, or the remaining guild override object (empty object if none remain).
- * @throws {Error} If a global reset is requested but the default config file (`config.json`) is not available.
+ * @returns {Object} The resulting configuration: the global config object when `guildId === 'global'`, or the remaining guild override object (an empty object if none remain).
+ * @throws {Error} When performing a global reset and the default config file (`config.json`) is not available.
  */
 export async function resetConfig(section, guildId = 'global') {
   // Guild reset — just delete overrides

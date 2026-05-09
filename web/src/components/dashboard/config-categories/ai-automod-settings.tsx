@@ -115,14 +115,14 @@ export function toggleAiAutoModCategoryAction(
 }
 
 /**
- * Renders a labeled checkbox toggle for a single automod action option.
+ * Render a labeled checkbox toggle for a single AI automod action option.
  *
- * @param categoryLabel - Human-readable label of the automod category (used for the checkbox aria-label)
- * @param option - The action option object containing `label` and `value` to display
- * @param checked - Whether the checkbox is currently selected
+ * @param categoryLabel - Human-readable category name used in the checkbox `aria-label`
+ * @param option - Action option object (provides `label` for visible text and `value` identifier)
+ * @param checked - Whether the checkbox is selected
  * @param disabled - Whether the checkbox is disabled
- * @param onToggle - Callback invoked with the new checked state when the checkbox changes
- * @returns A JSX element representing the action toggle control
+ * @param onToggle - Called with the new checked state when the checkbox changes
+ * @returns A JSX element for the labeled checkbox toggle
  */
 function AiAutoModActionToggle({
   categoryLabel,
