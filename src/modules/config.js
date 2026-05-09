@@ -345,14 +345,17 @@ export async function loadConfig() {
 
       // Build global config, using config.json as defaults for partial DB sections.
       const globalConfig = fileConfig ? structuredClone(fileConfig) : {};
-      globalAiAutoModDmNotificationsExplicit = globalRows.some(
-        (row) =>
-          row.key === 'aiAutoMod' &&
-          shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(
-            row.value,
-            fileAiAutoModDmNotificationsExplicit,
-          ),
-      );
+      const hasGlobalAiAutoModRow = globalRows.some((row) => row.key === 'aiAutoMod');
+      globalAiAutoModDmNotificationsExplicit =
+        globalRows.some(
+          (row) =>
+            row.key === 'aiAutoMod' &&
+            shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(
+              row.value,
+              fileAiAutoModDmNotificationsExplicit,
+            ),
+        ) ||
+        (!hasGlobalAiAutoModRow && fileAiAutoModDmNotificationsExplicit);
       for (const row of globalRows) {
         if (DANGEROUS_KEYS.has(row.key)) {
           logWarn('Skipping dangerous config key from database', {

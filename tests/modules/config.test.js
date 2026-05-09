@@ -280,10 +280,7 @@ describe('modules/config', () => {
           moderation: {
             dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
           },
-          aiAutoMod: {
-            enabled: false,
-            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
-          },
+          aiAutoMod: { enabled: false },
         }),
       );
 
@@ -324,6 +321,60 @@ describe('modules/config', () => {
         warn: false,
         timeout: false,
         kick: false,
+        ban: false,
+      });
+    });
+
+    it('should preserve explicit file AI AutoMod DM settings when DB has global rows but no AI AutoMod row', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: false, kick: true, ban: false },
+          },
+        }),
+      );
+
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+            {
+              guild_id: 'guild-file-ai-dm',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+          ],
+        }),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      const config = await configModule.loadConfig();
+      const guildConfig = configModule.getConfig('guild-file-ai-dm');
+
+      expect(config.aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: false,
+        kick: true,
+        ban: false,
+      });
+      expect(guildConfig.aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: false,
+        kick: true,
         ban: false,
       });
     });
@@ -378,8 +429,8 @@ describe('modules/config', () => {
       const guildConfig = configModule.getConfig('guild-explicit-ai-dm');
       expect(getAiAutoModConfig(guildConfig).dmNotifications).toEqual({
         warn: true,
-        timeout: false,
-        kick: false,
+        timeout: true,
+        kick: true,
         ban: true,
       });
     });
