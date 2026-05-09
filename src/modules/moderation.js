@@ -332,12 +332,15 @@ export async function scheduleAction(guildId, action, targetId, caseId, executeA
  * @param {string} action - Action type
  * @param {string|null} reason - Reason for the action
  * @param {string} guildName - Server name
+ * @param {{ title?: string, colorAction?: string }} [options] - Optional embed title/color overrides
  */
-export async function sendDmNotification(member, action, reason, guildName) {
+export async function sendDmNotification(member, action, reason, guildName, options = {}) {
   const pastTense = ACTION_PAST_TENSE[action] || action;
+  const title = options.title ?? `You have been ${pastTense} in ${guildName}`;
+  const colorAction = options.colorAction ?? action;
   const embed = new EmbedBuilder()
-    .setColor(ACTION_COLORS[action] || 0x5865f2)
-    .setTitle(`You have been ${pastTense} in ${guildName}`)
+    .setColor(ACTION_COLORS[colorAction] || ACTION_COLORS[action] || 0x5865f2)
+    .setTitle(title)
     .addFields({ name: 'Reason', value: reason || 'No reason provided' })
     .setTimestamp();
 

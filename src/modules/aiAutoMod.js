@@ -877,13 +877,14 @@ function truncateEmbedFieldValue(value, maxLength = DISCORD_EMBED_FIELD_VALUE_LI
 }
 
 /**
- * Builds the DM message body summarizing which DM-capable moderation actions were executed, which AI categories triggered, and the AI-provided reason.
+ * Builds the DM message body summarizing which DM-capable moderation actions were executed or planned,
+ * which AI categories triggered, and the AI-provided reason.
  * @param {{ categories: string[], reason?: string }} result - AI moderation result containing the triggered category keys and an optional reason.
  * @param {string[]} executedDmActions - Ordered list of DM-capable action keys that were executed (e.g., `['warn','timeout']`).
- * @returns {string} A single truncated string suitable for a Discord embed field with three lines: "Actions taken: ...", "Triggered categories: ...", and "Reason: ...".
+ * @param {string[]} [pendingDmActions=[]] - Ordered list of DM-capable destructive action keys that are planned but not yet completed.
+ * @returns {string} A single truncated string suitable for a Discord embed field with action summary, triggered categories, and reason lines.
  */
-function buildAiAutoModDmReason(result, executedDmActions) {
-  const actionSummary = formatList(executedDmActions.map((action) => DM_ACTION_LABELS[action]));
+function buildAiAutoModDmReason(result, executedDmActions, pendingDmActions = []) {
   const categorySummary = formatList(
     result.categories.map((category) => CATEGORY_LABELS[category] ?? category),
   );
@@ -891,14 +892,38 @@ function buildAiAutoModDmReason(result, executedDmActions) {
     '\u0000',
     '',
   );
+  const actionSummaryLines = [];
+
+  if (executedDmActions.length > 0) {
+    actionSummaryLines.push(
+      `Actions taken: ${formatList(executedDmActions.map((action) => DM_ACTION_LABELS[action]))}`,
+    );
+  }
+
+  if (pendingDmActions.length > 0) {
+    actionSummaryLines.push(
+      `Planned actions: ${formatList(pendingDmActions.map((action) => DM_ACTION_LABELS[action]))}`,
+    );
+  }
+
+  if (actionSummaryLines.length === 0) {
+    actionSummaryLines.push('Actions taken: none');
+  }
 
   return truncateEmbedFieldValue(
-    [
-      `Actions taken: ${actionSummary}`,
-      `Triggered categories: ${categorySummary}`,
-      `Reason: ${reason}`,
-    ].join('\n'),
+    [...actionSummaryLines, `Triggered categories: ${categorySummary}`, `Reason: ${reason}`].join(
+      '\n',
+    ),
   );
+}
+
+/**
+ * De-duplicate moderation action keys while preserving their first-seen order.
+ * @param {string[]} actions - Action keys to de-duplicate.
+ * @returns {string[]} Ordered action keys with duplicates removed.
+ */
+function dedupeActions(actions) {
+  return actions.filter((action, index) => actions.indexOf(action) === index);
 }
 
 /**
@@ -922,24 +947,45 @@ function getEnabledDmNotificationActions(autoModConfig, executedActions) {
  * @param {Object} result - AI moderation result containing categories, reason, scores, and actions.
  * @param {Object} autoModConfig - Resolved auto-mod configuration (used to determine which DM actions are enabled).
  * @param {string[]} executedActions - List of moderation actions that were executed for the message.
+ * @param {{ pendingActions?: string[] }} [options={}] - Pending action metadata used to send pre-enforcement destructive action DMs.
  * @returns {boolean} `true` if a DM notification flow was attempted (a DM action was enabled and the function attempted delivery), `false` if no DM was necessary or prerequisites were missing.
  */
-async function sendAiAutoModDmNotification(message, result, autoModConfig, executedActions) {
+async function sendAiAutoModDmNotification(
+  message,
+  result,
+  autoModConfig,
+  executedActions,
+  options = {},
+) {
   const { member, guild } = message;
   if (!member || !guild) return false;
 
   const executedDmActions = getEnabledDmNotificationActions(autoModConfig, executedActions);
-  if (executedDmActions.length === 0) return false;
+  const pendingDmActions = getEnabledDmNotificationActions(
+    autoModConfig,
+    options.pendingActions ?? [],
+  );
+  const dmActions = dedupeActions([...executedDmActions, ...pendingDmActions]);
+  if (dmActions.length === 0) return false;
 
-  const primaryDmAction = getPrimaryAction(executedDmActions);
-  const dmReason = buildAiAutoModDmReason(result, executedDmActions);
+  const primaryDmAction = getPrimaryAction(dmActions);
+  const dmReason = buildAiAutoModDmReason(result, executedDmActions, pendingDmActions);
+  const guildName = guild.name ?? guild.id;
+  const notificationOptions =
+    pendingDmActions.length > 0
+      ? { title: `Moderation action pending in ${guildName}`, colorAction: primaryDmAction }
+      : undefined;
 
   try {
-    await sendDmNotification(member, primaryDmAction, dmReason, guild.name ?? guild.id);
+    if (notificationOptions) {
+      await sendDmNotification(member, primaryDmAction, dmReason, guildName, notificationOptions);
+    } else {
+      await sendDmNotification(member, primaryDmAction, dmReason, guildName);
+    }
   } catch (err) {
     logError('AI auto-mod: sendAiAutoModDmNotification failed', {
       userId: member.user.id,
-      actions: executedDmActions,
+      actions: dmActions,
       error: err?.message,
     });
   }
@@ -986,6 +1032,7 @@ async function executeSingleAction(context) {
  * @param {Object} autoModConfig - Resolved AI auto-moderation configuration for the guild.
  * @param {Object} _guildConfig - Full guild configuration (passed through to action executors when needed).
  * @returns {Array<string>} List of action keys that were successfully executed, in the order they completed.
+ */
 async function executeAction(message, client, result, autoModConfig, _guildConfig) {
   const reason = `AI Auto-Mod: ${result.categories.join(', ')} — ${result.reason}`;
   const botId = client.user?.id ?? 'bot';
@@ -998,7 +1045,6 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
   const executedActions = [];
   const successfulAuditEvents = [];
   let aiAutoModDmAttempted = false;
-  let aiAutoModPendingDmAction = null;
 
   if (actions.length === 0) {
     logAiAutoModAuditEvent(message, result, autoModConfig, {
@@ -1015,19 +1061,21 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
   }
 
   for (const action of actions) {
-    const pendingDmActions = [...executedActions, action];
+    const remainingDestructiveActions = actions
+      .slice(actions.indexOf(action))
+      .filter((pendingAction) => AI_AUTOMOD_DESTRUCTIVE_ACTIONS.has(pendingAction));
     if (
       !aiAutoModDmAttempted &&
       AI_AUTOMOD_DESTRUCTIVE_ACTIONS.has(action) &&
-      getEnabledDmNotificationActions(autoModConfig, pendingDmActions).includes(action)
+      getEnabledDmNotificationActions(autoModConfig, [action]).includes(action)
     ) {
       aiAutoModDmAttempted = await sendAiAutoModDmNotification(
         message,
         result,
         autoModConfig,
-        pendingDmActions,
+        executedActions,
+        { pendingActions: remainingDestructiveActions },
       );
-      aiAutoModPendingDmAction = aiAutoModDmAttempted ? action : null;
     }
 
     const { success, caseData } = await executeSingleAction({
@@ -1043,16 +1091,9 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
       botTag,
     });
 
-    if (!success) {
-      if (aiAutoModPendingDmAction === action) {
-        aiAutoModDmAttempted = false;
-        aiAutoModPendingDmAction = null;
-      }
-      continue;
-    }
+    if (!success) continue;
 
     executedActions.push(action);
-    if (aiAutoModPendingDmAction === action) aiAutoModPendingDmAction = null;
     successfulAuditEvents.push({ action, caseData });
   }
 
