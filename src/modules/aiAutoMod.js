@@ -851,7 +851,15 @@ async function sendAiAutoModDmNotification(message, result, autoModConfig, execu
   const primaryDmAction = getPrimaryAction(executedDmActions);
   const dmReason = buildAiAutoModDmReason(result, executedDmActions);
 
-  await sendDmNotification(member, primaryDmAction, dmReason, guild.name ?? guild.id);
+  try {
+    await sendDmNotification(member, primaryDmAction, dmReason, guild.name ?? guild.id);
+  } catch (err) {
+    logError('AI auto-mod: sendAiAutoModDmNotification failed', {
+      userId: member.user.id,
+      actions: executedDmActions,
+      error: err?.message,
+    });
+  }
 }
 
 async function executeSingleAction(context) {

@@ -51,7 +51,7 @@ vi.mock('../../src/modules/auditLogger.js', () => ({
 }));
 
 // Import after mocks
-import { warn as logWarn } from '../../src/logger.js';
+import { error as logError, warn as logWarn } from '../../src/logger.js';
 import {
   analyzeMessage,
   checkAiAutoMod,
@@ -1036,6 +1036,7 @@ describe('checkAiAutoMod', () => {
   });
 
   it('continues warn persistence and escalation after sending warn DM notification', async () => {
+    vi.mocked(sendDmNotification).mockRejectedValueOnce(new Error('Cannot send messages'));
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.1, spam: 0.1, harassment: 0.9, reason: 'harassment' }),
     );
@@ -1068,6 +1069,11 @@ describe('checkAiAutoMod', () => {
       mockPool,
       expect.objectContaining({ action: 'ai_automod.warn' }),
     );
+    expect(logError).toHaveBeenCalledWith('AI auto-mod: sendAiAutoModDmNotification failed', {
+      userId: 'user-1',
+      actions: ['warn'],
+      error: 'Cannot send messages',
+    });
   });
 
   it('skips warn DMs when disabled while preserving warning persistence and escalation', async () => {
