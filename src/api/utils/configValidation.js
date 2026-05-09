@@ -181,6 +181,7 @@ const AI_AUTOMOD_CATEGORY_KEYS = [
 ];
 
 const AI_AUTOMOD_ACTION_TYPES = ['none', 'flag', 'delete', 'warn', 'timeout', 'kick', 'ban'];
+const AI_AUTOMOD_DM_NOTIFICATION_ACTION_TYPES = ['warn', 'timeout', 'kick', 'ban'];
 
 const CHANNEL_MODE_TYPES = ['off', 'mention', 'vibe'];
 
@@ -207,6 +208,13 @@ const AI_AUTOMOD_ACTION_SCHEMA = {
   type: 'object',
   properties: Object.fromEntries(
     AI_AUTOMOD_CATEGORY_KEYS.map((category) => [category, AI_AUTOMOD_ACTION_VALUE_SCHEMA]),
+  ),
+};
+
+const AI_AUTOMOD_DM_NOTIFICATION_SCHEMA = {
+  type: 'object',
+  properties: Object.fromEntries(
+    AI_AUTOMOD_DM_NOTIFICATION_ACTION_TYPES.map((action) => [action, { type: 'boolean' }]),
   ),
 };
 
@@ -427,6 +435,7 @@ export const CONFIG_SCHEMA = {
       flagChannelId: { type: 'string', nullable: true },
       autoDelete: { type: 'boolean' },
       exemptRoleIds: { type: 'array', items: { type: 'string' } },
+      dmNotifications: AI_AUTOMOD_DM_NOTIFICATION_SCHEMA,
     },
   },
   auditLog: {

@@ -19,7 +19,6 @@ import {
   createWarnCaseWithWarning,
   sendDmNotification,
   sendModLogEmbed,
-  shouldSendDm,
 } from './moderation.js';
 
 export const AI_AUTOMOD_CATEGORIES = Object.freeze([
@@ -84,6 +83,13 @@ const ACTION_PRIORITY = Object.freeze({
   flag: 1,
   none: -1,
 });
+export const AI_AUTOMOD_DM_NOTIFICATION_ACTIONS = Object.freeze(['warn', 'timeout', 'kick', 'ban']);
+const DEFAULT_DM_NOTIFICATIONS = Object.freeze({
+  warn: true,
+  timeout: true,
+  kick: true,
+  ban: true,
+});
 const missingFlagChannelWarningKeys = new Set();
 
 /** Default config when none is provided */
@@ -112,6 +118,7 @@ const DEFAULTS = {
   flagChannelId: null,
   autoDelete: true,
   exemptRoleIds: [],
+  dmNotifications: DEFAULT_DM_NOTIFICATIONS,
 };
 
 function normalizeActionList(value, fallback = []) {
@@ -145,6 +152,17 @@ function normalizeActionMap(rawActions = {}) {
   );
 }
 
+function normalizeDmNotificationMap(rawNotifications = {}) {
+  return Object.fromEntries(
+    AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.map((action) => [
+      action,
+      typeof rawNotifications[action] === 'boolean'
+        ? rawNotifications[action]
+        : DEFAULT_DM_NOTIFICATIONS[action],
+    ]),
+  );
+}
+
 function getPrimaryAction(actions) {
   let primaryAction = 'none';
   for (const action of actions) {
@@ -162,12 +180,18 @@ function getPrimaryAction(actions) {
  */
 export function getAiAutoModConfig(config) {
   const raw = config?.aiAutoMod ?? {};
+  const dmNotificationSource = {
+    ...(config?.moderation?.dmNotifications ?? {}),
+    ...(raw.dmNotifications ?? {}),
+  };
+
   return {
     ...DEFAULTS,
     ...raw,
     model: normalizeSupportedAiModel(raw.model),
     thresholds: { ...DEFAULTS.thresholds, ...(raw.thresholds ?? {}) },
     actions: normalizeActionMap(raw.actions ?? {}),
+    dmNotifications: normalizeDmNotificationMap(dmNotificationSource),
   };
 }
 
@@ -643,15 +667,6 @@ async function executeWarnAction({ message, client, reason, guildConfig, botId, 
   if (!persistedWarn?.caseData) return { success: false, caseData: null };
   const caseData = persistedWarn.caseData;
 
-  if (shouldSendDm(guildConfig, 'warn')) {
-    await sendDmNotification(member, 'warn', reason, guild.name ?? guild.id).catch((err) =>
-      logError('AI auto-mod: sendDmNotification (warn) failed', {
-        userId: member.user.id,
-        error: err?.message,
-      }),
-    );
-  }
-
   await sendCaseModLogEmbed(client, guildConfig, caseData, 'warn');
 
   await checkEscalation(client, guild.id, member.user.id, botId, botTag, guildConfig).catch((err) =>
@@ -774,6 +789,57 @@ const ACTION_EXECUTORS = Object.freeze({
   delete: executeDeleteAction,
 });
 
+const CATEGORY_LABELS = Object.freeze(
+  Object.fromEntries(AI_AUTOMOD_CATEGORIES.map(({ key, label }) => [key, label])),
+);
+const DM_ACTION_LABELS = Object.freeze({
+  warn: 'warning',
+  timeout: 'timeout',
+  kick: 'kick',
+  ban: 'ban',
+});
+
+function formatList(values) {
+  if (values.length === 0) return 'none';
+  if (values.length === 1) return values[0];
+  return `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`;
+}
+
+function buildAiAutoModDmReason(result, executedDmActions) {
+  const actionSummary = formatList(executedDmActions.map((action) => DM_ACTION_LABELS[action]));
+  const categorySummary = formatList(
+    result.categories.map((category) => CATEGORY_LABELS[category] ?? category),
+  );
+
+  return [
+    `Actions taken: ${actionSummary}`,
+    `Triggered categories: ${categorySummary}`,
+    `Reason: ${result.reason}`,
+  ].join('\n');
+}
+
+async function sendAiAutoModDmNotification(message, result, autoModConfig, executedActions) {
+  const { member, guild } = message;
+  if (!member || !guild) return;
+
+  const configuredNotifications = autoModConfig.dmNotifications ?? DEFAULT_DM_NOTIFICATIONS;
+  const executedDmActions = AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.filter(
+    (action) => executedActions.includes(action) && configuredNotifications[action] === true,
+  );
+  if (executedDmActions.length === 0) return;
+
+  const primaryDmAction = getPrimaryAction(executedDmActions);
+  const dmReason = buildAiAutoModDmReason(result, executedDmActions);
+
+  await sendDmNotification(member, primaryDmAction, dmReason, guild.name ?? guild.id).catch((err) =>
+    logError('AI auto-mod: sendDmNotification failed', {
+      userId: member.user.id,
+      actions: executedDmActions,
+      error: err?.message,
+    }),
+  );
+}
+
 async function executeSingleAction(context) {
   const executor = ACTION_EXECUTORS[context.action];
   if (!executor) return { success: false, caseData: null };
@@ -852,6 +918,8 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
     });
     return executedActions;
   }
+
+  await sendAiAutoModDmNotification(message, result, autoModConfig, executedActions);
 
   for (const { action, caseData } of successfulAuditEvents) {
     logAiAutoModAuditEvent(message, result, autoModConfig, {

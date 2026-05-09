@@ -179,8 +179,16 @@ function createDraftConfig(overrides: GuildConfig = {}): GuildConfig {
         violence: ['ban'],
         selfHarm: ['flag'],
       },
+      timeoutDurationMs: 300000,
       flagChannelId: null,
       autoDelete: true,
+      exemptRoleIds: [],
+      dmNotifications: {
+        warn: true,
+        timeout: true,
+        kick: true,
+        ban: true,
+      },
     },
     triage: {
       enabled: true,
@@ -241,6 +249,9 @@ describe('AiAutomationCategory', () => {
     expect(screen.getByLabelText('Violence Permanent Ban')).toBeChecked();
     expect(screen.getByLabelText('Self-Harm Flag & Log')).toBeChecked();
     expect(screen.getByLabelText('Self-Harm Issue Warning')).not.toBeChecked();
+    expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
+    expect(screen.getByLabelText('DM notifications for Timeouts')).toBeChecked();
+    expect(screen.getByText('One DM per incident')).toBeInTheDocument();
     expect(screen.getAllByText('Toxicity')).toHaveLength(1);
     expect(screen.getAllByText('Spam')).toHaveLength(1);
     expect(screen.getAllByText('Harassment')).toHaveLength(1);
@@ -346,6 +357,26 @@ describe('AiAutomationCategory', () => {
 
     expect(nextConfig.aiAutoMod?.actions?.toxicity).toEqual(['flag', 'warn']);
     expect(nextConfig.aiAutoMod?.actions?.spam).toEqual(['flag', 'delete']);
+  });
+
+  it('updates AI auto-moderation DM notification settings independently from actions', () => {
+    const updateDraftConfig = vi.fn();
+    mockAiAutoModContext(updateDraftConfig);
+
+    render(<AiAutomationCategory />);
+
+    fireEvent.click(screen.getByLabelText('DM notifications for Timeouts'));
+
+    const updater = updateDraftConfig.mock.calls[0]?.[0] as (config: GuildConfig) => GuildConfig;
+    const nextConfig = updater(createDraftConfig());
+
+    expect(nextConfig.aiAutoMod?.dmNotifications).toEqual({
+      warn: true,
+      timeout: false,
+      kick: true,
+      ban: true,
+    });
+    expect(nextConfig.aiAutoMod?.actions?.hateSpeech).toEqual(['timeout']);
   });
 
   it('preserves unknown saved models in the detection model dropdown', () => {

@@ -29,7 +29,6 @@ vi.mock('../../src/modules/moderation.js', () => ({
   }),
   sendDmNotification: vi.fn().mockResolvedValue(undefined),
   sendModLogEmbed: vi.fn().mockResolvedValue(null),
-  shouldSendDm: vi.fn().mockReturnValue(true),
 }));
 
 const { mockGenerate, mockGetPool, mockPool } = vi.hoisted(() => ({
@@ -66,7 +65,6 @@ import {
   createWarnCaseWithWarning,
   sendDmNotification,
   sendModLogEmbed,
-  shouldSendDm,
 } from '../../src/modules/moderation.js';
 import { fetchChannelCached } from '../../src/utils/discordCache.js';
 import { isExempt } from '../../src/utils/modExempt.js';
@@ -191,6 +189,7 @@ describe('getAiAutoModConfig', () => {
     expect(cfg.actions.toxicity).toEqual(['flag']);
     expect(cfg.actions.spam).toEqual(['delete']);
     expect(cfg.actions.harassment).toEqual(['warn']);
+    expect(cfg.dmNotifications).toEqual({ warn: true, timeout: true, kick: true, ban: true });
   });
 
   it('merges guild overrides onto defaults and normalizes legacy single actions', () => {
@@ -227,6 +226,27 @@ describe('getAiAutoModConfig', () => {
 
     expect(cfg.actions.toxicity).toEqual(['warn', 'delete']);
     expect(cfg.actions.spam).toEqual([]);
+  });
+
+  it('normalizes AI auto-mod DM notifications with moderation defaults as fallback', () => {
+    const cfg = getAiAutoModConfig({
+      moderation: { dmNotifications: { warn: false, timeout: true, kick: false, ban: true } },
+      aiAutoMod: { dmNotifications: { timeout: false } },
+    });
+
+    expect(cfg.dmNotifications).toEqual({ warn: false, timeout: false, kick: false, ban: true });
+
+    const fallbackCfg = getAiAutoModConfig({
+      moderation: { dmNotifications: { warn: false, timeout: true, kick: false, ban: true } },
+      aiAutoMod: {},
+    });
+
+    expect(fallbackCfg.dmNotifications).toEqual({
+      warn: false,
+      timeout: true,
+      kick: false,
+      ban: true,
+    });
   });
 });
 
@@ -598,7 +618,6 @@ describe('checkAiAutoMod', () => {
     vi.mocked(checkEscalation).mockResolvedValue(null);
     vi.mocked(sendDmNotification).mockResolvedValue(undefined);
     vi.mocked(sendModLogEmbed).mockResolvedValue(null);
-    vi.mocked(shouldSendDm).mockReturnValue(true);
     vi.mocked(logAuditEvent).mockResolvedValue(undefined);
     vi.mocked(fetchChannelCached).mockResolvedValue(null);
     vi.mocked(safeSend).mockResolvedValue(undefined);
@@ -861,11 +880,10 @@ describe('checkAiAutoMod', () => {
     const result = await checkAiAutoMod(message, client, guildConfig);
 
     expect(result).toMatchObject({ flagged: true, action: 'warn' });
-    expect(shouldSendDm).toHaveBeenCalledWith(guildConfig, 'warn');
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
       'warn',
-      'AI Auto-Mod: harassment — harassment',
+      'Actions taken: warning\nTriggered categories: Harassment\nReason: harassment',
       'guild-1',
     );
     expect(createWarnCaseWithWarning).toHaveBeenCalledWith(
@@ -898,15 +916,11 @@ describe('checkAiAutoMod', () => {
     );
   });
 
-  it('skips warn DM when DM notifications are disabled but continues warn pipeline', async () => {
-    vi.mocked(shouldSendDm).mockReturnValueOnce(false);
+  it('skips warn DM when AI auto-mod DM notifications are disabled but continues warn pipeline', async () => {
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.1, spam: 0.1, harassment: 0.9, reason: 'harassment' }),
     );
-    const guildConfig = makeAiAutoModGuildConfig(
-      {},
-      { moderation: { dmNotifications: { warn: false } } },
-    );
+    const guildConfig = makeAiAutoModGuildConfig({ dmNotifications: { warn: false } });
 
     const result = await checkAiAutoMod(message, client, guildConfig);
 
@@ -1023,13 +1037,12 @@ describe('checkAiAutoMod', () => {
   });
 
   it('skips warn DMs when disabled while preserving warning persistence and escalation', async () => {
-    vi.mocked(shouldSendDm).mockReturnValue(false);
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.1, spam: 0.1, harassment: 0.9, reason: 'harassment' }),
     );
     const guildConfig = makeAiAutoModGuildConfig(
-      {},
-      { moderation: { ...moderationWarnConfig, dmNotifications: { warn: false } } },
+      { dmNotifications: { warn: false } },
+      { moderation: moderationWarnConfig },
     );
 
     const result = await checkAiAutoMod(message, client, guildConfig);
@@ -1078,10 +1091,11 @@ describe('checkAiAutoMod', () => {
       actions: ['delete', 'warn', 'timeout'],
     });
     expect(message.delete).toHaveBeenCalledTimes(1);
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
-      'warn',
-      'AI Auto-Mod: toxicity — toxic',
+      'timeout',
+      'Actions taken: warning and timeout\nTriggered categories: Toxicity\nReason: toxic',
       'guild-1',
     );
     expect(createWarnCaseWithWarning).toHaveBeenCalledWith(

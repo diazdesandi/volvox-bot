@@ -89,8 +89,11 @@ const minimalConfig = {
     enabled: false,
     thresholds: { toxicity: 0.7, spam: 0.7, harassment: 0.7 },
     actions: { toxicity: ['flag'], spam: ['flag'], harassment: ['flag'] },
+    timeoutDurationMs: 300000,
     flagChannelId: null,
     autoDelete: true,
+    exemptRoleIds: [],
+    dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
   },
   welcome: {
     enabled: false,

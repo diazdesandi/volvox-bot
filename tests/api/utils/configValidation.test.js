@@ -141,6 +141,8 @@ describe('configValidation', () => {
       expect(validateSingleValue('aiAutoMod.actions.hateSpeech', ['flag', 'timeout'])).toEqual([]);
       expect(validateSingleValue('aiAutoMod.actions.hateSpeech', [])).toEqual([]);
       expect(validateSingleValue('aiAutoMod.exemptRoleIds', ['role-1'])).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.warn', true)).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.ban', false)).toEqual([]);
     });
 
     it('should reject invalid aiAutoMod model, threshold, and action values', () => {
@@ -167,6 +169,9 @@ describe('configValidation', () => {
       );
       expect(validateSingleValue('aiAutoMod.actions.spam', ['delete', 'obliterate'])).toEqual(
         expect.arrayContaining([expect.stringContaining('must be one of')]),
+      );
+      expect(validateSingleValue('aiAutoMod.dmNotifications.warn', 'yes')).toEqual(
+        expect.arrayContaining([expect.stringContaining('expected boolean')]),
       );
     });
 

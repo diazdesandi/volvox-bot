@@ -353,6 +353,12 @@
     "timeoutDurationMs": 300000,
     "flagChannelId": null,
     "autoDelete": true,
-    "exemptRoleIds": []
+    "exemptRoleIds": [],
+    "dmNotifications": {
+      "warn": true,
+      "timeout": true,
+      "kick": true,
+      "ban": true
+    }
   }
 }

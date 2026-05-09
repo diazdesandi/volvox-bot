@@ -14,6 +14,7 @@ import { RoleSelector } from '@/components/ui/role-selector';
 import {
   AI_AUTOMOD_ACTION_OPTIONS,
   AI_AUTOMOD_CATEGORIES,
+  AI_AUTOMOD_DM_NOTIFICATION_OPTIONS,
   type SelectableAiAutoModAction,
 } from '@/data/ai-automod-catalog';
 import {
@@ -21,7 +22,7 @@ import {
   VISIBLE_PROVIDER_MODEL_OPTIONS,
 } from '@/lib/provider-model-options';
 import { cn } from '@/lib/utils';
-import type { AiAutoModCategory, ChannelMode } from '@/types/config';
+import type { AiAutoModCategory, AiAutoModDmNotificationAction, ChannelMode } from '@/types/config';
 import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
 import { SystemPromptEditor } from '../system-prompt-editor';
 import { ToggleSwitch } from '../toggle-switch';
@@ -118,6 +119,37 @@ function AiAutoModActionToggle({
       <span className="block rounded-lg border border-border/40 bg-background/70 px-3 py-2 text-[11px] font-bold text-foreground/60 transition-colors peer-checked:border-primary/60 peer-checked:bg-primary/15 peer-checked:text-foreground peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary">
         {option.label}
       </span>
+    </label>
+  );
+}
+
+function AiAutoModDmNotificationToggle({
+  option,
+  checked,
+  disabled,
+  onToggle,
+}: Readonly<{
+  option: (typeof AI_AUTOMOD_DM_NOTIFICATION_OPTIONS)[number];
+  checked: boolean;
+  disabled: boolean;
+  onToggle: (checked: boolean) => void;
+}>) {
+  return (
+    <label className="group cursor-pointer rounded-2xl border border-border/40 bg-background/45 p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <span className="text-sm font-bold text-foreground/85">{option.label}</span>
+          <p className="text-[11px] leading-5 text-muted-foreground">{option.description}</p>
+        </div>
+        <input
+          type="checkbox"
+          aria-label={`DM notifications for ${option.label}`}
+          checked={checked}
+          onChange={(event) => onToggle(event.target.checked)}
+          disabled={disabled}
+          className="mt-0.5 h-4 w-4 rounded border-border/60 accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+        />
+      </div>
     </label>
   );
 }
@@ -253,6 +285,20 @@ export function AiAutomationCategory() {
           checked,
         ),
       );
+    },
+    [updateAiAutoModField],
+  );
+
+  const updateAiAutoModDmNotification = useCallback(
+    (action: AiAutoModDmNotificationAction, checked: boolean) => {
+      updateAiAutoModField('dmNotifications', (previousNotifications) => ({
+        warn: true,
+        timeout: true,
+        kick: true,
+        ban: true,
+        ...previousNotifications,
+        [action]: checked,
+      }));
     },
     [updateAiAutoModField],
   );
@@ -595,6 +641,36 @@ export function AiAutomationCategory() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-border/30 bg-background/30 p-4">
+              <div className="mb-4 grid gap-1 sm:grid-cols-[1fr_auto] sm:items-end">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-semibold tracking-wide text-foreground/90">
+                    User DM Notifications
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground/70">
+                    Send one concise DM after successful AI enforcement, summarizing the actions,
+                    triggered categories, and reason.
+                  </p>
+                </div>
+                <span className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+                  One DM per incident
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {AI_AUTOMOD_DM_NOTIFICATION_OPTIONS.map((option) => (
+                  <AiAutoModDmNotificationToggle
+                    key={option.value}
+                    option={option}
+                    checked={Boolean(
+                      draftConfig.aiAutoMod?.dmNotifications?.[option.value] ?? true,
+                    )}
+                    disabled={saving}
+                    onToggle={(checked) => updateAiAutoModDmNotification(option.value, checked)}
+                  />
+                ))}
               </div>
             </div>
           </div>

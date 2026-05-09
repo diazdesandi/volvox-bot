@@ -6,16 +6,19 @@ import { describe, expect, it } from 'vitest';
 import {
   AI_AUTOMOD_ACTION_OPTIONS,
   AI_AUTOMOD_CATEGORIES,
+  AI_AUTOMOD_DM_NOTIFICATION_OPTIONS,
   type SelectableAiAutoModAction,
 } from '@/data/ai-automod-catalog';
-import type { AiAutoModCategory } from '@/types/config';
+import type { AiAutoModCategory, AiAutoModDmNotificationAction } from '@/types/config';
 
 type BackendAiAutoModModule = {
   AI_AUTOMOD_ACTION_TYPES: readonly SelectableAiAutoModAction[];
   AI_AUTOMOD_CATEGORIES: readonly { key: AiAutoModCategory }[];
+  AI_AUTOMOD_DM_NOTIFICATION_ACTIONS: readonly AiAutoModDmNotificationAction[];
   getAiAutoModConfig: (config: { aiAutoMod?: object }) => {
     thresholds: Record<AiAutoModCategory, number>;
     actions: Record<AiAutoModCategory, SelectableAiAutoModAction[]>;
+    dmNotifications: Record<AiAutoModDmNotificationAction, boolean>;
   };
 };
 
@@ -62,6 +65,12 @@ describe('AI auto-mod catalog sync', () => {
     expect(webDefaultActions).toEqual(backendDefaults.actions);
     expect(AI_AUTOMOD_ACTION_OPTIONS.map(({ value }) => value)).toEqual(
       backendAiAutoMod.AI_AUTOMOD_ACTION_TYPES,
+    );
+    expect(AI_AUTOMOD_DM_NOTIFICATION_OPTIONS.map(({ value }) => value)).toEqual(
+      backendAiAutoMod.AI_AUTOMOD_DM_NOTIFICATION_ACTIONS,
+    );
+    expect(Object.keys(backendDefaults.dmNotifications)).toEqual(
+      backendAiAutoMod.AI_AUTOMOD_DM_NOTIFICATION_ACTIONS,
     );
   });
 });

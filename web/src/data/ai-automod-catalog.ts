@@ -1,4 +1,8 @@
-import type { AiAutoModAction, AiAutoModCategory } from '@/types/config';
+import type {
+  AiAutoModAction,
+  AiAutoModCategory,
+  AiAutoModDmNotificationAction,
+} from '@/types/config';
 
 export type SelectableAiAutoModAction = Exclude<AiAutoModAction, 'none'>;
 
@@ -30,3 +34,14 @@ export const AI_AUTOMOD_ACTION_OPTIONS = [
   { value: 'kick', label: 'Server Kick' },
   { value: 'ban', label: 'Permanent Ban' },
 ] as const satisfies readonly { value: SelectableAiAutoModAction; label: string }[];
+
+export const AI_AUTOMOD_DM_NOTIFICATION_OPTIONS = [
+  { value: 'warn', label: 'Warnings', description: 'DM when AI AutoMod issues a warning.' },
+  { value: 'timeout', label: 'Timeouts', description: 'DM when AI AutoMod applies a timeout.' },
+  { value: 'kick', label: 'Kicks', description: 'DM when AI AutoMod removes a member.' },
+  { value: 'ban', label: 'Bans', description: 'DM when AI AutoMod bans a member.' },
+] as const satisfies readonly {
+  value: AiAutoModDmNotificationAction;
+  label: string;
+  description: string;
+}[];

@@ -35,6 +35,13 @@ export type AiAutoModAction = 'none' | 'flag' | 'delete' | 'warn' | 'timeout' | 
 
 export type AiAutoModActionValue = AiAutoModAction | AiAutoModAction[];
 
+export type AiAutoModDmNotificationAction = Extract<
+  AiAutoModAction,
+  'warn' | 'timeout' | 'kick' | 'ban'
+>;
+
+export type AiAutoModDmNotifications = Record<AiAutoModDmNotificationAction, boolean>;
+
 export interface AiAutoModConfig {
   enabled: boolean;
   model: string;
@@ -44,6 +51,7 @@ export interface AiAutoModConfig {
   flagChannelId: string | null;
   autoDelete: boolean;
   exemptRoleIds: string[];
+  dmNotifications: AiAutoModDmNotifications;
 }
 
 /** Dynamic welcome message generation settings. */
