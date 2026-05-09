@@ -17,7 +17,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Clearer welcome personalization toggle** — The "Engine Intelligence" toggle on **Config → Onboarding & Growth** is now labeled **AI-Powered Personalization**. The new label explains that the bot uses server context — active channels, member milestones — to personalize welcome messages. Highlight and Exclude channel pickers also stop showing the same channel in both lists, so the two settings can't conflict.
 
-**Tidier dashboard chrome** — The configuration search now closes automatically when you click outside it or select a result. The **Variables** lists in welcome and XP-level editors collapse to save vertical space, and the **AI Chat** entry has moved out of the sidebar — use **Conversations** for AI history.
+**Tidier dashboard chrome** — The configuration search now closes automatically when you select a result or interact elsewhere on the page. The **Variables** lists in welcome and XP-level editors collapse to save vertical space, and the **AI Chat** entry has moved out of the sidebar — use **Conversations** for AI history.
 </Update>
 
 <Update label="2026-05-08" description="May 2026" tags={["Features", "Improvements"]}>
@@ -91,7 +91,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-04-29" description="April 2026" tags={["Features", "Improvements", "Fixes"]}>
 ## New features
 
-**AI auto-moderation** — Active Sentry now scores incoming messages with AI across toxicity, spam, harassment, hate speech, sexual content, violence, and self-harm. Select a detection model and set per-category sensitivity thresholds. Configure response actions — ignore, delete, flag, warn, timeout, kick, or ban — including multiple actions per violation. Volvox.Bot logs AI auto-moderation actions alongside classic moderation cases. Configure it under **Config → Moderation & Safety → Content Safety** in the [dashboard](/dashboard), and see the [moderation docs](/features/moderation) for details.
+**AI auto-moderation** — Active Sentry now scores incoming messages with AI across toxicity, spam, harassment, hate speech, sexual content, violence, and self-harm. Select a detection model and set per-category sensitivity thresholds. Configure response actions — ignore, delete, flag, warn, timeout, kick, or ban — including multiple actions per violation. Volvox.Bot logs AI auto-moderation actions alongside classic moderation cases. Configure it under **Config → Moderation & Safety → Content Safety** in the [dashboard](/dashboard). See the [moderation docs](/features/moderation) for details.
 
 **Configurable model for `/tldr`** — You can now select which provider/model the [TL;DR command](/features/tldr) uses to generate summaries, right from the dashboard. MiniMax M2.7 is the new default.
 
