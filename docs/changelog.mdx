@@ -20,7 +20,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 **Tidier dashboard chrome** — The configuration search now closes automatically when you select a result or interact elsewhere on the page. The **Variables** lists in welcome and XP-level editors collapse to save vertical space, and the **AI Chat** entry has moved out of the sidebar — use **Conversations** for AI history.
 </Update>
 
-<Update label="2026-05-08" description="May 2026" tags={["Features", "Improvements"]}>
+<Update label="2026-05-08" description="May 2026" tags={["Features", "Improvements", "Fixes"]}>
 ## New features
 
 **Customizable onboarding panel messages** — Tailor the copy on your rules, role menu, and introduction panels directly from the [dashboard](/dashboard) under Onboarding & Growth. Each panel has its own Discord markdown editor (up to 2000 characters), so you can match your server's tone instead of relying on the defaults.
@@ -32,6 +32,14 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 ## Improvements
 
 **More reliable welcome publishing** — Welcome publish routes are rate-limited and validate channels per guild, so misconfigured publishes fail fast with a useful error. The bot also surfaces persistence warnings on the dashboard when Discord delivery succeeds but state can't be saved, so you know to retry.
+
+**Friendlier timezone inputs** — Challenge schedule timezones now accept UTC/GMT offsets like `GMT+3` or `UTC-05`, in addition to IANA names like `America/New_York`. Offsets normalize to their canonical IANA equivalent (for example, `GMT+3` → `Etc/GMT-3`) when you save.
+
+## Fixes
+
+**Stricter timezone validation** — The dashboard now rejects unsupported timezone strings up front with a clear error (`expected a valid IANA timezone or UTC/GMT offset`), instead of letting bad values reach the scheduler. Existing servers fall back to a supported timezone automatically, so daily challenges keep posting on time.
+
+**Steadier server list** — The dashboard server selector no longer drops servers when a single guild lookup fails. Loading falls back to bot-side data so admins still see and manage every server they have access to.
 </Update>
 
 <Update label="2026-05-07" description="May 2026" tags={["Improvements", "Fixes"]}>
