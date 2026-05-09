@@ -3,6 +3,19 @@
 import * as amplitude from '@amplitude/analytics-browser';
 
 export const DASHBOARD_PAGE_VIEW_EVENT = 'dashboard_page_viewed';
+export const DASHBOARD_GUILD_SELECTED_EVENT = 'dashboard_guild_selected';
+export const DASHBOARD_AUTH_STARTED_EVENT = 'dashboard_auth_started';
+export const DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT = 'dashboard_config_save_attempted';
+export const DASHBOARD_CONFIG_SAVED_EVENT = 'dashboard_config_saved';
+export const DASHBOARD_CONFIG_SAVE_FAILED_EVENT = 'dashboard_config_save_failed';
+export const DASHBOARD_ANALYTICS_REFRESHED_EVENT = 'dashboard_analytics_refreshed';
+export const DASHBOARD_ANALYTICS_REFRESH_FAILED_EVENT = 'dashboard_analytics_refresh_failed';
+export const DASHBOARD_ANALYTICS_EXPORTED_EVENT = 'dashboard_analytics_exported';
+export const DASHBOARD_ANALYTICS_FILTER_CHANGED_EVENT = 'dashboard_analytics_filter_changed';
+export const DASHBOARD_WELCOME_PUBLISHED_EVENT = 'dashboard_welcome_published';
+export const DASHBOARD_WELCOME_PUBLISH_FAILED_EVENT = 'dashboard_welcome_publish_failed';
+export const DASHBOARD_AI_FEEDBACK_SUBMITTED_EVENT = 'dashboard_ai_feedback_submitted';
+export const DASHBOARD_AI_FEEDBACK_FAILED_EVENT = 'dashboard_ai_feedback_failed';
 
 type BrowserAmplitudeOptions = NonNullable<Parameters<typeof amplitude.init>[2]>;
 type BrowserAmplitudeProperties = Record<string, unknown>;
@@ -68,13 +81,12 @@ function parseBoolean(value: string | undefined): boolean {
 }
 
 /**
- * Normalize a server zone identifier to either 'US' or 'EU'.
+ * Return the only supported Amplitude server zone for this deployment.
  *
- * @param value - Raw server zone value (for example from an environment variable); leading/trailing whitespace is ignored and comparison is case-insensitive.
- * @returns `'EU'` if the trimmed, uppercased input equals `'EU'`, otherwise `'US'`.
+ * @returns `'US'`.
  */
-function normalizeServerZone(value: string | undefined): 'US' | 'EU' {
-  return value?.trim().toUpperCase() === 'EU' ? 'EU' : 'US';
+function getAmplitudeServerZone(): 'US' {
+  return 'US';
 }
 
 /**
@@ -183,8 +195,8 @@ export function isDashboardAmplitudeEnabled(): boolean {
  *
  * The returned object configures autocapture based on NEXT_PUBLIC_AMPLITUDE_AUTOCAPTURE,
  * keeps SDK page-view autocapture disabled so app-owned page tracking is not duplicated,
- * sets log level to `None`, disables remote config fetching, normalizes `serverZone`
- * from NEXT_PUBLIC_AMPLITUDE_SERVER_ZONE, and disables IP address tracking.
+ * sets log level to `None`, disables remote config fetching, keeps `serverZone`
+ * fixed to `US`, and disables IP address tracking.
  *
  * @returns The options object to pass to `amplitude.init`
  */
@@ -208,7 +220,7 @@ export function getBrowserAmplitudeOptions(): BrowserAmplitudeOptions {
     remoteConfig: {
       fetchRemoteConfig: false,
     },
-    serverZone: normalizeServerZone(process.env.NEXT_PUBLIC_AMPLITUDE_SERVER_ZONE),
+    serverZone: getAmplitudeServerZone(),
     trackingOptions: {
       ipAddress: false,
     },

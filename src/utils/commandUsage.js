@@ -5,6 +5,7 @@
  * This decouples dashboard analytics from log transport availability.
  */
 
+import { BOT_COMMAND_USED_EVENT, trackAnalyticsEvent } from '../amplitude.js';
 import { error as logError } from '../logger.js';
 import { queryWithLogging } from './dbUtils.js';
 
@@ -27,6 +28,12 @@ export async function logCommandUsage({ guildId, userId, commandName, channelId 
     });
     return;
   }
+
+  trackAnalyticsEvent(BOT_COMMAND_USED_EVENT, {
+    commandName,
+    guildScope: 'selected',
+    hasChannel: Boolean(channelId),
+  });
 
   try {
     await queryWithLogging(

@@ -6,12 +6,21 @@ import { exportAnalyticsPdf } from '@/lib/analytics-pdf';
 import { endOfDayIso, startOfDayIso } from '@/lib/analytics-utils';
 import type { DashboardAnalytics } from '@/types/analytics';
 
-const { mockUseGuildSelection } = vi.hoisted(() => ({
+const { mockTrackDashboardEvent, mockUseGuildSelection } = vi.hoisted(() => ({
+  mockTrackDashboardEvent: vi.fn(),
   mockUseGuildSelection: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-guild-selection', () => ({
   useGuildSelection: (options?: { onGuildChange?: () => void }) => mockUseGuildSelection(options),
+}));
+
+vi.mock('@/lib/amplitude', () => ({
+  DASHBOARD_ANALYTICS_EXPORTED_EVENT: 'dashboard_analytics_exported',
+  DASHBOARD_ANALYTICS_FILTER_CHANGED_EVENT: 'dashboard_analytics_filter_changed',
+  DASHBOARD_ANALYTICS_REFRESH_FAILED_EVENT: 'dashboard_analytics_refresh_failed',
+  DASHBOARD_ANALYTICS_REFRESHED_EVENT: 'dashboard_analytics_refreshed',
+  trackDashboardEvent: mockTrackDashboardEvent,
 }));
 
 vi.mock('@/lib/analytics-pdf', () => ({
@@ -98,12 +107,35 @@ function AnalyticsHarness() {
       <output data-testid="error">{analytics.error ?? ''}</output>
       <output data-testid="guild">{analytics.analytics?.guildId ?? 'none'}</output>
       <output data-testid="range">{analytics.rangePreset}</output>
+      <output data-testid="compare">{String(analytics.compareMode)}</output>
       <output data-testid="channel">{analytics.channelFilter ?? 'all'}</output>
       <output data-testid="updated">{analytics.lastUpdatedAt instanceof Date ? 'yes' : 'no'}</output>
       <button type="button" onClick={() => analytics.setRangePreset('today')}>Today</button>
+      <button type="button" onClick={() => analytics.setRangePreset('week')}>Same range</button>
       <button type="button" onClick={() => analytics.setCompareMode(true)}>Compare</button>
+      <button type="button" onClick={() => analytics.setCompareMode((current) => current)}>Same compare</button>
+      <button
+        type="button"
+        onClick={() => {
+          analytics.setCompareMode((current) => !current);
+          analytics.setCompareMode((current) => !current);
+        }}
+      >
+        Toggle compare twice
+      </button>
       <button type="button" onClick={() => analytics.setChannelFilter('channel-1')}>Channel</button>
+      <button type="button" onClick={() => analytics.setChannelFilter((current) => current)}>Same channel</button>
+      <button
+        type="button"
+        onClick={() => {
+          analytics.setChannelFilter((current) => (current ? null : 'channel-1'));
+          analytics.setChannelFilter((current) => (current ? null : 'channel-1'));
+        }}
+      >
+        Toggle channel twice
+      </button>
       <button type="button" onClick={() => analytics.setCustomRange('2026-02-03', '2026-02-04')}>Custom</button>
+      <button type="button" onClick={() => analytics.setCustomRange('2026-02-03', '2026-02-04')}>Same custom</button>
       <button type="button" onClick={() => { analytics.refresh(true); }}>Background refresh</button>
       <button type="button" onClick={analytics.exportCsv}>Export CSV</button>
       <button type="button" onClick={analytics.exportPdf}>Export PDF</button>
@@ -139,6 +171,7 @@ describe('AnalyticsProvider', () => {
     vi.restoreAllMocks();
     mockUseGuildSelection.mockReset();
     mockUseGuildSelection.mockReturnValue('guild/1');
+    mockTrackDashboardEvent.mockClear();
     vi.mocked(exportAnalyticsPdf).mockClear();
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(analyticsPayload));
   });
@@ -210,6 +243,169 @@ describe('AnalyticsProvider', () => {
 
     await user.click(screen.getByRole('button', { name: 'Export PDF' }));
     expect(exportAnalyticsPdf).toHaveBeenCalledWith(analyticsPayload);
+  });
+
+  it('tracks analytics refreshes, filter changes, and exports without raw guild or channel ids', async () => {
+    const user = userEvent.setup();
+    const createObjectURLSpy = vi.spyOn(globalThis.URL, 'createObjectURL').mockReturnValue('blob:csv');
+    vi.spyOn(globalThis.URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      const element = originalCreateElement(tagName);
+      if (tagName.toLowerCase() === 'a') {
+        Object.defineProperty(element, 'click', { value: vi.fn(), configurable: true });
+      }
+      return element;
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('guild')).toHaveTextContent('guild/1'));
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_analytics_refreshed', {
+      backgroundRefresh: false,
+      channelFiltered: false,
+      compareMode: false,
+      range: 'week',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Today' }));
+    await user.click(screen.getByRole('button', { name: 'Compare' }));
+    await user.click(screen.getByRole('button', { name: 'Channel' }));
+    await user.click(screen.getByRole('button', { name: 'Background refresh' }));
+    await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+    await user.click(screen.getByRole('button', { name: 'Export PDF' }));
+
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_analytics_filter_changed', {
+      channelFiltered: false,
+      compareMode: false,
+      filter: 'range',
+      range: 'today',
+    });
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_analytics_filter_changed', {
+      channelFiltered: false,
+      compareMode: true,
+      filter: 'compare',
+      range: 'today',
+    });
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_analytics_filter_changed', {
+      channelFiltered: true,
+      compareMode: true,
+      filter: 'channel',
+      range: 'today',
+    });
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith(
+      'dashboard_analytics_exported',
+      expect.objectContaining({ format: 'csv' }),
+    );
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith(
+      'dashboard_analytics_exported',
+      expect.objectContaining({ format: 'pdf' }),
+    );
+    expect(createObjectURLSpy).toHaveBeenCalled();
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('guild/1');
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('channel-1');
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('general,1');
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('top-1');
+  });
+
+  it('does not track no-op filter setter calls', async () => {
+    const user = userEvent.setup();
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('guild')).toHaveTextContent('guild/1'));
+    mockTrackDashboardEvent.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Same range' }));
+    await user.click(screen.getByRole('button', { name: 'Same compare' }));
+    await user.click(screen.getByRole('button', { name: 'Channel' }));
+    await user.click(screen.getByRole('button', { name: 'Same channel' }));
+    await user.click(screen.getByRole('button', { name: 'Custom' }));
+    await user.click(screen.getByRole('button', { name: 'Same custom' }));
+
+    const filterChangedCalls = mockTrackDashboardEvent.mock.calls.filter(
+      ([eventName]) => eventName === 'dashboard_analytics_filter_changed',
+    );
+
+    expect(filterChangedCalls).toEqual([
+      [
+        'dashboard_analytics_filter_changed',
+        {
+          channelFiltered: true,
+          compareMode: false,
+          filter: 'channel',
+          range: 'week',
+        },
+      ],
+      [
+        'dashboard_analytics_filter_changed',
+        {
+          channelFiltered: true,
+          compareMode: false,
+          filter: 'range',
+          range: 'custom',
+        },
+      ],
+    ]);
+  });
+
+  it('resolves batched functional filter updaters against the latest queued value', async () => {
+    const user = userEvent.setup();
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('guild')).toHaveTextContent('guild/1'));
+    expect(screen.getByTestId('compare')).toHaveTextContent('false');
+    expect(screen.getByTestId('channel')).toHaveTextContent('all');
+    mockTrackDashboardEvent.mockClear();
+
+    await user.click(screen.getByRole('button', { name: 'Toggle compare twice' }));
+    await user.click(screen.getByRole('button', { name: 'Toggle channel twice' }));
+
+    expect(screen.getByTestId('compare')).toHaveTextContent('false');
+    expect(screen.getByTestId('channel')).toHaveTextContent('all');
+    expect(
+      mockTrackDashboardEvent.mock.calls.filter(
+        ([eventName]) => eventName === 'dashboard_analytics_filter_changed',
+      ),
+    ).toEqual([
+      [
+        'dashboard_analytics_filter_changed',
+        {
+          channelFiltered: false,
+          compareMode: true,
+          filter: 'compare',
+          range: 'week',
+        },
+      ],
+      [
+        'dashboard_analytics_filter_changed',
+        {
+          channelFiltered: false,
+          compareMode: false,
+          filter: 'compare',
+          range: 'week',
+        },
+      ],
+      [
+        'dashboard_analytics_filter_changed',
+        {
+          channelFiltered: true,
+          compareMode: false,
+          filter: 'channel',
+          range: 'week',
+        },
+      ],
+      [
+        'dashboard_analytics_filter_changed',
+        {
+          channelFiltered: false,
+          compareMode: false,
+          filter: 'channel',
+          range: 'week',
+        },
+      ],
+    ]);
   });
 
   it('preserves unavailable AI cost as blank cells in CSV exports', async () => {

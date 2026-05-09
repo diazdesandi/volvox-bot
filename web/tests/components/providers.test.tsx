@@ -16,6 +16,7 @@ const { mockSetContext, mockUseGuildSelection, mockUsePathname } = vi.hoisted(()
 }));
 
 vi.mock('@/lib/amplitude', () => ({
+  DASHBOARD_GUILD_SELECTED_EVENT: 'dashboard_guild_selected',
   DASHBOARD_PAGE_VIEW_EVENT: 'dashboard_page_viewed',
   initDashboardAmplitude: mockInitDashboardAmplitude,
   trackDashboardEvent: mockTrackDashboardEvent,
@@ -242,6 +243,96 @@ describe('Providers', () => {
       route: '/dashboard/members/[userId]',
     });
     expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('1234567890');
+  });
+
+  it('tracks dashboard guild selection changes without sending the raw guild id', () => {
+    mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
+    mockUsePathname.mockReturnValue('/dashboard/settings');
+    mockUseGuildSelection.mockReturnValue('111111111111111111');
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'discord-user-123' } },
+      status: 'authenticated',
+    });
+
+    const { rerender } = render(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    mockTrackDashboardEvent.mockClear();
+    mockUseGuildSelection.mockReturnValue('222222222222222222');
+
+    rerender(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_guild_selected', {
+      guildSelection: 'selected',
+      route: '/dashboard/settings',
+    });
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('111111111111111111');
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('222222222222222222');
+  });
+
+  it('tracks the first explicit dashboard guild selection after no selection', () => {
+    mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
+    mockUsePathname.mockReturnValue('/dashboard/settings');
+    mockUseGuildSelection.mockReturnValue(null);
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'discord-user-123' } },
+      status: 'authenticated',
+    });
+
+    const { rerender } = render(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    mockTrackDashboardEvent.mockClear();
+    mockUseGuildSelection.mockReturnValue('222222222222222222');
+
+    rerender(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    expect(mockTrackDashboardEvent).toHaveBeenCalledTimes(1);
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_guild_selected', {
+      guildSelection: 'selected',
+      route: '/dashboard/settings',
+    });
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('222222222222222222');
+  });
+
+  it('does not track a guild-selected event for an already selected initial dashboard guild', () => {
+    mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
+    mockUsePathname.mockReturnValue('/dashboard/settings');
+    mockUseGuildSelection.mockReturnValue('111111111111111111');
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'discord-user-123' } },
+      status: 'authenticated',
+    });
+
+    render(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    expect(mockTrackDashboardEvent).not.toHaveBeenCalledWith(
+      'dashboard_guild_selected',
+      expect.anything(),
+    );
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_page_viewed', {
+      authStatus: 'authenticated',
+      guildSelection: 'selected',
+      route: '/dashboard/settings',
+    });
   });
 
   it.each(['/', '/privacy', '/login', '/error', '/dashboard-login'])(

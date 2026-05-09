@@ -37,6 +37,7 @@ Community-facing features must be gated behind `config.<feature>.enabled`. Moder
 
 - Next.js dev with Chrome DevTools uses `127.0.0.1`; keep `web/next.config.mjs` `allowedDevOrigins` including `127.0.0.1` or HMR can reload-loop and Turbopack can fail with `Map maximum size exceeded`.
 - Railway builds the web service from the repo root with `web/Dockerfile` so pnpm can read the workspace lockfile and `pnpm-workspace.yaml`. Runtime web code still cannot import repo-root files; keep root-shared web data copied under `web/src/data/` and covered by a sync test.
+- Next.js dashboard variables that affect browser bundles, edge bundles, source-map upload, or `next.config.mjs` must be declared as build `ARG`s in `web/Dockerfile`. Railway service variables existing at runtime is not enough for Dockerfile builds.
 - New dashboard routes need title wiring in `web/src/lib/page-titles.ts`: use `createPageMetadata()` for SSR and keep `DashboardTitleSync` aligned for client navigation.
 - Dashboard clients that need the guild list must consume `GuildDirectoryProvider`; do not add extra `/api/guilds` fetch loops in leaf components.
 - Recharts dashboard views must use `web/src/components/ui/stable-responsive-container.tsx`; raw `ResponsiveContainer` mounts can spam `width(-1)/height(-1)` warnings when panels render before layout settles.

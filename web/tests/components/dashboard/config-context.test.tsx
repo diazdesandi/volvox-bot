@@ -7,6 +7,17 @@ vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
 }));
 
+const { mockTrackDashboardEvent } = vi.hoisted(() => ({
+  mockTrackDashboardEvent: vi.fn(),
+}));
+
+vi.mock('@/lib/amplitude', () => ({
+  DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT: 'dashboard_config_save_attempted',
+  DASHBOARD_CONFIG_SAVE_FAILED_EVENT: 'dashboard_config_save_failed',
+  DASHBOARD_CONFIG_SAVED_EVENT: 'dashboard_config_saved',
+  trackDashboardEvent: mockTrackDashboardEvent,
+}));
+
 const mockPush = vi.fn();
 const mockPathname = vi.fn(() => '/dashboard/settings');
 vi.mock('next/navigation', () => ({
@@ -82,6 +93,7 @@ describe('ConfigProvider', () => {
     localStorage.setItem('volvox-bot-selected-guild', 'guild-123');
     mockPathname.mockReturnValue('/dashboard/settings');
     mockPush.mockClear();
+    mockTrackDashboardEvent.mockClear();
   });
 
   afterEach(() => {
@@ -469,6 +481,18 @@ describe('ConfigProvider', () => {
       );
       expect(toast.success).toHaveBeenCalledWith('Config saved successfully!');
       expect(result.current.prevSavedConfig?.guildId).toBe('guild-123');
+      expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_config_save_attempted', {
+        activeCategoryId: null,
+        changedCategoryCount: 1,
+        changedSections: ['ai'],
+        patchCount: 1,
+      });
+      expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_config_saved', {
+        activeCategoryId: null,
+        changedCategoryCount: 1,
+        changedSections: ['ai'],
+        patchCount: 1,
+      });
 
       act(() => result.current.undoLastSave());
       expect(result.current.prevSavedConfig).toBeNull();
@@ -485,9 +509,19 @@ describe('ConfigProvider', () => {
       });
       await act(async () => result.current.executeSave());
       expect(toast.error).toHaveBeenCalledWith('Failed to save config', { description: 'HTTP 400: bad patch' });
+      expect(mockTrackDashboardEvent).toHaveBeenCalledWith(
+        'dashboard_config_save_failed',
+        expect.objectContaining({
+          activeCategoryId: null,
+          changedCategoryCount: 1,
+          failureReason: 'validation',
+          patchCount: 1,
+        }),
+      );
 
       await act(async () => result.current.executeSave());
       expect(window.location.href).toBe('/login');
+      expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('guild-123');
     });
   });
 

@@ -151,7 +151,7 @@ describe('logger module', () => {
 
     expect(mockAmplitudeInit).toHaveBeenCalledWith('runtime-key', {
       logLevel: 'none',
-      serverZone: 'EU',
+      serverZone: 'US',
     });
     expect(mockAmplitudeTrack).toHaveBeenCalledWith(
       'bot_log_recorded',

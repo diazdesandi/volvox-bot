@@ -22,6 +22,12 @@ import type {
   ConfigFeatureId,
   ConfigSearchItem,
 } from '@/components/dashboard/config-workspace/types';
+import {
+  DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT,
+  DASHBOARD_CONFIG_SAVE_FAILED_EVENT,
+  DASHBOARD_CONFIG_SAVED_EVENT,
+  trackDashboardEvent,
+} from '@/lib/amplitude';
 import { computePatches, deepEqual } from '@/lib/config-utils';
 import { GUILD_SELECTED_EVENT, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
 import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
@@ -94,6 +100,17 @@ function parseCategoryFromPathname(pathname: string): ConfigCategoryId | null {
   if (!slug) return null;
   const match = CONFIG_CATEGORIES.find((c) => c.id === slug);
   return match ? match.id : null;
+}
+
+function getConfigSaveFailureReason(
+  error: unknown,
+): 'unauthorized' | 'validation' | 'request_failed' {
+  if (error instanceof Error) {
+    if (error.message === 'Unauthorized') return 'unauthorized';
+    if (error.message.startsWith('HTTP 400')) return 'validation';
+  }
+
+  return 'request_failed';
 }
 
 /**
@@ -499,6 +516,14 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const saveTelemetryProperties = {
+      activeCategoryId,
+      changedCategoryCount,
+      changedSections,
+      patchCount: patches.length,
+    };
+
+    trackDashboardEvent(DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT, saveTelemetryProperties);
     setSaving(true);
 
     const saveAbortController = new AbortController();
@@ -532,14 +557,28 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       toast.success('Config saved successfully!');
       setShowDiffModal(false);
       setPrevSavedConfig({ guildId, config: structuredClone(savedConfig) as GuildConfig });
+      trackDashboardEvent(DASHBOARD_CONFIG_SAVED_EVENT, saveTelemetryProperties);
       await fetchConfig(guildId);
     } catch (err) {
       const msg = (err as Error).message || 'Failed to save config';
       toast.error('Failed to save config', { description: msg });
+      trackDashboardEvent(DASHBOARD_CONFIG_SAVE_FAILED_EVENT, {
+        ...saveTelemetryProperties,
+        failureReason: getConfigSaveFailureReason(err),
+      });
     } finally {
       setSaving(false);
     }
-  }, [guildId, savedConfig, draftConfig, hasValidationErrors, fetchConfig]);
+  }, [
+    activeCategoryId,
+    changedCategoryCount,
+    changedSections,
+    guildId,
+    savedConfig,
+    draftConfig,
+    hasValidationErrors,
+    fetchConfig,
+  ]);
 
   // ── Undo last save ─────────────────────────────────────────────
   const undoLastSave = useCallback(() => {

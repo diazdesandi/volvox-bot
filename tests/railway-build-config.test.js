@@ -27,4 +27,36 @@ describe('Railway build config', () => {
     expect(webDockerfile).not.toContain('printf "packages:');
     expect(webRailwayConfig).toContain('dockerfilePath = "web/Dockerfile"');
   });
+
+  it('passes dashboard telemetry variables into the web Docker build', () => {
+    const webDockerfile = readRepoFile('web', 'Dockerfile');
+    const buildTimeEnvVars = [
+      'NEXT_PUBLIC_DISCORD_CLIENT_ID',
+      'NEXT_PUBLIC_SENTRY_DSN',
+      'NEXT_PUBLIC_SENTRY_ENVIRONMENT',
+      'NEXT_PUBLIC_SENTRY_RELEASE',
+      'NEXT_PUBLIC_SENTRY_SEND_DEFAULT_PII',
+      'NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE',
+      'NEXT_PUBLIC_SENTRY_REPLAYS_SESSION_SAMPLE_RATE',
+      'NEXT_PUBLIC_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE',
+      'NEXT_PUBLIC_AMPLITUDE_API_KEY',
+      'NEXT_PUBLIC_AMPLITUDE_AUTOCAPTURE',
+      'SENTRY_DSN',
+      'SENTRY_ENVIRONMENT',
+      'SENTRY_RELEASE',
+      'SENTRY_SEND_DEFAULT_PII',
+      'SENTRY_TRACES_SAMPLE_RATE',
+      'SENTRY_TRACES_RATE',
+      'SENTRY_ORG',
+      'SENTRY_PROJECT',
+      'SENTRY_AUTH_TOKEN',
+    ];
+
+    for (const envVar of buildTimeEnvVars) {
+      expect(webDockerfile).toContain(`ARG ${envVar}`);
+    }
+
+    const envSentryAuthTokenAssignment = /(^|\n)ENV\b[^\n]*(?:\\\n[^\n]*)*\bSENTRY_AUTH_TOKEN\s*=/;
+    expect(webDockerfile).not.toMatch(envSentryAuthTokenAssignment);
+  });
 });

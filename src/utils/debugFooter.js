@@ -4,6 +4,7 @@
  */
 
 import { EmbedBuilder } from 'discord.js';
+import { AI_USAGE_RECORDED_EVENT, trackAnalyticsEvent } from '../amplitude.js';
 import { getPool } from '../db.js';
 import { error as logError } from '../logger.js';
 
@@ -287,16 +288,63 @@ export function buildDebugEmbed(
 
 // ── AI usage analytics ──────────────────────────────────────────────────────
 
+function getAiUsageNumber(value) {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getAiUsageTelemetryProperties(guildId, channelId, stats) {
+  const classifyStats = stats?.classify || {};
+  const respondStats = stats?.respond || {};
+  const classifyInputTokens = getAiUsageNumber(classifyStats.inputTokens);
+  const classifyOutputTokens = getAiUsageNumber(classifyStats.outputTokens);
+  const respondInputTokens = getAiUsageNumber(respondStats.inputTokens);
+  const respondOutputTokens = getAiUsageNumber(respondStats.outputTokens);
+  const classifyDurationMs = getAiUsageNumber(classifyStats.durationMs);
+  const respondDurationMs = getAiUsageNumber(respondStats.durationMs);
+  const classifyCostUsd = getAiUsageNumber(classifyStats.cost);
+  const respondCostUsd = getAiUsageNumber(respondStats.cost);
+
+  return {
+    channelScope: channelId ? 'selected' : 'none',
+    classifyCacheCreationTokens: getAiUsageNumber(classifyStats.cacheCreation),
+    classifyCacheReadTokens: getAiUsageNumber(classifyStats.cacheRead),
+    classifyCostUsd,
+    classifyDurationMs,
+    classifyInputTokens,
+    classifyModel: classifyStats.model || 'unknown',
+    classifyOutputTokens,
+    guildScope: guildId ? 'selected' : 'none',
+    respondCacheCreationTokens: getAiUsageNumber(respondStats.cacheCreation),
+    respondCacheReadTokens: getAiUsageNumber(respondStats.cacheRead),
+    respondCostUsd,
+    respondDurationMs,
+    respondInputTokens,
+    respondModel: respondStats.model || 'unknown',
+    respondOutputTokens,
+    searchCount: getAiUsageNumber(stats?.searchCount),
+    totalCostUsd: classifyCostUsd + respondCostUsd,
+    totalDurationMs: classifyDurationMs + respondDurationMs,
+    totalInputTokens: classifyInputTokens + respondInputTokens,
+    totalOutputTokens: classifyOutputTokens + respondOutputTokens,
+  };
+}
+
 /**
- * Log AI usage stats to the database (fire-and-forget).
- * Writes two rows: one for classify, one for respond.
- * Silently skips if the database pool is not available.
+ * Record AI usage telemetry and log usage stats to the database (fire-and-forget).
+ * Always emits an Amplitude event before attempting database logging.
+ * Writes two database rows: one for classify, one for respond.
+ * Silently skips database logging if the pool is unavailable; telemetry still fires.
  *
  * @param {string} guildId - Discord guild ID
  * @param {string} channelId - Discord channel ID
  * @param {Object} stats - Stats object with classify/respond sub-objects, userId, searchCount
  */
 export function logAiUsage(guildId, channelId, stats) {
+  trackAnalyticsEvent(
+    AI_USAGE_RECORDED_EVENT,
+    getAiUsageTelemetryProperties(guildId, channelId, stats),
+  );
+
   let pool;
   try {
     pool = getPool();

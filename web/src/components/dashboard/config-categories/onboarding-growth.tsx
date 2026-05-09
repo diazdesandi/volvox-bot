@@ -21,6 +21,11 @@ import { DiscordMarkdownEditor } from '@/components/ui/discord-markdown-editor';
 import { InfoTip } from '@/components/ui/info-tip';
 import { RoleSelector } from '@/components/ui/role-selector';
 import {
+  DASHBOARD_WELCOME_PUBLISH_FAILED_EVENT,
+  DASHBOARD_WELCOME_PUBLISHED_EVENT,
+  trackDashboardEvent,
+} from '@/lib/amplitude';
+import {
   getVisibleProviderModelValue,
   VISIBLE_PROVIDER_MODEL_OPTIONS,
 } from '@/lib/provider-model-options';
@@ -198,6 +203,25 @@ function getWelcomePanelStatusClassName(statusText: string) {
   if (statusText === 'posted') return 'border-primary/30 text-primary bg-primary/10';
   if (statusText === 'failed') return 'border-destructive/30 text-destructive bg-destructive/10';
   return 'border-border/50 text-muted-foreground bg-muted/30';
+}
+
+function getWelcomePublishTelemetryProperties(
+  data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
+  panelType?: 'rules' | 'role_menu',
+) {
+  const results = panelType
+    ? [{ panelType, status: data?.status, persistWarning: data?.persistWarning }]
+    : Array.isArray(data?.results)
+      ? data.results
+      : [];
+
+  return {
+    failedCount: results.filter((entry) => entry.status === 'failed').length,
+    panelScope: panelType ?? 'all',
+    persistWarning: results.some((entry) => Boolean(entry.persistWarning)),
+    postedCount: results.filter((entry) => entry.status === 'posted').length,
+    unconfiguredCount: results.filter((entry) => entry.status === 'unconfigured').length,
+  };
 }
 
 async function postWelcomePanel(
@@ -419,11 +443,19 @@ export function OnboardingGrowthCategory() {
         const data = await postWelcomePanel(initiatingGuildId, panelType);
         assertWelcomePublishSucceeded(data, panelType);
         if (!isInitiatingGuildSelected()) return;
+        trackDashboardEvent(
+          DASHBOARD_WELCOME_PUBLISHED_EVENT,
+          getWelcomePublishTelemetryProperties(data, panelType),
+        );
         showWelcomePublishOutcome(data, panelType);
         if (!isInitiatingGuildSelected()) return;
         await fetchWelcomeStatus();
       } catch (error) {
         if (!isInitiatingGuildSelected()) return;
+        trackDashboardEvent(DASHBOARD_WELCOME_PUBLISH_FAILED_EVENT, {
+          failureReason: 'publish_failed',
+          panelScope: panelType ?? 'all',
+        });
         toast.error('Failed to publish welcome panel', {
           description: error instanceof Error ? error.message : 'A network error occurred.',
         });

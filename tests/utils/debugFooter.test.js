@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // ── Mocks (before imports) ───────────────────────────────────────────────────
 
 const mockQuery = vi.fn().mockResolvedValue({});
+const { mockTrackAnalyticsEvent } = vi.hoisted(() => ({
+  mockTrackAnalyticsEvent: vi.fn(),
+}));
 
 vi.mock('../../src/db.js', () => ({
   getPool: vi.fn(() => ({ query: mockQuery })),
@@ -12,6 +15,11 @@ vi.mock('../../src/logger.js', () => ({
   error: vi.fn(),
   info: vi.fn(),
   warn: vi.fn(),
+}));
+
+vi.mock('../../src/amplitude.js', () => ({
+  AI_USAGE_RECORDED_EVENT: 'bot_ai_usage_recorded',
+  trackAnalyticsEvent: mockTrackAnalyticsEvent,
 }));
 
 import { getPool } from '../../src/db.js';
@@ -580,15 +588,150 @@ describe('logAiUsage', () => {
     expect(respondArgs[4]).toBe(1204);
     expect(respondArgs[10]).toBe('user-123'); // user_id
     expect(respondArgs[11]).toBe(2); // search_count
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_ai_usage_recorded', {
+      channelScope: 'selected',
+      classifyCacheCreationTokens: 8,
+      classifyCacheReadTokens: 0,
+      classifyCostUsd: 0.001,
+      classifyDurationMs: 50,
+      classifyInputTokens: 48,
+      classifyModel: 'claude-haiku-4-5',
+      classifyOutputTokens: 12,
+      guildScope: 'selected',
+      respondCacheCreationTokens: 120,
+      respondCacheReadTokens: 800,
+      respondCostUsd: 0.02,
+      respondDurationMs: 2250,
+      respondInputTokens: 1204,
+      respondModel: 'claude-sonnet-4-6',
+      respondOutputTokens: 340,
+      searchCount: 2,
+      totalCostUsd: 0.021,
+      totalDurationMs: 2300,
+      totalInputTokens: 1252,
+      totalOutputTokens: 352,
+    });
+    expect(JSON.stringify(mockTrackAnalyticsEvent.mock.calls)).not.toContain('guild-1');
+    expect(JSON.stringify(mockTrackAnalyticsEvent.mock.calls)).not.toContain('ch-1');
+    expect(JSON.stringify(mockTrackAnalyticsEvent.mock.calls)).not.toContain('user-123');
   });
 
-  it('should silently skip when database is not available', () => {
+  it('should silently skip database logging when database is not available after telemetry fires', () => {
     getPool.mockImplementationOnce(() => {
       throw new Error('Database not initialized');
     });
 
     logAiUsage('guild-1', 'ch-1', { classify: {}, respond: {} });
 
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_ai_usage_recorded', {
+      channelScope: 'selected',
+      classifyCacheCreationTokens: 0,
+      classifyCacheReadTokens: 0,
+      classifyCostUsd: 0,
+      classifyDurationMs: 0,
+      classifyInputTokens: 0,
+      classifyModel: 'unknown',
+      classifyOutputTokens: 0,
+      guildScope: 'selected',
+      respondCacheCreationTokens: 0,
+      respondCacheReadTokens: 0,
+      respondCostUsd: 0,
+      respondDurationMs: 0,
+      respondInputTokens: 0,
+      respondModel: 'unknown',
+      respondOutputTokens: 0,
+      searchCount: 0,
+      totalCostUsd: 0,
+      totalDurationMs: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+    });
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it('reports guildScope "none" when guildId is null', () => {
+    logAiUsage(null, 'ch-1', { classify: {}, respond: {} });
+
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith(
+      'bot_ai_usage_recorded',
+      expect.objectContaining({ guildScope: 'none' }),
+    );
+  });
+
+  it('reports channelScope "none" when channelId is null', () => {
+    logAiUsage('guild-1', null, { classify: {}, respond: {} });
+
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith(
+      'bot_ai_usage_recorded',
+      expect.objectContaining({ channelScope: 'none' }),
+    );
+  });
+
+  it('reports both scopes "none" when guildId and channelId are null', () => {
+    logAiUsage(null, null, { classify: {}, respond: {} });
+
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith(
+      'bot_ai_usage_recorded',
+      expect.objectContaining({ guildScope: 'none', channelScope: 'none' }),
+    );
+  });
+
+  it('coerces non-finite token and cost values to 0 in telemetry', () => {
+    const statsWithNonFinite = {
+      classify: {
+        model: 'claude-haiku-4-5',
+        inputTokens: NaN,
+        outputTokens: Infinity,
+        cacheCreation: -Infinity,
+        cacheRead: NaN,
+        cost: NaN,
+        durationMs: Infinity,
+      },
+      respond: {
+        model: 'claude-sonnet-4-6',
+        inputTokens: NaN,
+        outputTokens: NaN,
+        cacheCreation: NaN,
+        cacheRead: NaN,
+        cost: NaN,
+        durationMs: NaN,
+      },
+    };
+
+    logAiUsage('guild-1', 'ch-1', statsWithNonFinite);
+
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith(
+      'bot_ai_usage_recorded',
+      expect.objectContaining({
+        classifyInputTokens: 0,
+        classifyOutputTokens: 0,
+        classifyCacheCreationTokens: 0,
+        classifyCacheReadTokens: 0,
+        classifyCostUsd: 0,
+        classifyDurationMs: 0,
+        respondInputTokens: 0,
+        respondOutputTokens: 0,
+        respondCostUsd: 0,
+        respondDurationMs: 0,
+        totalCostUsd: 0,
+        totalDurationMs: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+      }),
+    );
+  });
+
+  it('fires analytics even when the database pool is unavailable', () => {
+    getPool.mockImplementationOnce(() => {
+      throw new Error('Database not initialized');
+    });
+
+    logAiUsage('guild-1', 'ch-1', {
+      classify: { model: 'claude-haiku-4-5', inputTokens: 10, outputTokens: 5, cost: 0.001, durationMs: 30 },
+      respond: { model: 'claude-sonnet-4-6', inputTokens: 100, outputTokens: 50, cost: 0.01, durationMs: 300 },
+    });
+
+    expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_ai_usage_recorded', expect.any(Object));
     expect(mockQuery).not.toHaveBeenCalled();
   });
 

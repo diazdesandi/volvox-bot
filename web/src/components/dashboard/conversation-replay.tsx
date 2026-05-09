@@ -20,6 +20,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  DASHBOARD_AI_FEEDBACK_FAILED_EVENT,
+  DASHBOARD_AI_FEEDBACK_SUBMITTED_EVENT,
+  trackDashboardEvent,
+} from '@/lib/amplitude';
 import { cn } from '@/lib/utils';
 
 export interface ConversationMessage {
@@ -132,14 +137,25 @@ export function ConversationReplay({
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `Failed to flag message (${res.status})`);
       }
+      trackDashboardEvent(DASHBOARD_AI_FEEDBACK_SUBMITTED_EVENT, {
+        hasNotes: flagNotes.trim().length > 0,
+        messageRole: messages.find((message) => message.id === flagMessageId)?.role ?? 'unknown',
+        reason: flagReason,
+      });
       setFlagDialogOpen(false);
       onFlagSubmitted?.();
     } catch (err) {
+      trackDashboardEvent(DASHBOARD_AI_FEEDBACK_FAILED_EVENT, {
+        failureReason: 'request_failed',
+        hasNotes: flagNotes.trim().length > 0,
+        messageRole: messages.find((message) => message.id === flagMessageId)?.role ?? 'unknown',
+        reason: flagReason,
+      });
       setFlagError(err instanceof Error ? err.message : 'Failed to flag message');
     } finally {
       setFlagSubmitting(false);
     }
-  }, [flagMessageId, flagReason, flagNotes, conversationId, guildId, onFlagSubmitted]);
+  }, [flagMessageId, flagReason, flagNotes, conversationId, guildId, messages, onFlagSubmitted]);
 
   const participantMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -298,6 +314,7 @@ export function ConversationReplay({
                           <Button
                             variant="ghost"
                             size="icon"
+                            aria-label="Flag AI response"
                             className="h-6 w-6 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-500"
                             onClick={() => openFlagDialog(msg.id)}
                           >

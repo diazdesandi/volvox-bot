@@ -11,6 +11,7 @@ import { PrismaticBackground } from '@/components/landing/Hero';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { DASHBOARD_AUTH_STARTED_EVENT, trackDashboardEvent } from '@/lib/amplitude';
 import { cn } from '@/lib/utils';
 
 interface FeatureItemProps {
@@ -56,6 +57,19 @@ function LoginForm() {
     rawCallbackUrl?.startsWith('/') && !rawCallbackUrl.startsWith('//')
       ? rawCallbackUrl
       : '/dashboard';
+
+  const isDashboardCallback =
+    callbackUrl === '/dashboard' ||
+    callbackUrl.startsWith('/dashboard/') ||
+    callbackUrl.startsWith('/dashboard?');
+
+  const handleDiscordSignIn = () => {
+    trackDashboardEvent(DASHBOARD_AUTH_STARTED_EVENT, {
+      callbackTarget: isDashboardCallback ? 'dashboard' : 'internal',
+      provider: 'discord',
+    });
+    signIn('discord', { callbackUrl });
+  };
 
   useEffect(() => {
     if (session) {
@@ -155,7 +169,7 @@ function LoginForm() {
                     variant="discord"
                     size="lg"
                     className="relative h-14 md:h-16 w-full gap-4 overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-foreground text-background transition-all hover:scale-[1.01] active:scale-[0.98] group/btn shadow-xl px-8"
-                    onClick={() => signIn('discord', { callbackUrl })}
+                    onClick={handleDiscordSignIn}
                   >
                     <svg
                       aria-hidden="true"
@@ -187,7 +201,7 @@ function LoginForm() {
                     variant="discord"
                     size="lg"
                     className="relative h-14 md:h-16 w-full gap-4 overflow-hidden rounded-[1.5rem] md:rounded-[2rem] bg-foreground text-background transition-all hover:scale-[1.01] active:scale-[0.98] group/btn shadow-xl px-8"
-                    onClick={() => signIn('discord', { callbackUrl })}
+                    onClick={handleDiscordSignIn}
                   >
                     <svg
                       aria-hidden="true"

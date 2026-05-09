@@ -44,7 +44,7 @@ describe('amplitude analytics', () => {
     expect(mockTrack).not.toHaveBeenCalled();
   });
 
-  it('initializes Amplitude with EU residency on first track when configured', async () => {
+  it('initializes Amplitude with US residency even when EU is configured', async () => {
     vi.stubEnv('AMPLITUDE_API_KEY', 'server-key');
     vi.stubEnv('AMPLITUDE_SERVER_ZONE', 'EU');
 
@@ -57,7 +57,7 @@ describe('amplitude analytics', () => {
 
     expect(mockInit).toHaveBeenCalledWith('server-key', {
       logLevel: 'none',
-      serverZone: 'EU',
+      serverZone: 'US',
     });
   });
 
@@ -76,7 +76,7 @@ describe('amplitude analytics', () => {
     expect(analytics.isAmplitudeEnabled()).toBe(true);
     expect(mockInit).toHaveBeenCalledWith('runtime-key', {
       logLevel: 'none',
-      serverZone: 'EU',
+      serverZone: 'US',
     });
     expect(mockTrack).toHaveBeenCalledWith(
       'bot_log_recorded',
@@ -430,12 +430,12 @@ describe('amplitude analytics — additional edge cases', () => {
     expect(getAmplitudeServerOptions().serverZone).toBe('US');
   });
 
-  it('uses the EU server zone for lowercase eu input', async () => {
+  it('keeps the US server zone for lowercase eu input', async () => {
     vi.stubEnv('AMPLITUDE_API_KEY', 'server-key');
     vi.stubEnv('AMPLITUDE_SERVER_ZONE', 'eu');
 
     const { getAmplitudeServerOptions } = await import('../src/amplitude.js');
-    expect(getAmplitudeServerOptions().serverZone).toBe('EU');
+    expect(getAmplitudeServerOptions().serverZone).toBe('US');
   });
 
   it('falls back to US server zone for empty AMPLITUDE_SERVER_ZONE string', async () => {
@@ -512,5 +512,29 @@ describe('amplitude analytics — additional edge cases', () => {
   it('DEFAULT_AMPLITUDE_DEVICE_ID constant has expected value', async () => {
     const { DEFAULT_AMPLITUDE_DEVICE_ID } = await import('../src/amplitude.js');
     expect(DEFAULT_AMPLITUDE_DEVICE_ID).toBe('volvox-bot-server');
+  });
+
+  it('BOT_COMMAND_USED_EVENT constant has expected value', async () => {
+    const { BOT_COMMAND_USED_EVENT } = await import('../src/amplitude.js');
+    expect(BOT_COMMAND_USED_EVENT).toBe('bot_command_used');
+  });
+
+  it('AI_USAGE_RECORDED_EVENT constant has expected value', async () => {
+    const { AI_USAGE_RECORDED_EVENT } = await import('../src/amplitude.js');
+    expect(AI_USAGE_RECORDED_EVENT).toBe('bot_ai_usage_recorded');
+  });
+
+  it('getAmplitudeServerOptions always returns US regardless of AMPLITUDE_SERVER_ZONE', async () => {
+    for (const zone of ['EU', 'eu', 'US', 'us', '', 'MOON', undefined]) {
+      vi.resetModules();
+      if (zone === undefined) {
+        delete process.env.AMPLITUDE_SERVER_ZONE;
+      } else {
+        vi.stubEnv('AMPLITUDE_SERVER_ZONE', zone);
+      }
+      vi.stubEnv('AMPLITUDE_API_KEY', 'server-key');
+      const { getAmplitudeServerOptions } = await import('../src/amplitude.js');
+      expect(getAmplitudeServerOptions().serverZone).toBe('US');
+    }
   });
 });

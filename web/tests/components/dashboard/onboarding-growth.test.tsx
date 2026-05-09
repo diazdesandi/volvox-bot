@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from 'sonner';
 
 const mockUseConfigContext = vi.fn();
+const { mockTrackDashboardEvent } = vi.hoisted(() => ({
+  mockTrackDashboardEvent: vi.fn(),
+}));
 
 vi.mock('@/components/ui/select', () => import('../../helpers/mock-select'));
 
@@ -22,6 +25,12 @@ vi.mock('framer-motion', () => ({
 
 vi.mock('@/components/dashboard/config-context', () => ({
   useConfigContext: () => mockUseConfigContext(),
+}));
+
+vi.mock('@/lib/amplitude', () => ({
+  DASHBOARD_WELCOME_PUBLISH_FAILED_EVENT: 'dashboard_welcome_publish_failed',
+  DASHBOARD_WELCOME_PUBLISHED_EVENT: 'dashboard_welcome_published',
+  trackDashboardEvent: mockTrackDashboardEvent,
 }));
 
 vi.mock('@/components/layout/channel-directory-context', () => ({
@@ -430,6 +439,10 @@ describe('OnboardingGrowthCategory', () => {
   });
 
   beforeEach(() => {
+    mockTrackDashboardEvent.mockClear();
+    vi.mocked(toast.error).mockClear();
+    vi.mocked(toast.info).mockClear();
+    vi.mocked(toast.success).mockClear();
     vi.stubGlobal('fetch', vi.fn(async () =>
       Response.json({
         guildId: 'guild-1',
@@ -807,6 +820,58 @@ describe('OnboardingGrowthCategory', () => {
     expect(toast.success).not.toHaveBeenCalledWith('Welcome panels published');
   });
 
+  it('tracks welcome publish outcomes without raw guild, channel, or message ids', async () => {
+    const user = userEvent.setup();
+    const statusResponse = {
+      guildId: 'guild-1',
+      panels: {
+        rules: {
+          status: 'posted',
+          configured: true,
+          channelId: 'rules-channel',
+          configuredChannelId: 'rules-channel',
+          messageId: 'message-1',
+          stale: false,
+        },
+        role_menu: {
+          status: 'missing',
+          configured: true,
+          channelId: 'welcome-channel',
+          configuredChannelId: 'welcome-channel',
+          messageId: null,
+          stale: false,
+        },
+      },
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(Response.json(statusResponse))
+        .mockResolvedValueOnce(Response.json({ panelType: 'rules', status: 'posted' }))
+        .mockResolvedValueOnce(Response.json(statusResponse)),
+    );
+    mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
+
+    render(<OnboardingGrowthCategory />);
+
+    await screen.findByText('#rules');
+    await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+
+    await waitFor(() => {
+      expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_welcome_published', {
+        failedCount: 0,
+        panelScope: 'role_menu',
+        persistWarning: false,
+        postedCount: 1,
+        unconfiguredCount: 0,
+      });
+    });
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('guild-1');
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('rules-channel');
+    expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('message-1');
+  });
+
   it('refreshes welcome status after a partial bulk publish error', async () => {
     const user = userEvent.setup();
     const initialStatusResponse = {
@@ -870,6 +935,13 @@ describe('OnboardingGrowthCategory', () => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
     });
     expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/guilds/guild-1/welcome/status');
+    expect(mockTrackDashboardEvent).toHaveBeenCalledWith(
+      'dashboard_welcome_publish_failed',
+      expect.objectContaining({
+        failureReason: 'publish_failed',
+        panelScope: 'all',
+      }),
+    );
   });
 
   it('shows a warning toast when a single panel publishes but persistence fails', async () => {

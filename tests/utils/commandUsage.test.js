@@ -5,6 +5,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockQuery = vi.fn();
 const mockPool = { query: mockQuery };
 const mockGetPool = vi.fn(() => mockPool);
+const { mockTrackAnalyticsEvent } = vi.hoisted(() => ({
+  mockTrackAnalyticsEvent: vi.fn(),
+}));
 
 vi.mock('../../src/db.js', () => ({
   getPool: () => mockGetPool(),
@@ -24,6 +27,11 @@ vi.mock('../../src/logger.js', () => ({
   debug: vi.fn(),
   info: vi.fn(),
   error: vi.fn(),
+}));
+
+vi.mock('../../src/amplitude.js', () => ({
+  BOT_COMMAND_USED_EVENT: 'bot_command_used',
+  trackAnalyticsEvent: mockTrackAnalyticsEvent,
 }));
 
 import { error as logError } from '../../src/logger.js';
@@ -69,6 +77,13 @@ describe('logCommandUsage', () => {
         expect.objectContaining({ commandName: undefined }),
       );
     });
+
+    it('does not track analytics when required parameters are missing', async () => {
+      await logCommandUsage({ userId: 'user-123', commandName: 'ping' });
+      await logCommandUsage({ guildId: 'guild-123', commandName: 'ping' });
+      await logCommandUsage({ guildId: 'guild-123', userId: 'user-123' });
+      expect(mockTrackAnalyticsEvent).not.toHaveBeenCalled();
+    });
   });
 
   describe('successful insert', () => {
@@ -86,6 +101,14 @@ describe('logCommandUsage', () => {
       const [sql, params] = mockQuery.mock.calls[0];
       expect(sql).toMatch(/INSERT INTO command_usage/);
       expect(params).toEqual(['guild-123', 'user-456', 'ping', 'channel-789']);
+      expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_command_used', {
+        commandName: 'ping',
+        guildScope: 'selected',
+        hasChannel: true,
+      });
+      expect(JSON.stringify(mockTrackAnalyticsEvent.mock.calls)).not.toContain('guild-123');
+      expect(JSON.stringify(mockTrackAnalyticsEvent.mock.calls)).not.toContain('user-456');
+      expect(JSON.stringify(mockTrackAnalyticsEvent.mock.calls)).not.toContain('channel-789');
     });
 
     it('inserts with optional channelId null', async () => {
@@ -100,6 +123,39 @@ describe('logCommandUsage', () => {
       expect(mockQuery).toHaveBeenCalledOnce();
       const [, params] = mockQuery.mock.calls[0];
       expect(params[3]).toBeNull();
+    });
+
+    it('tracks hasChannel: false when channelId is not provided', async () => {
+      mockQuery.mockResolvedValue({ rowCount: 1 });
+
+      await logCommandUsage({
+        guildId: 'guild-123',
+        userId: 'user-456',
+        commandName: 'help',
+      });
+
+      expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_command_used', {
+        commandName: 'help',
+        guildScope: 'selected',
+        hasChannel: false,
+      });
+    });
+
+    it('fires analytics even when the DB insert fails', async () => {
+      mockQuery.mockRejectedValue(new Error('DB down'));
+
+      await logCommandUsage({
+        guildId: 'guild-123',
+        userId: 'user-456',
+        commandName: 'ban',
+        channelId: 'channel-789',
+      });
+
+      expect(mockTrackAnalyticsEvent).toHaveBeenCalledWith('bot_command_used', {
+        commandName: 'ban',
+        guildScope: 'selected',
+        hasChannel: true,
+      });
     });
   });
 

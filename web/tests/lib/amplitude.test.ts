@@ -40,7 +40,7 @@ describe('dashboard Amplitude analytics', () => {
     expect(mockTrack).not.toHaveBeenCalled();
   });
 
-  it('builds conservative browser options by default', async () => {
+  it('builds conservative US-only browser options by default', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_SERVER_ZONE', 'EU');
 
@@ -52,7 +52,7 @@ describe('dashboard Amplitude analytics', () => {
       remoteConfig: {
         fetchRemoteConfig: false,
       },
-      serverZone: 'EU',
+      serverZone: 'US',
       trackingOptions: {
         ipAddress: false,
       },
@@ -110,10 +110,39 @@ describe('dashboard Amplitude analytics', () => {
     expect(mockReset).toHaveBeenCalledOnce();
   });
 
+  it('exports all required dashboard event name constants', async () => {
+    const amplitude = await import('@/lib/amplitude');
+
+    expect(amplitude.DASHBOARD_PAGE_VIEW_EVENT).toBe('dashboard_page_viewed');
+    expect(amplitude.DASHBOARD_GUILD_SELECTED_EVENT).toBe('dashboard_guild_selected');
+    expect(amplitude.DASHBOARD_AUTH_STARTED_EVENT).toBe('dashboard_auth_started');
+    expect(amplitude.DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT).toBe('dashboard_config_save_attempted');
+    expect(amplitude.DASHBOARD_CONFIG_SAVED_EVENT).toBe('dashboard_config_saved');
+    expect(amplitude.DASHBOARD_CONFIG_SAVE_FAILED_EVENT).toBe('dashboard_config_save_failed');
+    expect(amplitude.DASHBOARD_ANALYTICS_REFRESHED_EVENT).toBe('dashboard_analytics_refreshed');
+    expect(amplitude.DASHBOARD_ANALYTICS_REFRESH_FAILED_EVENT).toBe('dashboard_analytics_refresh_failed');
+    expect(amplitude.DASHBOARD_ANALYTICS_EXPORTED_EVENT).toBe('dashboard_analytics_exported');
+    expect(amplitude.DASHBOARD_ANALYTICS_FILTER_CHANGED_EVENT).toBe('dashboard_analytics_filter_changed');
+    expect(amplitude.DASHBOARD_WELCOME_PUBLISHED_EVENT).toBe('dashboard_welcome_published');
+    expect(amplitude.DASHBOARD_WELCOME_PUBLISH_FAILED_EVENT).toBe('dashboard_welcome_publish_failed');
+    expect(amplitude.DASHBOARD_AI_FEEDBACK_SUBMITTED_EVENT).toBe('dashboard_ai_feedback_submitted');
+    expect(amplitude.DASHBOARD_AI_FEEDBACK_FAILED_EVENT).toBe('dashboard_ai_feedback_failed');
+  });
+
+  it('getAmplitudeServerZone always returns US regardless of NEXT_PUBLIC_AMPLITUDE_SERVER_ZONE', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_SERVER_ZONE', 'EU');
+
+    const { getBrowserAmplitudeOptions } = await import('@/lib/amplitude');
+
+    expect(getBrowserAmplitudeOptions().serverZone).toBe('US');
+  });
+
   it('tracks sanitized dashboard events', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
 
     const { trackDashboardEvent } = await import('@/lib/amplitude');
+
     const shared = { ok: true };
     const cyclic = ['root'] as unknown[];
     cyclic.push(cyclic);

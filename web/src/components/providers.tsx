@@ -9,6 +9,7 @@ import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/components/theme-provider';
 import { useGuildSelection } from '@/hooks/use-guild-selection';
 import {
+  DASHBOARD_GUILD_SELECTED_EVENT,
   DASHBOARD_PAGE_VIEW_EVENT,
   initDashboardAmplitude,
   trackDashboardEvent,
@@ -128,8 +129,10 @@ function AmplitudeContextBridge() {
   const guildId = useGuildSelection();
   const { data: session, status } = useSession();
   const userId = status === 'authenticated' ? session?.user?.id : null;
+  const lastTrackedGuildIdRef = useRef<string | null | undefined>(undefined);
   const lastTrackedRouteRef = useRef<string | null>(null);
   const telemetryRoute = getDashboardTelemetryRoute(pathname);
+  const isAuthenticatedDashboardRoute = status === 'authenticated' && isDashboardRoute(pathname);
 
   useEffect(() => {
     initDashboardAmplitude(userId);
@@ -156,6 +159,25 @@ function AmplitudeContextBridge() {
       route: telemetryRoute,
     });
   }, [guildId, pathname, status, telemetryRoute]);
+
+  useEffect(() => {
+    if (!isAuthenticatedDashboardRoute) {
+      lastTrackedGuildIdRef.current = undefined;
+      return;
+    }
+
+    const previousGuildId = lastTrackedGuildIdRef.current;
+    lastTrackedGuildIdRef.current = guildId;
+
+    if (previousGuildId === undefined || previousGuildId === guildId || !guildId) {
+      return;
+    }
+
+    trackDashboardEvent(DASHBOARD_GUILD_SELECTED_EVENT, {
+      guildSelection: getGuildTelemetryScope(guildId),
+      route: telemetryRoute,
+    });
+  }, [guildId, isAuthenticatedDashboardRoute, telemetryRoute]);
 
   return null;
 }

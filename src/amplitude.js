@@ -6,12 +6,14 @@
  *
  * Configure via environment variables:
  *   AMPLITUDE_API_KEY     - Amplitude project API key (required to enable)
- *   AMPLITUDE_SERVER_ZONE - US or EU data residency (optional, default: US)
+ *   AMPLITUDE_SERVER_ZONE - Ignored; Amplitude events always use US residency.
  */
 
 import * as amplitude from '@amplitude/analytics-node';
 
 export const AMPLITUDE_LOG_EVENT = 'bot_log_recorded';
+export const BOT_COMMAND_USED_EVENT = 'bot_command_used';
+export const AI_USAGE_RECORDED_EVENT = 'bot_ai_usage_recorded';
 export const DEFAULT_AMPLITUDE_DEVICE_ID = 'volvox-bot-server';
 
 const AMPLITUDE_MIN_ID_LENGTH = 5;
@@ -89,14 +91,11 @@ function getEnvValue(key) {
 }
 
 /**
- * Normalize an Amplitude server zone string to either 'US' or 'EU'.
- *
- * Trims whitespace and uppercases the input; returns 'EU' only when the normalized value equals 'EU', otherwise returns 'US'.
- * @param {string | undefined} value - The server zone value to normalize (may be undefined).
- * @returns {'US' | 'EU'} 'EU' if the normalized input equals 'EU', 'US' otherwise.
+ * Return the only supported Amplitude server zone for this deployment.
+ * @returns {'US'} The US Amplitude server zone.
  */
-function normalizeServerZone(value) {
-  return value?.trim().toUpperCase() === 'EU' ? 'EU' : 'US';
+function getAmplitudeServerZone() {
+  return 'US';
 }
 
 /**
@@ -219,12 +218,12 @@ export function scrubAmplitudeProperties(value, seen = new WeakSet()) {
 
 /**
  * Build the configuration object for initializing the Amplitude server SDK.
- * @returns {{logLevel: number, serverZone: 'US' | 'EU'}} An options object where `logLevel` is set to disable SDK logging and `serverZone` is normalized to either `'US'` or `'EU'`.
+ * @returns {{logLevel: number, serverZone: 'US'}} An options object where `logLevel` is set to disable SDK logging and `serverZone` is fixed to `'US'`.
  */
 export function getAmplitudeServerOptions() {
   return {
     logLevel: amplitude.Types.LogLevel.None,
-    serverZone: normalizeServerZone(process.env.AMPLITUDE_SERVER_ZONE),
+    serverZone: getAmplitudeServerZone(),
   };
 }
 

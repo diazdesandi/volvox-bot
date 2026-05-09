@@ -17,10 +17,8 @@ function getSentryConnectSrcOrigin(dsn) {
   }
 }
 
-function getAmplitudeConnectSrcOrigin(serverZone) {
-  return String(serverZone).toUpperCase() === "EU"
-    ? "https://api.eu.amplitude.com"
-    : "https://api2.amplitude.com";
+function getAmplitudeConnectSrcOrigin() {
+  return "https://api2.amplitude.com";
 }
 
 const connectSrc = ["'self'"];
@@ -39,7 +37,7 @@ if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
 }
 
 if (process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY) {
-  connectSrc.push(getAmplitudeConnectSrcOrigin(process.env.NEXT_PUBLIC_AMPLITUDE_SERVER_ZONE));
+  connectSrc.push(getAmplitudeConnectSrcOrigin());
 }
 
 const securityHeaders = [

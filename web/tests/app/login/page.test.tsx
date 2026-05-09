@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  trackDashboardEvent: vi.fn(),
   signIn: vi.fn(),
   signOut: vi.fn(),
   push: vi.fn(),
@@ -20,6 +21,11 @@ vi.mock('next-auth/react', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mocks.push }),
   useSearchParams: () => mocks.searchParams,
+}));
+
+vi.mock('@/lib/amplitude', () => ({
+  DASHBOARD_AUTH_STARTED_EVENT: 'dashboard_auth_started',
+  trackDashboardEvent: mocks.trackDashboardEvent,
 }));
 
 vi.mock('next/image', () => ({
@@ -73,6 +79,7 @@ describe('LoginPage', () => {
     mocks.signIn.mockClear();
     mocks.signOut.mockClear();
     mocks.push.mockClear();
+    mocks.trackDashboardEvent.mockClear();
     mocks.session = { data: null, status: 'unauthenticated' };
     mocks.reducedMotion = false;
   });
@@ -94,6 +101,10 @@ describe('LoginPage', () => {
     expect(mocks.signIn).toHaveBeenCalledWith('discord', {
       callbackUrl: '/dashboard',
     });
+    expect(mocks.trackDashboardEvent).toHaveBeenCalledWith('dashboard_auth_started', {
+      callbackTarget: 'dashboard',
+      provider: 'discord',
+    });
   });
 
   it('uses a valid relative callbackUrl for sign in', async () => {
@@ -106,6 +117,43 @@ describe('LoginPage', () => {
 
     expect(mocks.signIn).toHaveBeenCalledWith('discord', {
       callbackUrl: '/servers/123?tab=moderation',
+    });
+    expect(mocks.trackDashboardEvent).toHaveBeenCalledWith('dashboard_auth_started', {
+      callbackTarget: 'internal',
+      provider: 'discord',
+    });
+  });
+
+  it.each(['/dashboard/settings', '/dashboard?tab=moderation'])(
+    'tracks dashboard callback targets for %s',
+    async (callbackUrl) => {
+      const user = userEvent.setup();
+      mocks.searchParams = new URLSearchParams(`callbackUrl=${callbackUrl}`);
+
+      renderLogin();
+
+      await user.click(screen.getByRole('button', { name: /sign in with discord/i }));
+
+      expect(mocks.signIn).toHaveBeenCalledWith('discord', { callbackUrl });
+      expect(mocks.trackDashboardEvent).toHaveBeenCalledWith('dashboard_auth_started', {
+        callbackTarget: 'dashboard',
+        provider: 'discord',
+      });
+    },
+  );
+
+  it('does not classify dashboard-prefix lookalike callbacks as dashboard targets', async () => {
+    const user = userEvent.setup();
+    mocks.searchParams = new URLSearchParams('callbackUrl=/dashboardevil');
+
+    renderLogin();
+
+    await user.click(screen.getByRole('button', { name: /sign in with discord/i }));
+
+    expect(mocks.signIn).toHaveBeenCalledWith('discord', { callbackUrl: '/dashboardevil' });
+    expect(mocks.trackDashboardEvent).toHaveBeenCalledWith('dashboard_auth_started', {
+      callbackTarget: 'internal',
+      provider: 'discord',
     });
   });
 
