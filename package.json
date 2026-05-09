@@ -51,7 +51,7 @@
     "winston-daily-rotate-file": "^5.0.0",
     "winston-transport": "^4.9.0",
     "ws": "^8.20.0",
-    "zod": "^3.25.76"
+    "zod": "^4.1.8"
   },
   "engines": {
     "node": ">=22.0.0"
