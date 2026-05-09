@@ -935,6 +935,23 @@ describe('checkAiAutoMod', () => {
     expect(checkEscalation).toHaveBeenCalled();
   });
 
+  it('truncates and sanitizes AI auto-mod DM reasons to Discord embed field limits', async () => {
+    const longReason = `@everyone ${'x'.repeat(1100)}\u0000`;
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.1, spam: 0.1, harassment: 0.9, reason: longReason }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({}, { moderation: moderationWarnConfig });
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    const reason = vi.mocked(sendDmNotification).mock.calls[0][2];
+    expect(reason).toHaveLength(1024);
+    expect(reason).toContain('@\u200beveryone');
+    expect(reason).not.toContain('@everyone');
+    expect(reason).not.toContain('\u0000');
+    expect(reason.endsWith('… [truncated]')).toBe(true);
+  });
+
   it('does not create warn records when warn runs without a member or guild', async () => {
     message.member = null;
     mockGenerate.mockResolvedValue(

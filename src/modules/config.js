@@ -77,7 +77,7 @@ function getExplicitAiAutoModDmNotifications(configSection) {
   if (!isPlainObject(configSection) || !hasOwn(configSection, 'dmNotifications')) {
     return undefined;
   }
-  return configSection.dmNotifications;
+  return isPlainObject(configSection.dmNotifications) ? configSection.dmNotifications : undefined;
 }
 
 function hasExplicitAiAutoModDmNotifications(configSection) {
@@ -110,6 +110,28 @@ function preserveLegacyAiAutoModDmFallback(config, explicitAiDmNotifications) {
     explicitAiDmNotifications,
   );
   return config;
+}
+
+function stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
+  guildId,
+  section,
+  sectionValue,
+  writesAiDmNotifications = false,
+) {
+  if (
+    guildId !== 'global' ||
+    section !== 'aiAutoMod' ||
+    writesAiDmNotifications ||
+    globalAiAutoModDmNotificationsExplicit ||
+    !isPlainObject(sectionValue) ||
+    !hasOwn(sectionValue, 'dmNotifications')
+  ) {
+    return sectionValue;
+  }
+
+  const persistedValue = structuredClone(sectionValue);
+  delete persistedValue.dmNotifications;
+  return persistedValue;
 }
 
 /**
@@ -225,6 +247,8 @@ export async function loadConfig() {
     fileConfig = null;
     info('config.json not available, will rely on database for configuration');
   }
+  const explicitFileAiDmNotifications = getExplicitAiAutoModDmNotifications(fileConfig?.aiAutoMod);
+  const fileAiAutoModDmNotificationsExplicit = explicitFileAiDmNotifications !== undefined;
 
   try {
     let pool;
@@ -239,8 +263,9 @@ export async function loadConfig() {
       }
       info('Database not available, using config.json');
       configCache = new Map();
+      globalAiAutoModDmNotificationsExplicit = fileAiAutoModDmNotificationsExplicit;
       const fallbackConfig = structuredClone(fileConfig);
-      preserveLegacyAiAutoModDmFallback(fallbackConfig);
+      preserveLegacyAiAutoModDmFallback(fallbackConfig, explicitFileAiDmNotifications);
       configCache.set('global', fallbackConfig);
       return configCache.get('global');
     }
@@ -275,8 +300,9 @@ export async function loadConfig() {
         await client.query('COMMIT');
         info('Config seeded to database');
         configCache = new Map();
+        globalAiAutoModDmNotificationsExplicit = fileAiAutoModDmNotificationsExplicit;
         const seededGlobalConfig = structuredClone(fileConfig);
-        preserveLegacyAiAutoModDmFallback(seededGlobalConfig);
+        preserveLegacyAiAutoModDmFallback(seededGlobalConfig, explicitFileAiDmNotifications);
         configCache.set('global', seededGlobalConfig);
 
         // Load any preexisting guild overrides that were already in the DB.
@@ -365,8 +391,9 @@ export async function loadConfig() {
     }
     logError('Failed to load config from database, using config.json', { error: err.message });
     configCache = new Map();
+    globalAiAutoModDmNotificationsExplicit = fileAiAutoModDmNotificationsExplicit;
     const fallbackConfig = structuredClone(fileConfig);
-    preserveLegacyAiAutoModDmFallback(fallbackConfig);
+    preserveLegacyAiAutoModDmFallback(fallbackConfig, explicitFileAiDmNotifications);
     configCache.set('global', fallbackConfig);
   }
 
@@ -682,9 +709,15 @@ export async function setConfigValue(path, value, guildId = 'global') {
         );
       } else {
         // New section — use ON CONFLICT to handle concurrent inserts safely
+        const persistedSection = stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
+          guildId,
+          section,
+          sectionClone,
+          section === 'aiAutoMod' && nestedParts[0] === 'dmNotifications',
+        );
         await client.query(
           'INSERT INTO config (guild_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (guild_id, key) DO UPDATE SET value = $3, updated_at = NOW()',
-          [guildId, section, JSON.stringify(sectionClone)],
+          [guildId, section, JSON.stringify(persistedSection)],
         );
       }
       await client.query('COMMIT');
@@ -820,17 +853,27 @@ export async function setMultipleConfigValues(patches, guildId = 'global') {
         setNestedValue(dbSection, nestedParts, parsedVal);
       }
 
-      persistedSections.set(section, structuredClone(dbSection));
+      const writesAiDmNotifications = patchesBySection
+        .get(section)
+        .some((patch) => patch.path.startsWith('aiAutoMod.dmNotifications'));
+      const persistedSection = stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
+        guildId,
+        section,
+        dbSection,
+        writesAiDmNotifications,
+      );
+
+      persistedSections.set(section, structuredClone(persistedSection));
 
       if (rows.length > 0) {
         await client.query(
           'UPDATE config SET value = $1, updated_at = NOW() WHERE guild_id = $2 AND key = $3',
-          [JSON.stringify(dbSection), guildId, section],
+          [JSON.stringify(persistedSection), guildId, section],
         );
       } else {
         await client.query(
           'INSERT INTO config (guild_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (guild_id, key) DO UPDATE SET value = $3, updated_at = NOW()',
-          [guildId, section, JSON.stringify(dbSection)],
+          [guildId, section, JSON.stringify(persistedSection)],
         );
       }
     }

@@ -384,6 +384,141 @@ describe('modules/config', () => {
       });
     });
 
+    it('should preserve explicit file AI AutoMod DM settings when DB is not initialized', async () => {
+      const getPool = vi.fn(() => {
+        throw new Error('Database not initialized');
+      });
+      const mod = await importConfigWithMocks({
+        getPool,
+        fileContents: JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: false, kick: true, ban: false },
+          },
+        }),
+      });
+
+      const config = await mod.loadConfig();
+
+      expect(config.aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: false,
+        kick: true,
+        ban: false,
+      });
+    });
+
+    it('should preserve explicit file AI AutoMod DM settings while seeding and merging guild overrides', async () => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({}),
+        release: vi.fn(),
+      };
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'guild-legacy',
+              key: 'moderation',
+              value: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
+            },
+          ],
+        }),
+        connect: vi.fn().mockResolvedValue(mockClient),
+      };
+      const mod = await importConfigWithMocks({
+        getPool: vi.fn().mockReturnValue(mockPool),
+        fileContents: JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+        }),
+      });
+
+      await mod.loadConfig();
+
+      expect(mod.getConfig('guild-legacy').aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: true,
+        kick: true,
+        ban: true,
+      });
+    });
+
+    it('should preserve explicit file AI AutoMod DM settings during DB-error fallback', async () => {
+      const mockPool = {
+        query: vi.fn().mockRejectedValue(new Error('DB connection failed')),
+      };
+      const mod = await importConfigWithMocks({
+        getPool: vi.fn().mockReturnValue(mockPool),
+        fileContents: JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: false, kick: true, ban: false },
+          },
+        }),
+      });
+
+      const config = await mod.loadConfig();
+
+      expect(config.aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: false,
+        kick: true,
+        ban: false,
+      });
+    });
+
+    it('should not treat null AI AutoMod DM notifications as explicit', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+          aiAutoMod: { enabled: false },
+        }),
+      );
+
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: { dmNotifications: { warn: true, timeout: true, kick: true, ban: true } },
+            },
+            { guild_id: 'global', key: 'aiAutoMod', value: { dmNotifications: null } },
+            {
+              guild_id: 'guild-legacy',
+              key: 'moderation',
+              value: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
+            },
+          ],
+        }),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      await configModule.loadConfig();
+
+      expect(configModule.getConfig('guild-legacy').aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: false,
+        ban: false,
+      });
+    });
+
     it('should handle DB error and fall back to config.json', async () => {
       const mockPool = {
         query: vi.fn().mockRejectedValue(new Error('DB connection failed')),
@@ -622,6 +757,62 @@ describe('modules/config', () => {
       expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
       expect(mockClient.query).toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('should not persist derived global AI AutoMod DM fallback when creating aiAutoMod row', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: { enabled: false, model: 'test-model' },
+        }),
+      );
+      const mockClient = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockResolvedValueOnce({ rows: [] }) // SELECT missing aiAutoMod row
+          .mockResolvedValueOnce({}) // INSERT
+          .mockResolvedValueOnce({}), // COMMIT
+        release: vi.fn(),
+      };
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
+            },
+          ],
+        }),
+        connect: vi.fn().mockResolvedValue(mockClient),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      await configModule.loadConfig();
+      expect(configModule.getConfig().aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: false,
+        ban: false,
+      });
+
+      await configModule.setConfigValue('aiAutoMod.enabled', 'true');
+
+      const insertCall = mockClient.query.mock.calls.find((call) =>
+        call[0].startsWith('INSERT INTO config'),
+      );
+      expect(JSON.parse(insertCall[1][2])).toEqual({ enabled: true, model: 'test-model' });
+      expect(configModule.getConfig().aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: false,
+        ban: false,
+      });
     });
 
     it('should handle transaction rollback on error', async () => {

@@ -11,6 +11,7 @@ import { generate } from '../utils/aiClient.js';
 import { fetchChannelCached } from '../utils/discordCache.js';
 import { isExempt } from '../utils/modExempt.js';
 import { safeSend } from '../utils/safeSend.js';
+import { sanitizeMentions } from '../utils/sanitizeMentions.js';
 import { DEFAULT_AI_MODEL, normalizeSupportedAiModel } from '../utils/supportedAiModels.js';
 import { logAuditEvent } from './auditLogger.js';
 import {
@@ -65,6 +66,8 @@ const SCORE_ALIASES = Object.freeze({
   selfHarm: ['self_harm', 'self-harm'],
 });
 const SCORE_CONTAINER_KEYS = Object.freeze(['scores', 'score', 'ratings', 'analysis']);
+const DISCORD_EMBED_FIELD_VALUE_LIMIT = 1024;
+const TRUNCATION_SUFFIX = '… [truncated]';
 
 export const AI_AUTOMOD_ACTION_TYPES = Object.freeze([
   'flag',
@@ -805,17 +808,28 @@ function formatList(values) {
   return `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`;
 }
 
+function truncateEmbedFieldValue(value, maxLength = DISCORD_EMBED_FIELD_VALUE_LIMIT) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength - TRUNCATION_SUFFIX.length)}${TRUNCATION_SUFFIX}`;
+}
+
 function buildAiAutoModDmReason(result, executedDmActions) {
   const actionSummary = formatList(executedDmActions.map((action) => DM_ACTION_LABELS[action]));
   const categorySummary = formatList(
     result.categories.map((category) => CATEGORY_LABELS[category] ?? category),
   );
+  const reason = sanitizeMentions(String(result.reason ?? 'No reason provided')).replaceAll(
+    '\u0000',
+    '',
+  );
 
-  return [
-    `Actions taken: ${actionSummary}`,
-    `Triggered categories: ${categorySummary}`,
-    `Reason: ${result.reason}`,
-  ].join('\n');
+  return truncateEmbedFieldValue(
+    [
+      `Actions taken: ${actionSummary}`,
+      `Triggered categories: ${categorySummary}`,
+      `Reason: ${reason}`,
+    ].join('\n'),
+  );
 }
 
 async function sendAiAutoModDmNotification(message, result, autoModConfig, executedActions) {
