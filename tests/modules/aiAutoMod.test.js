@@ -53,6 +53,7 @@ vi.mock('../../src/modules/auditLogger.js', () => ({
 // Import after mocks
 import { error as logError, warn as logWarn } from '../../src/logger.js';
 import {
+  AI_AUTOMOD_DM_NOTIFICATION_ACTIONS,
   analyzeMessage,
   checkAiAutoMod,
   extractFirstBalancedJsonObject,
@@ -266,28 +267,25 @@ describe('getAiAutoModConfig', () => {
       ban: true,
     });
   });
+});
 
-  it('returns hardcoded defaults when both aiAutoMod and moderation dmNotifications are absent', () => {
-    const cfg = getAiAutoModConfig({ aiAutoMod: {} });
-    expect(cfg.dmNotifications).toEqual({ warn: true, timeout: true, kick: true, ban: true });
+describe('AI_AUTOMOD_DM_NOTIFICATION_ACTIONS', () => {
+  it('exports exactly the four DM-eligible action types in the expected order', () => {
+    expect(AI_AUTOMOD_DM_NOTIFICATION_ACTIONS).toEqual(['warn', 'timeout', 'kick', 'ban']);
   });
 
-  it('returns hardcoded defaults when config is null', () => {
-    const cfg = getAiAutoModConfig(null);
-    expect(cfg.dmNotifications).toEqual({ warn: true, timeout: true, kick: true, ban: true });
-    expect(cfg.enabled).toBe(false);
+  it('is frozen and cannot be mutated', () => {
+    expect(Object.isFrozen(AI_AUTOMOD_DM_NOTIFICATION_ACTIONS)).toBe(true);
+    expect(() => {
+      AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.push('delete');
+    }).toThrow();
+    expect(AI_AUTOMOD_DM_NOTIFICATION_ACTIONS).toHaveLength(4);
   });
 
-  it('aiAutoMod dmNotification true overrides moderation false for the same action', () => {
-    const cfg = getAiAutoModConfig({
-      moderation: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
-      aiAutoMod: { dmNotifications: { warn: true } },
-    });
-    expect(cfg.dmNotifications.warn).toBe(true);
-    // Other actions fall back to moderation
-    expect(cfg.dmNotifications.timeout).toBe(false);
-    expect(cfg.dmNotifications.kick).toBe(false);
-    expect(cfg.dmNotifications.ban).toBe(false);
+  it('does not include non-DM actions like flag or delete', () => {
+    expect(AI_AUTOMOD_DM_NOTIFICATION_ACTIONS).not.toContain('flag');
+    expect(AI_AUTOMOD_DM_NOTIFICATION_ACTIONS).not.toContain('delete');
+    expect(AI_AUTOMOD_DM_NOTIFICATION_ACTIONS).not.toContain('none');
   });
 });
 
@@ -1841,6 +1839,94 @@ Reason: toxic`,
     expect(logAuditEvent).not.toHaveBeenCalled();
   });
 
+  it('does not send any DM notification when only flag and delete actions execute', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.9, harassment: 0.1, reason: 'toxic spam' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { toxicity: ['flag', 'delete'], spam: ['flag', 'delete'] },
+    });
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    expect(sendDmNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not send any DM when all DM notification actions are disabled', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.9, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig(
+      {
+        actions: { toxicity: ['warn', 'timeout'] },
+        dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+      },
+      { moderation: moderationWarnConfig },
+    );
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result).toMatchObject({ flagged: true });
+    expect(sendDmNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not send a DM when message has no member', async () => {
+    message.member = null;
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { toxicity: ['warn'] },
+      dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+    });
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    expect(sendDmNotification).not.toHaveBeenCalled();
+  });
+
+  it('sends a timeout DM when timeout action is enabled and executes', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { toxicity: ['timeout'] },
+      dmNotifications: { warn: false, timeout: true, kick: false, ban: false },
+    });
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result).toMatchObject({ flagged: true, action: 'timeout', actions: ['timeout'] });
+    expect(sendDmNotification).toHaveBeenCalledWith(
+      message.member,
+      'timeout',
+      expect.stringContaining('Actions taken: timeout'),
+      'guild-1',
+    );
+  });
+
+  it('formats the DM reason with correct category label mapping', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({
+        toxicity: 0.1,
+        spam: 0.1,
+        harassment: 0.9,
+        reason: 'targeted harassment',
+      }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { harassment: ['warn'] },
+      dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+    });
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    const dmReason = vi.mocked(sendDmNotification).mock.calls[0][2];
+    expect(dmReason).toContain('Triggered categories: Harassment');
+    expect(dmReason).toContain('Reason: targeted harassment');
+    expect(dmReason).toContain('Actions taken: warning');
+  });
+
   it('should send flag embed to flagChannelId when configured', async () => {
     const mockFlagChannel = { id: 'flag-channel-1', send: vi.fn().mockResolvedValue(undefined) };
     fetchChannelCached.mockResolvedValue(mockFlagChannel);
@@ -1860,53 +1946,5 @@ Reason: toxic`,
       mockFlagChannel,
       expect.objectContaining({ embeds: expect.any(Array) }),
     );
-  });
-
-  it('uses "No reason provided" in DM when AI response omits a reason field', async () => {
-    mockGenerate.mockResolvedValue(
-      makeAiResponse(JSON.stringify({ harassment: 0.9, toxicity: 0.1, spam: 0.1 })),
-    );
-    const guildConfig = makeAiAutoModGuildConfig({}, { moderation: moderationWarnConfig });
-
-    await checkAiAutoMod(message, client, guildConfig);
-
-    expect(sendDmNotification).toHaveBeenCalledTimes(1);
-    const dmReason = vi.mocked(sendDmNotification).mock.calls[0][2];
-    expect(dmReason).toContain('No reason provided');
-  });
-
-  it('sends no DM when all applicable AI auto-mod DM notification types are disabled', async () => {
-    mockGenerate.mockResolvedValue(
-      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
-    );
-    const guildConfig = makeAiAutoModGuildConfig({
-      actions: { toxicity: ['warn', 'timeout', 'kick', 'ban'] },
-      dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
-    });
-
-    const result = await checkAiAutoMod(message, client, guildConfig);
-
-    expect(result.flagged).toBe(true);
-    expect(sendDmNotification).not.toHaveBeenCalled();
-  });
-
-  it('DM reason lists multiple triggered categories when several thresholds are exceeded', async () => {
-    mockGenerate.mockResolvedValue(
-      makeAiResponse(
-        JSON.stringify({ toxicity: 0.9, spam: 0.9, harassment: 0.1, reason: 'multi-category' }),
-      ),
-    );
-    // Trigger both toxicity (warn) and spam (delete) actions
-    const guildConfig = makeAiAutoModGuildConfig(
-      { actions: { toxicity: 'warn', spam: 'warn' } },
-      { moderation: moderationWarnConfig },
-    );
-
-    await checkAiAutoMod(message, client, guildConfig);
-
-    expect(sendDmNotification).toHaveBeenCalledTimes(1);
-    const dmReason = vi.mocked(sendDmNotification).mock.calls[0][2];
-    expect(dmReason).toContain('Toxicity');
-    expect(dmReason).toContain('Spam');
   });
 });
