@@ -22,10 +22,25 @@ import { ConfigCategoryLayout } from './config-category-layout';
 
 const hasVisibleModelOptions = VISIBLE_PROVIDER_MODEL_OPTIONS.length > 0;
 
+/**
+ * Determines whether a stored model identifier is a string that differs from its normalized form.
+ *
+ * @param value - The stored model value to check.
+ * @param normalizedValue - The canonical model value to compare against.
+ * @returns `true` if `value` is a string and not equal to `normalizedValue`, `false` otherwise.
+ */
 function shouldNormalizeSavedModel(value: unknown, normalizedValue: string): value is string {
   return typeof value === 'string' && normalizedValue !== value;
 }
 
+/**
+ * Produce the toggle state and change handler for the configuration category specified by `activeTab`.
+ *
+ * @param activeTab - Identifier of the active configuration feature/tab
+ * @param draftConfig - Current draft configuration object used to read the feature's enabled state
+ * @param handlers - Updater functions used to persist changes to the corresponding feature section
+ * @returns An object with `checked` set to whether the feature is enabled, and `onChange` a callback that updates the feature's `enabled` field; for unknown `activeTab` returns `checked: false` and a no-op `onChange`.
+ */
 function getFeatureToggle(
   activeTab: ConfigFeatureId,
   draftConfig: NonNullable<ReturnType<typeof useConfigContext>['draftConfig']>,
@@ -66,13 +81,11 @@ function getFeatureToggle(
 }
 
 /**
- * Render the AI feature UI and the shared Content Safety panel used by Moderation & Safety.
+ * Render the AI feature UI and the shared Content Safety panel for the active feature tab.
  *
- * Renders controls and panels appropriate to the currently active feature tab and wires updates into
- * the shared draft configuration via the config context. Returns `null` when the draft configuration
- * or the active tab is not available.
+ * Wires user interactions into the shared draft configuration from the config context.
  *
- * @returns The component's rendered JSX element, or `null` when configuration or the active feature is unavailable.
+ * @returns The rendered configuration UI as a `JSX.Element`, or `null` when the draft configuration or active feature tab is unavailable.
  */
 export function AiAutomationCategory() {
   const { draftConfig, saving, guildId, updateDraftConfig, activeTabId } = useConfigContext();

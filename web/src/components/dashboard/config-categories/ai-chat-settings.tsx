@@ -5,6 +5,23 @@ import type { ChannelMode } from '@/types/config';
 import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
 import { SystemPromptEditor } from '../system-prompt-editor';
 
+/**
+ * Render AI chat configuration controls including a system prompt editor and optional guild-specific panels.
+ *
+ * Renders a SystemPromptEditor bound to `draftConfig.ai?.systemPrompt`, and when `guildId` is provided it also
+ * renders a "Response Boundaries" channel selector for blocked channels and a ChannelModeSection for per-channel
+ * and default mode configuration.
+ *
+ * @param draftConfig - Current editable guild AI configuration
+ * @param saving - When true, disables interactive inputs
+ * @param guildId - Guild identifier; when falsy guild-specific sections are omitted
+ * @param onSystemPromptChange - Called with the updated system prompt string
+ * @param onBlockedChannelsChange - Called with the updated list of blocked channel IDs
+ * @param onChannelModeChange - Called to set or clear a specific channel's mode
+ * @param onDefaultChannelModeChange - Called to change the default channel mode
+ * @param onResetAllChannelModes - Called to reset all channel modes to their defaults
+ * @returns The JSX element containing AI chat settings UI for the given draft configuration
+ */
 export function AiChatSettings({
   draftConfig,
   saving,

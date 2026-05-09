@@ -30,6 +30,21 @@ const TRIAGE_BOOLEAN_TOGGLES = [
   key: TriageBooleanField;
 }>;
 
+/**
+ * Renders a guild-level triage configuration editor UI driven by a provided draft configuration.
+ *
+ * The component presents controls for model selection, audit-log channel, role filtering, daily budgets,
+ * and operational boolean toggles. All inputs are disabled while `saving` is true; user changes are propagated
+ * via `onFieldChange`.
+ *
+ * @param draftConfig - Current draft guild configuration containing the `triage` settings to display and edit
+ * @param saving - When true, disables all interactive controls
+ * @param guildId - Guild identifier used by role and channel selectors
+ * @param classifyModelValue - Currently selected classifier model identifier
+ * @param respondModelValue - Currently selected response model identifier
+ * @param onFieldChange - Callback invoked when a triage field changes; receives the field key and the new value
+ * @returns The triage settings form as a JSX element
+ */
 export function AiTriageSettings({
   draftConfig,
   saving,

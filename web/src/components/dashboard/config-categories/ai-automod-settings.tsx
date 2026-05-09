@@ -18,6 +18,12 @@ export type AiAutoModFieldUpdater<K extends keyof AiAutoModDraft> =
 
 const AI_AUTOMOD_ACTION_ORDER = AI_AUTOMOD_ACTION_OPTIONS.map((option) => option.value);
 
+/**
+ * Type-guard that determines whether a value is a recognized selectable AI automod action.
+ *
+ * @param value - The value to test.
+ * @returns `true` if `value` is a string matching one of the known selectable automod action identifiers, `false` otherwise.
+ */
 function isSelectableAiAutoModAction(value: unknown): value is SelectableAiAutoModAction {
   return (
     typeof value === 'string' &&
@@ -25,6 +31,12 @@ function isSelectableAiAutoModAction(value: unknown): value is SelectableAiAutoM
   );
 }
 
+/**
+ * Produce a deduplicated list of actions ordered by the canonical AI_AUTOMOD_ACTION_ORDER.
+ *
+ * @param actions - Array of selectable action values (may contain duplicates)
+ * @returns The unique actions from `actions`, sorted according to `AI_AUTOMOD_ACTION_ORDER`
+ */
 function sortAiAutoModActions(
   actions: readonly SelectableAiAutoModAction[],
 ): SelectableAiAutoModAction[] {
@@ -32,6 +44,19 @@ function sortAiAutoModActions(
   return AI_AUTOMOD_ACTION_ORDER.filter((action) => selected.has(action));
 }
 
+/**
+ * Normalize a persisted or configured automod action value into a stable, ordered list of valid actions.
+ *
+ * Accepts raw input from storage or configuration and produces a deduplicated, ordered array of
+ * SelectableAiAutoModAction values. If `value === 'none'`, returns an empty array. If `value` is an
+ * array it is used as the source; if `value` is a single valid action it is wrapped in an array;
+ * otherwise `fallback` is used. The result keeps the first occurrence of each valid action and is
+ * ordered according to the canonical action order.
+ *
+ * @param value - Raw persisted/configured value which may be `'none'`, an array, a single action, or unknown
+ * @param fallback - Fallback array of actions to use when `value` is not a recognized action or array
+ * @returns An ordered, deduplicated array of valid `SelectableAiAutoModAction` values
+ */
 function normalizeAiAutoModActions(
   value: unknown,
   fallback: readonly SelectableAiAutoModAction[],
@@ -54,6 +79,19 @@ function normalizeAiAutoModActions(
   return sortAiAutoModActions(uniqueActions);
 }
 
+/**
+ * Update the response-action mapping for a single automod category by adding or removing an action.
+ *
+ * The function uses `fallbackActions` when the category has no existing entry, ensures the resulting
+ * action list contains unique values, and returns actions in a stable canonical order.
+ *
+ * @param previousActions - Existing category -> actions mapping (may be `null`/`undefined`)
+ * @param categoryKey - The category whose actions should be updated
+ * @param fallbackActions - Default actions to use when the category has no existing entry
+ * @param action - The action to add or remove for the category
+ * @param checked - If `true`, add `action` to the category; if `false`, remove it
+ * @returns An updated, non-nullable mapping of category keys to their normalized action lists
+ */
 export function toggleAiAutoModCategoryAction(
   previousActions: AiAutoModDraft['actions'],
   categoryKey: AiAutoModCategory,
@@ -76,6 +114,16 @@ export function toggleAiAutoModCategoryAction(
   };
 }
 
+/**
+ * Renders a labeled checkbox toggle for a single automod action option.
+ *
+ * @param categoryLabel - Human-readable label of the automod category (used for the checkbox aria-label)
+ * @param option - The action option object containing `label` and `value` to display
+ * @param checked - Whether the checkbox is currently selected
+ * @param disabled - Whether the checkbox is disabled
+ * @param onToggle - Callback invoked with the new checked state when the checkbox changes
+ * @returns A JSX element representing the action toggle control
+ */
 function AiAutoModActionToggle({
   categoryLabel,
   option,
@@ -106,6 +154,15 @@ function AiAutoModActionToggle({
   );
 }
 
+/**
+ * Renders a labeled card-style toggle for a single AI AutoMod DM notification option.
+ *
+ * @param option - The DM notification option containing `label` and `description` to display.
+ * @param checked - `true` if the toggle is on, `false` otherwise.
+ * @param disabled - `true` to disable user interaction with the toggle.
+ * @param onToggle - Callback invoked with the new checked state when the toggle changes.
+ * @returns The JSX element for the DM notification toggle control.
+ */
 function AiAutoModDmNotificationToggle({
   option,
   checked,
@@ -137,6 +194,16 @@ function AiAutoModDmNotificationToggle({
   );
 }
 
+/**
+ * Determine whether DM notifications for a specific AI automod action are enabled for the guild.
+ *
+ * Checks the value with the following precedence: `draftConfig.aiAutoMod.dmNotifications[action]`,
+ * then `draftConfig.moderation.dmNotifications[action]`, and defaults to enabled.
+ *
+ * @param draftConfig - The guild configuration draft to read settings from
+ * @param action - The DM notification action to check
+ * @returns `true` if DM notifications for `action` are enabled, `false` otherwise
+ */
 function isAiAutoModDmNotificationEnabled(
   draftConfig: GuildConfig,
   action: AiAutoModDmNotificationAction,
@@ -148,6 +215,22 @@ function isAiAutoModDmNotificationEnabled(
   );
 }
 
+/**
+ * Render the AI Auto Moderation settings UI for editing a guild's `aiAutoMod` configuration.
+ *
+ * Renders controls for selecting the detection model, incident report channel, instant enforcement (auto-delete),
+ * per-category confidence thresholds and response actions, and user DM notification toggles. Inputs respect the
+ * `saving` state and call the provided change handlers to update the draft configuration.
+ *
+ * @param draftConfig - Current guild configuration draft containing `aiAutoMod` and related settings
+ * @param saving - When `true`, disables form inputs to prevent edits while saving
+ * @param guildId - Guild identifier used by the channel selector
+ * @param modelValue - Currently selected detection model value for the model selector
+ * @param onFieldChange - Updates a top-level `aiAutoMod` field; accepts either a direct value or an updater function
+ * @param onActionChange - Called when a per-category response action checkbox is toggled
+ * @param onDmNotificationChange - Called when a DM notification action toggle is changed
+ * @returns A JSX element containing the AI Auto Moderation settings form and controls
+ */
 export function AiAutoModSettings({
   draftConfig,
   saving,

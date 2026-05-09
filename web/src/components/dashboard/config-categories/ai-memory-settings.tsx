@@ -10,6 +10,18 @@ type MemoryConfigDraft = NonNullable<GuildConfig['memory']>;
 export type MemoryConfigField = keyof MemoryConfigDraft;
 type MemoryConfigFieldValue = MemoryConfigDraft[MemoryConfigField];
 
+/**
+ * Render AI memory configuration controls for editing a guild's memory settings.
+ *
+ * Renders a numeric "Retrieval Depth" input (min 1) bound to `draftConfig.memory?.maxContextMemories` and an
+ * "Autonomous Extraction" toggle bound to `draftConfig.memory?.autoExtract`. Both controls are disabled when `saving` is `true`
+ * and propagate changes via `onFieldChange`.
+ *
+ * @param draftConfig - The current editable guild configuration that provides memory defaults
+ * @param saving - When `true`, inputs are disabled to prevent changes during save operations
+ * @param onFieldChange - Callback invoked with the memory field key and new value when a control changes
+ * @returns The JSX element for the AI memory settings panel
+ */
 export function AiMemorySettings({
   draftConfig,
   saving,
