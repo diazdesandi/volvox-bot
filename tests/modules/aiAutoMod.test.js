@@ -1173,6 +1173,182 @@ describe('checkAiAutoMod', () => {
     expect(message.member.timeout).toHaveBeenCalledWith(300000, expect.any(String));
   });
 
+  it.each(['kick', 'ban'])('sends AI auto-mod DM before Discord %s enforcement', async (action) => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({ actions: { toxicity: action } });
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    const destructiveActionMock =
+      action === 'kick' ? message.member.kick : message.guild.members.ban;
+    expect(result).toMatchObject({ flagged: true, action, actions: [action] });
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
+    expect(sendDmNotification).toHaveBeenCalledWith(
+      message.member,
+      action,
+      `Actions taken: ${action}
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+      destructiveActionMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not duplicate AI auto-mod DMs for multi-action queues with destructive actions', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig(
+      { actions: { toxicity: ['warn', 'kick', 'ban'] } },
+      { moderation: moderationWarnConfig },
+    );
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result).toMatchObject({
+      flagged: true,
+      action: 'ban',
+      actions: ['warn', 'kick', 'ban'],
+    });
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
+    expect(sendDmNotification).toHaveBeenCalledWith(
+      message.member,
+      'kick',
+      `Actions taken: warning and kick
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+      message.member.kick.mock.invocationCallOrder[0],
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+      message.guild.members.ban.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('sends a ban-relevant DM when an earlier destructive pre-DM action fails and ban succeeds', async () => {
+    message.member.kick.mockRejectedValueOnce(new Error('Missing Permissions'));
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { toxicity: ['kick', 'ban'] },
+      dmNotifications: { kick: true, ban: true },
+    });
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result).toMatchObject({
+      flagged: true,
+      action: 'ban',
+      actions: ['ban'],
+    });
+    expect(sendDmNotification).toHaveBeenCalledTimes(2);
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      1,
+      message.member,
+      'kick',
+      `Actions taken: kick
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+    );
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      2,
+      message.member,
+      'ban',
+      `Actions taken: ban
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeLessThan(
+      message.guild.members.ban.mock.invocationCallOrder[0],
+    );
+    expect(logAuditEvent).toHaveBeenCalledWith(
+      mockPool,
+      expect.objectContaining({ action: 'ai_automod.ban' }),
+    );
+    expect(logAuditEvent).not.toHaveBeenCalledWith(
+      mockPool,
+      expect.objectContaining({ action: 'ai_automod.kick' }),
+    );
+  });
+
+  it('attempts a destructive DM before a later enabled action when the first destructive DM is disabled', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { toxicity: ['kick', 'ban'] },
+      dmNotifications: { kick: false, ban: true },
+    });
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result).toMatchObject({
+      flagged: true,
+      action: 'ban',
+      actions: ['kick', 'ban'],
+    });
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
+    expect(sendDmNotification).toHaveBeenCalledWith(
+      message.member,
+      'ban',
+      `Actions taken: ban
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+    );
+    expect(message.member.kick.mock.invocationCallOrder[0]).toBeLessThan(
+      sendDmNotification.mock.invocationCallOrder[0],
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+      message.guild.members.ban.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not let a prior warn suppress a later enabled ban DM when kick DMs are disabled', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig(
+      {
+        actions: { toxicity: ['warn', 'kick', 'ban'] },
+        dmNotifications: { kick: false, ban: true },
+      },
+      { moderation: moderationWarnConfig },
+    );
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result).toMatchObject({
+      flagged: true,
+      action: 'ban',
+      actions: ['warn', 'kick', 'ban'],
+    });
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
+    expect(sendDmNotification).toHaveBeenCalledWith(
+      message.member,
+      'ban',
+      `Actions taken: warning and ban
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+    );
+    expect(message.member.kick.mock.invocationCallOrder[0]).toBeLessThan(
+      sendDmNotification.mock.invocationCallOrder[0],
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+      message.guild.members.ban.mock.invocationCallOrder[0],
+    );
+  });
+
   it.each([
     'timeout',
     'kick',

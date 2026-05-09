@@ -87,6 +87,7 @@ const ACTION_PRIORITY = Object.freeze({
   none: -1,
 });
 export const AI_AUTOMOD_DM_NOTIFICATION_ACTIONS = Object.freeze(['warn', 'timeout', 'kick', 'ban']);
+const AI_AUTOMOD_DESTRUCTIVE_ACTIONS = new Set(['kick', 'ban']);
 const DEFAULT_DM_NOTIFICATIONS = Object.freeze({
   warn: true,
   timeout: true,
@@ -838,15 +839,19 @@ function buildAiAutoModDmReason(result, executedDmActions) {
   );
 }
 
-async function sendAiAutoModDmNotification(message, result, autoModConfig, executedActions) {
-  const { member, guild } = message;
-  if (!member || !guild) return;
-
+function getEnabledDmNotificationActions(autoModConfig, executedActions) {
   const configuredNotifications = autoModConfig.dmNotifications ?? DEFAULT_DM_NOTIFICATIONS;
-  const executedDmActions = AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.filter(
+  return AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.filter(
     (action) => executedActions.includes(action) && configuredNotifications[action] === true,
   );
-  if (executedDmActions.length === 0) return;
+}
+
+async function sendAiAutoModDmNotification(message, result, autoModConfig, executedActions) {
+  const { member, guild } = message;
+  if (!member || !guild) return false;
+
+  const executedDmActions = getEnabledDmNotificationActions(autoModConfig, executedActions);
+  if (executedDmActions.length === 0) return false;
 
   const primaryDmAction = getPrimaryAction(executedDmActions);
   const dmReason = buildAiAutoModDmReason(result, executedDmActions);
@@ -860,6 +865,8 @@ async function sendAiAutoModDmNotification(message, result, autoModConfig, execu
       error: err?.message,
     });
   }
+
+  return true;
 }
 
 async function executeSingleAction(context) {
@@ -894,6 +901,8 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
   );
   const executedActions = [];
   const successfulAuditEvents = [];
+  let aiAutoModDmAttempted = false;
+  let aiAutoModPendingDmAction = null;
 
   if (actions.length === 0) {
     logAiAutoModAuditEvent(message, result, autoModConfig, {
@@ -910,6 +919,21 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
   }
 
   for (const action of actions) {
+    const pendingDmActions = [...executedActions, action];
+    if (
+      !aiAutoModDmAttempted &&
+      AI_AUTOMOD_DESTRUCTIVE_ACTIONS.has(action) &&
+      getEnabledDmNotificationActions(autoModConfig, pendingDmActions).includes(action)
+    ) {
+      aiAutoModDmAttempted = await sendAiAutoModDmNotification(
+        message,
+        result,
+        autoModConfig,
+        pendingDmActions,
+      );
+      aiAutoModPendingDmAction = aiAutoModDmAttempted ? action : null;
+    }
+
     const { success, caseData } = await executeSingleAction({
       action,
       message,
@@ -923,9 +947,16 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
       botTag,
     });
 
-    if (!success) continue;
+    if (!success) {
+      if (aiAutoModPendingDmAction === action) {
+        aiAutoModDmAttempted = false;
+        aiAutoModPendingDmAction = null;
+      }
+      continue;
+    }
 
     executedActions.push(action);
+    if (aiAutoModPendingDmAction === action) aiAutoModPendingDmAction = null;
     successfulAuditEvents.push({ action, caseData });
   }
 
@@ -941,7 +972,14 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
     return executedActions;
   }
 
-  await sendAiAutoModDmNotification(message, result, autoModConfig, executedActions);
+  if (!aiAutoModDmAttempted) {
+    aiAutoModDmAttempted = await sendAiAutoModDmNotification(
+      message,
+      result,
+      autoModConfig,
+      executedActions,
+    );
+  }
 
   for (const { action, caseData } of successfulAuditEvents) {
     logAiAutoModAuditEvent(message, result, autoModConfig, {
