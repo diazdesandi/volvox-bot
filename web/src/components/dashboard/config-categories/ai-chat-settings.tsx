@@ -39,6 +39,10 @@ export function AiChatSettings({
   onDefaultChannelModeChange: (mode: ChannelMode) => void;
   onResetAllChannelModes: () => void;
 }>) {
+  const blockedChannelIds = Array.isArray(draftConfig.ai?.blockedChannelIds)
+    ? draftConfig.ai.blockedChannelIds.filter((id): id is string => typeof id === 'string')
+    : [];
+
   return (
     <div className="space-y-6">
       <SystemPromptEditor
@@ -61,7 +65,7 @@ export function AiChatSettings({
           <ChannelSelector
             id="ai-blocked-channels"
             guildId={guildId}
-            selected={(draftConfig.ai?.blockedChannelIds ?? []) as string[]}
+            selected={blockedChannelIds}
             onChange={onBlockedChannelsChange}
             placeholder="Search channels to block..."
             disabled={saving}

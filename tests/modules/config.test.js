@@ -1341,9 +1341,7 @@ describe('modules/config', () => {
       });
 
       // Explicitly set aiAutoMod DM notifications via setMultipleConfigValues
-      await mod.setMultipleConfigValues([
-        { path: 'aiAutoMod.dmNotifications.warn', value: true },
-      ]);
+      await mod.setMultipleConfigValues([{ path: 'aiAutoMod.dmNotifications.warn', value: true }]);
 
       // After explicit set, moderation changes should not override the explicit AI DM settings
       await mod.setMultipleConfigValues([
@@ -1354,6 +1352,4 @@ describe('modules/config', () => {
       expect(mod.getConfig().aiAutoMod.dmNotifications.warn).toBe(true);
     });
   });
-
 });
-

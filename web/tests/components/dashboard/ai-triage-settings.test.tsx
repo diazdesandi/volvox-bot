@@ -91,6 +91,8 @@ vi.mock('@/components/dashboard/toggle-switch', () => ({
 
 import { AiTriageSettings } from '@/components/dashboard/config-categories/ai-triage-settings';
 
+type AiTriageSettingsProps = Parameters<typeof AiTriageSettings>[0];
+
 function createTriageDraftConfig(overrides: Partial<GuildConfig> = {}): GuildConfig {
   return {
     triage: {
@@ -117,7 +119,7 @@ function renderTriageSettings(
     guildId?: string;
     classifyModelValue?: string;
     respondModelValue?: string;
-    onFieldChange?: ReturnType<typeof vi.fn>;
+    onFieldChange?: ReturnType<typeof vi.fn<AiTriageSettingsProps['onFieldChange']>>;
   } = {},
 ) {
   const {
@@ -125,7 +127,7 @@ function renderTriageSettings(
     guildId = 'guild-1',
     classifyModelValue = 'minimax:MiniMax-M2.7',
     respondModelValue = 'minimax:MiniMax-M2.7',
-    onFieldChange = vi.fn(),
+    onFieldChange = vi.fn<AiTriageSettingsProps['onFieldChange']>(),
   } = props;
 
   render(

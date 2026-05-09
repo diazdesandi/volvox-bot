@@ -37,6 +37,8 @@ vi.mock('@/components/dashboard/config-sections/ChannelModeSection', () => ({
 
 import { AiChatSettings } from '@/components/dashboard/config-categories/ai-chat-settings';
 
+type AiChatSettingsProps = Parameters<typeof AiChatSettings>[0];
+
 function createDefaultDraftConfig(overrides: Partial<GuildConfig> = {}): GuildConfig {
   return {
     ai: {
@@ -53,21 +55,27 @@ function renderAiChatSettings(
   props: {
     saving?: boolean;
     guildId?: string;
-    onSystemPromptChange?: ReturnType<typeof vi.fn>;
-    onBlockedChannelsChange?: ReturnType<typeof vi.fn>;
-    onChannelModeChange?: ReturnType<typeof vi.fn>;
-    onDefaultChannelModeChange?: ReturnType<typeof vi.fn>;
-    onResetAllChannelModes?: ReturnType<typeof vi.fn>;
+    onSystemPromptChange?: ReturnType<typeof vi.fn<AiChatSettingsProps['onSystemPromptChange']>>;
+    onBlockedChannelsChange?: ReturnType<
+      typeof vi.fn<AiChatSettingsProps['onBlockedChannelsChange']>
+    >;
+    onChannelModeChange?: ReturnType<typeof vi.fn<AiChatSettingsProps['onChannelModeChange']>>;
+    onDefaultChannelModeChange?: ReturnType<
+      typeof vi.fn<AiChatSettingsProps['onDefaultChannelModeChange']>
+    >;
+    onResetAllChannelModes?: ReturnType<
+      typeof vi.fn<AiChatSettingsProps['onResetAllChannelModes']>
+    >;
   } = {},
 ) {
   const {
     saving = false,
     guildId = 'guild-1',
-    onSystemPromptChange = vi.fn(),
-    onBlockedChannelsChange = vi.fn(),
-    onChannelModeChange = vi.fn(),
-    onDefaultChannelModeChange = vi.fn(),
-    onResetAllChannelModes = vi.fn(),
+    onSystemPromptChange = vi.fn<AiChatSettingsProps['onSystemPromptChange']>(),
+    onBlockedChannelsChange = vi.fn<AiChatSettingsProps['onBlockedChannelsChange']>(),
+    onChannelModeChange = vi.fn<AiChatSettingsProps['onChannelModeChange']>(),
+    onDefaultChannelModeChange = vi.fn<AiChatSettingsProps['onDefaultChannelModeChange']>(),
+    onResetAllChannelModes = vi.fn<AiChatSettingsProps['onResetAllChannelModes']>(),
   } = props;
 
   render(

@@ -83,6 +83,9 @@ import {
   toggleAiAutoModCategoryAction,
 } from '@/components/dashboard/config-categories/ai-automod-settings';
 
+type AiAutoModSettingsProps = Parameters<typeof AiAutoModSettings>[0];
+type AiAutoModActions = NonNullable<NonNullable<GuildConfig['aiAutoMod']>['actions']>;
+
 function createDraftConfig(overrides: Partial<GuildConfig> = {}): GuildConfig {
   return {
     aiAutoMod: {
@@ -127,18 +130,20 @@ function renderAiAutoModSettings(
     saving?: boolean;
     guildId?: string;
     modelValue?: string;
-    onFieldChange?: ReturnType<typeof vi.fn>;
-    onActionChange?: ReturnType<typeof vi.fn>;
-    onDmNotificationChange?: ReturnType<typeof vi.fn>;
+    onFieldChange?: ReturnType<typeof vi.fn<AiAutoModSettingsProps['onFieldChange']>>;
+    onActionChange?: ReturnType<typeof vi.fn<AiAutoModSettingsProps['onActionChange']>>;
+    onDmNotificationChange?: ReturnType<
+      typeof vi.fn<AiAutoModSettingsProps['onDmNotificationChange']>
+    >;
   } = {},
 ) {
   const {
     saving = false,
     guildId = 'guild-1',
     modelValue = 'minimax:MiniMax-M2.7',
-    onFieldChange = vi.fn(),
-    onActionChange = vi.fn(),
-    onDmNotificationChange = vi.fn(),
+    onFieldChange = vi.fn<AiAutoModSettingsProps['onFieldChange']>(),
+    onActionChange = vi.fn<AiAutoModSettingsProps['onActionChange']>(),
+    onDmNotificationChange = vi.fn<AiAutoModSettingsProps['onDmNotificationChange']>(),
   } = props;
 
   render(
@@ -147,7 +152,7 @@ function renderAiAutoModSettings(
       saving={saving}
       guildId={guildId}
       modelValue={modelValue}
-      onFieldChange={onFieldChange}
+      onFieldChange={onFieldChange as AiAutoModSettingsProps['onFieldChange']}
       onActionChange={onActionChange}
       onDmNotificationChange={onDmNotificationChange}
     />,
@@ -536,7 +541,11 @@ describe('toggleAiAutoModCategoryAction', () => {
   });
 
   it('preserves actions for other categories', () => {
-    const previousActions = { toxicity: ['flag'], spam: ['delete'], harassment: ['warn'] };
+    const previousActions: AiAutoModActions = {
+      toxicity: ['flag'],
+      spam: ['delete'],
+      harassment: ['warn'],
+    };
     const result = toggleAiAutoModCategoryAction(
       previousActions,
       'toxicity',

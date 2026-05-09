@@ -134,6 +134,7 @@ const DEFAULTS = {
  * @param {string|string[]|null|undefined} value - The raw configured action(s).
  * @param {string[]} [fallback=[]] - The fallback action list to use when `value` is falsy.
  * @return {string[]} The filtered, de-duplicated list of valid action strings (members of `AI_AUTOMOD_ACTION_TYPES`), excluding `'none'`.
+ */
 function normalizeActionList(value, fallback = []) {
   let rawActions;
   if (Array.isArray(value)) {
@@ -925,6 +926,7 @@ function getEnabledDmNotificationActions(autoModConfig, executedActions) {
  * @param {Object} autoModConfig - Merged AI auto-moderation configuration that controls which actions trigger DMs.
  * @param {string[]} executedActions - List of moderation actions that were executed.
  * @returns {boolean} `true` if a DM was attempted (or sent), `false` if no DM was sent because the member/guild was missing or no enabled DM actions were present.
+ */
 async function sendAiAutoModDmNotification(message, result, autoModConfig, executedActions) {
   const { member, guild } = message;
   if (!member || !guild) return false;

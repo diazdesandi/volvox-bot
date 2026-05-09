@@ -115,7 +115,7 @@ function shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(rowValue, fileAiDmE
  * @returns {Record<string, boolean>|any} A cloned notifications object with applicable overrides applied.
  */
 function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
-  const merged = structuredClone(fallbackNotifications);
+  const merged = isPlainObject(fallbackNotifications) ? structuredClone(fallbackNotifications) : {};
 
   if (isPlainObject(overrideNotifications)) {
     for (const [key, value] of Object.entries(overrideNotifications)) {
@@ -161,6 +161,7 @@ function preserveLegacyAiAutoModDmFallback(config, explicitAiDmNotifications) {
  * @param {*} sectionValue - The section value proposed for persistence; expected to be a plain object when stripping may apply.
  * @param {boolean} [writesAiDmNotifications=false] - True when the current write explicitly includes `aiAutoMod.dmNotifications`; prevents stripping.
  * @returns {*} The original `sectionValue` or a cloned object with `dmNotifications` removed when stripping rules apply.
+ */
 function stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
   guildId,
   section,
@@ -846,15 +847,15 @@ export async function setConfigValue(path, value, guildId = 'global') {
  *
  * Each patch must have a non-empty string `path` with at least two segments
  * (section + nested key, e.g. "aiAutoMod.dmNotifications.email") and a `value`.
- * All patches are validated, grouped by top-level section, and persisted within
- * a single database transaction; in-memory caches are updated and per-patch
- * change events are emitted after persistence.
+ * All patches are validated and grouped by top-level section. When the database
+ * is available, updates are persisted within a single transaction; otherwise
+ * in-memory caches are updated and per-patch change events are emitted.
  *
  * @param {Array<{path: string, value: any}>} patches - Array of patches to apply; each entry's `path` must include a top-level section and one or more nested segments.
  * @param {string} [guildId='global'] - Guild ID to update, or `'global'` for global configuration.
  * @returns {Promise<void>} No return value.
  * @throws {Error} If any patch path is invalid (not a non-empty string or missing section/key).
- * @throws {Error} If the database is unavailable for the bulk write.
+ * @throws {Error} If a database transaction fails after persistence is available.
  */
 export async function setMultipleConfigValues(patches, guildId = 'global') {
   if (!Array.isArray(patches) || patches.length === 0) return;
@@ -887,76 +888,86 @@ export async function setMultipleConfigValues(patches, guildId = 'global') {
   try {
     pool = getPool();
   } catch {
-    throw new Error('Database unavailable for bulk config write');
+    logWarn('Database not initialized for bulk config write — updating in-memory only');
   }
 
-  if (!pool) {
-    throw new Error('Database unavailable for bulk config write');
-  }
-
-  const client = await pool.connect();
   const persistedSections = new Map();
-  try {
-    await client.query('BEGIN');
+  const sectionList = Array.from(sectionsToUpdate).sort((a, b) => a.localeCompare(b));
 
-    const sectionList = Array.from(sectionsToUpdate).sort((a, b) => a.localeCompare(b));
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
+      for (const section of sectionList) {
+        const guildConfig = configCache.get(guildId) || {};
+        const sectionClone = structuredClone(guildConfig[section] || {});
+
+        const { rows } = await client.query(
+          'SELECT value FROM config WHERE guild_id = $1 AND key = $2 FOR UPDATE',
+          [guildId, section],
+        );
+
+        const dbSection = rows.length > 0 ? rows[0].value : sectionClone;
+
+        for (const patch of patchesBySection.get(section)) {
+          const parts = patch.path.split('.');
+          const nestedParts = parts.slice(1);
+          const parsedVal = parseValue(patch.value);
+          // API callers validate patch.path via validateConfigPatchBody, which gates
+          // the top-level key against SAFE_CONFIG_KEYS before any property write.
+          setNestedValue(dbSection, nestedParts, parsedVal);
+        }
+
+        const writesAiDmNotifications = patchesBySection
+          .get(section)
+          .some((patch) => patch.path.startsWith('aiAutoMod.dmNotifications'));
+        const persistedSection = stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
+          guildId,
+          section,
+          dbSection,
+          writesAiDmNotifications,
+        );
+
+        persistedSections.set(section, structuredClone(persistedSection));
+
+        if (rows.length > 0) {
+          await client.query(
+            'UPDATE config SET value = $1, updated_at = NOW() WHERE guild_id = $2 AND key = $3',
+            [JSON.stringify(persistedSection), guildId, section],
+          );
+        } else {
+          await client.query(
+            'INSERT INTO config (guild_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (guild_id, key) DO UPDATE SET value = $3, updated_at = NOW()',
+            [guildId, section, JSON.stringify(persistedSection)],
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      dbPersisted = true;
+    } catch (txErr) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* ignore rollback failure */
+      }
+      throw txErr;
+    } finally {
+      client.release();
+    }
+  } else {
+    const guildConfig = configCache.get(guildId) || {};
     for (const section of sectionList) {
-      const guildConfig = configCache.get(guildId) || {};
       const sectionClone = structuredClone(guildConfig[section] || {});
-
-      const { rows } = await client.query(
-        'SELECT value FROM config WHERE guild_id = $1 AND key = $2 FOR UPDATE',
-        [guildId, section],
-      );
-
-      const dbSection = rows.length > 0 ? rows[0].value : sectionClone;
-
       for (const patch of patchesBySection.get(section)) {
         const parts = patch.path.split('.');
         const nestedParts = parts.slice(1);
         const parsedVal = parseValue(patch.value);
-        // API callers validate patch.path via validateConfigPatchBody, which gates
-        // the top-level key against SAFE_CONFIG_KEYS before any property write.
-        setNestedValue(dbSection, nestedParts, parsedVal);
+        setNestedValue(sectionClone, nestedParts, parsedVal);
       }
-
-      const writesAiDmNotifications = patchesBySection
-        .get(section)
-        .some((patch) => patch.path.startsWith('aiAutoMod.dmNotifications'));
-      const persistedSection = stripImplicitGlobalAiAutoModDmNotificationsForPersistence(
-        guildId,
-        section,
-        dbSection,
-        writesAiDmNotifications,
-      );
-
-      persistedSections.set(section, structuredClone(persistedSection));
-
-      if (rows.length > 0) {
-        await client.query(
-          'UPDATE config SET value = $1, updated_at = NOW() WHERE guild_id = $2 AND key = $3',
-          [JSON.stringify(persistedSection), guildId, section],
-        );
-      } else {
-        await client.query(
-          'INSERT INTO config (guild_id, key, value) VALUES ($1, $2, $3) ON CONFLICT (guild_id, key) DO UPDATE SET value = $3, updated_at = NOW()',
-          [guildId, section, JSON.stringify(persistedSection)],
-        );
-      }
+      persistedSections.set(section, sectionClone);
     }
-
-    await client.query('COMMIT');
-    dbPersisted = true;
-  } catch (txErr) {
-    try {
-      await client.query('ROLLBACK');
-    } catch {
-      /* ignore rollback failure */
-    }
-    throw txErr;
-  } finally {
-    client.release();
   }
 
   if (!configCache.has(guildId)) {
