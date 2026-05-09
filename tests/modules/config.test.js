@@ -435,6 +435,64 @@ describe('modules/config', () => {
       });
     });
 
+    it('should preserve explicit file AI AutoMod DM settings when upgraded global DB row omits them', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+        }),
+      );
+
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+            {
+              guild_id: 'global',
+              key: 'aiAutoMod',
+              value: { enabled: true },
+            },
+            {
+              guild_id: 'guild-upgraded',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+          ],
+        }),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      const config = await configModule.loadConfig();
+
+      expect(config.aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: true,
+        kick: true,
+        ban: true,
+      });
+      expect(configModule.getConfig('guild-upgraded').aiAutoMod.dmNotifications).toEqual({
+        warn: true,
+        timeout: true,
+        kick: true,
+        ban: true,
+      });
+    });
+
     it('should preserve explicit file AI AutoMod DM settings when DB is not initialized', async () => {
       const getPool = vi.fn(() => {
         throw new Error('Database not initialized');

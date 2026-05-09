@@ -84,6 +84,12 @@ function hasExplicitAiAutoModDmNotifications(configSection) {
   return getExplicitAiAutoModDmNotifications(configSection) !== undefined;
 }
 
+function shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(rowValue, fileAiDmExplicit) {
+  if (hasExplicitAiAutoModDmNotifications(rowValue)) return true;
+
+  return isPlainObject(rowValue) && !hasOwn(rowValue, 'dmNotifications') && fileAiDmExplicit;
+}
+
 function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
   const merged = structuredClone(fallbackNotifications);
 
@@ -344,7 +350,12 @@ export async function loadConfig() {
       // Build global config, using config.json as defaults for partial DB sections.
       const globalConfig = fileConfig ? structuredClone(fileConfig) : {};
       globalAiAutoModDmNotificationsExplicit = globalRows.some(
-        (row) => row.key === 'aiAutoMod' && hasExplicitAiAutoModDmNotifications(row.value),
+        (row) =>
+          row.key === 'aiAutoMod' &&
+          shouldTreatGlobalAiAutoModDmNotificationsAsExplicit(
+            row.value,
+            fileAiAutoModDmNotificationsExplicit,
+          ),
       );
       for (const row of globalRows) {
         if (DANGEROUS_KEYS.has(row.key)) {
