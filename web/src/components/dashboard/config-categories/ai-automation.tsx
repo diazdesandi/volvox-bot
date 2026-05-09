@@ -23,23 +23,23 @@ import { ConfigCategoryLayout } from './config-category-layout';
 const hasVisibleModelOptions = VISIBLE_PROVIDER_MODEL_OPTIONS.length > 0;
 
 /**
- * Determines whether a stored model identifier is a string that differs from its normalized form.
+ * Determines whether a saved model value is a string that differs from the provided normalized model.
  *
- * @param value - The stored model value to check.
- * @param normalizedValue - The canonical model value to compare against.
- * @returns `true` if `value` is a string and not equal to `normalizedValue`, `false` otherwise.
+ * @param value - The stored value to check.
+ * @param normalizedValue - The normalized model string to compare against.
+ * @returns `true` if `value` is a string different from `normalizedValue`, `false` otherwise.
  */
 function shouldNormalizeSavedModel(value: unknown, normalizedValue: string): value is string {
   return typeof value === 'string' && normalizedValue !== value;
 }
 
 /**
- * Get the UI toggle state and change handler for the currently active configuration tab.
+ * Produce the toggle checked state and change handler for the given feature tab.
  *
- * @param activeTab - Identifier of the active configuration feature/tab
- * @param draftConfig - Current draft configuration used to read the feature's `enabled` state
- * @param handlers - Field updater functions used to persist changes for each feature section
- * @returns An object where `checked` is `true` if the feature is enabled and `false` otherwise, and `onChange` is a callback that updates the feature's `enabled` field; for unknown `activeTab` returns `checked: false` and a no-op `onChange`
+ * @param activeTab - The active feature identifier determining which config subtree to target.
+ * @param draftConfig - The current draft configuration used to read the feature's `enabled` value.
+ * @param handlers - Updater functions used to write the new `enabled` value back into the appropriate draft config subtree.
+ * @returns An object with `checked` set to the feature's current enabled state and `onChange` that updates that enabled state.
  */
 function getFeatureToggle(
   activeTab: ConfigFeatureId,
@@ -81,11 +81,13 @@ function getFeatureToggle(
 }
 
 /**
- * Render the AI feature UI and the shared Content Safety panel for the active feature tab.
+ * Render the settings UI for the selected AI feature and the shared content-safety panel.
  *
- * Wires user interactions into the shared draft configuration from the config context.
+ * Presents the appropriate feature panel based on the active tab (AI Chat, AI AutoMod, Triage, Memory),
+ * wires user interactions into the draft configuration via the config context, and performs model
+ * normalization effects when needed.
  *
- * @returns The rendered configuration UI as a `JSX.Element`, or `null` when the draft configuration or active feature tab is unavailable.
+ * @returns The rendered JSX element for the active feature, or `null` when the draft configuration or active tab is unavailable.
  */
 export function AiAutomationCategory() {
   const { draftConfig, saving, guildId, updateDraftConfig, activeTabId } = useConfigContext();

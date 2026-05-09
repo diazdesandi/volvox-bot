@@ -11,12 +11,14 @@ export type MemoryConfigField = keyof MemoryConfigDraft;
 type MemoryConfigFieldValue = MemoryConfigDraft[MemoryConfigField];
 
 /**
- * Render the AI memory settings panel with controls for retrieval depth and autonomous extraction.
+ * Renders AI memory settings controls for retrieval depth and autonomous extraction.
  *
- * @param draftConfig - The editable guild configuration providing current memory values and defaults
- * @param saving - When `true`, controls are disabled to prevent changes during save operations
- * @param onFieldChange - Callback invoked with the memory field key and its new value when a control changes
- * @returns The JSX element for the AI memory settings panel
+ * Renders a numeric input bound to `draftConfig.memory?.maxContextMemories` (default 10) with a minimum of 1, and a toggle bound to `draftConfig.memory?.autoExtract` (default false). Both controls are disabled when `saving` is true and propagate validated changes via `onFieldChange`.
+ *
+ * @param draftConfig - Current guild configuration draft containing `memory` settings.
+ * @param saving - When true, disables user interaction with the controls.
+ * @param onFieldChange - Callback invoked with the memory field key and its new value when a user-updated value is accepted.
+ * @returns The settings UI as a JSX element.
  */
 export function AiMemorySettings({
   draftConfig,

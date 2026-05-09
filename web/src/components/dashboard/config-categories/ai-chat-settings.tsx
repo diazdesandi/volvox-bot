@@ -6,21 +6,19 @@ import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
 import { SystemPromptEditor } from '../system-prompt-editor';
 
 /**
- * Render AI chat configuration controls including a system prompt editor and optional guild-specific panels.
+ * Render controls for configuring AI chat settings for a guild.
  *
- * Renders a SystemPromptEditor bound to `draftConfig.ai?.systemPrompt`, and when `guildId` is provided it also
- * renders a "Response Boundaries" channel selector for blocked channels and a ChannelModeSection for per-channel
- * and default mode configuration.
+ * Renders a system prompt editor bound to `draftConfig.ai?.systemPrompt`. When `guildId` is provided, also renders a "Response Boundaries" channel selector for `draftConfig.ai?.blockedChannelIds` and a channel mode configuration section.
  *
- * @param draftConfig - Current editable guild AI configuration
- * @param saving - When true, disables interactive inputs
- * @param guildId - Guild identifier; when falsy guild-specific sections are omitted
- * @param onSystemPromptChange - Called with the updated system prompt string
- * @param onBlockedChannelsChange - Called with the updated list of blocked channel IDs
- * @param onChannelModeChange - Called to set or clear a specific channel's mode
- * @param onDefaultChannelModeChange - Called to change the default channel mode
- * @param onResetAllChannelModes - Called to reset all channel modes to their defaults
- * @returns The JSX element containing AI chat settings UI for the given draft configuration
+ * @param draftConfig - Draft guild configuration used to populate the controls (e.g., `ai.systemPrompt`, `ai.blockedChannelIds`).
+ * @param saving - If true, input controls are disabled to reflect an in-progress save.
+ * @param guildId - Guild identifier; when falsy, guild-scoped controls (blocked channels and channel modes) are not rendered.
+ * @param onSystemPromptChange - Called with the new system prompt value when it changes.
+ * @param onBlockedChannelsChange - Called with the updated list of blocked channel IDs.
+ * @param onChannelModeChange - Called to set or clear the mode for a specific channel (`channelId`, `mode` or `undefined` to clear).
+ * @param onDefaultChannelModeChange - Called to change the default channel mode.
+ * @param onResetAllChannelModes - Called to reset all per-channel mode overrides to defaults.
+ * @returns A JSX element that renders the AI chat settings UI.
  */
 export function AiChatSettings({
   draftConfig,
