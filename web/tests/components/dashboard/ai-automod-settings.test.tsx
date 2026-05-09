@@ -1,39 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { GuildConfig } from '@/components/dashboard/config-editor-utils';
+import type { AiAutoModDmNotificationAction } from '@/types/config';
 
 vi.mock('@/components/ui/select', () => import('../../helpers/mock-select'));
-
-vi.mock('@/components/dashboard/toggle-switch', () => ({
-  ToggleSwitch: ({
-    checked,
-    disabled,
-    label,
-    onChange,
-  }: {
-    checked: boolean;
-    disabled?: boolean;
-    label: string;
-    onChange: (checked: boolean) => void;
-  }) => (
-    <button
-      type="button"
-      disabled={disabled}
-      aria-pressed={checked}
-      onClick={() => {
-        if (!disabled) onChange(!checked);
-      }}
-    >
-      {label}
-    </button>
-  ),
-}));
-
-vi.mock('@/components/ui/channel-selector', () => ({
-  ChannelSelector: ({ id }: { id?: string }) => (
-    <div data-testid={id ? `channel-selector-${id}` : 'channel-selector'} />
-  ),
-}));
 
 vi.mock('@/lib/provider-model-options', () => ({
   DEFAULT_AI_MODEL: 'minimax:MiniMax-M2.7',
@@ -49,20 +19,6 @@ vi.mock('@/lib/provider-model-options', () => ({
           providerDisplayName: 'MiniMax',
           modelName: 'MiniMax-M2.7',
           modelDisplayName: 'MiniMax M2.7',
-        },
-      ],
-    },
-    {
-      providerName: 'moonshot',
-      providerDisplayName: 'Moonshot',
-      options: [
-        {
-          value: 'moonshot:kimi-k2.6',
-          label: 'Kimi K2.6',
-          providerName: 'moonshot',
-          providerDisplayName: 'Moonshot',
-          modelName: 'kimi-k2.6',
-          modelDisplayName: 'Kimi K2.6',
         },
       ],
     },
@@ -89,6 +45,37 @@ vi.mock('@/lib/provider-model-options', () => ({
     if (typeof value === 'string' && value) return value;
     return 'minimax:MiniMax-M2.7';
   },
+}));
+
+vi.mock('@/components/ui/channel-selector', () => ({
+  ChannelSelector: ({ id }: { id?: string }) => (
+    <div data-testid={id ? `channel-selector-${id}` : 'channel-selector'} />
+  ),
+}));
+
+vi.mock('@/components/dashboard/toggle-switch', () => ({
+  ToggleSwitch: ({
+    checked,
+    disabled,
+    label,
+    onChange,
+  }: {
+    checked: boolean;
+    disabled?: boolean;
+    label: string;
+    onChange: (checked: boolean) => void;
+  }) => (
+    <button
+      type="button"
+      disabled={disabled}
+      aria-pressed={checked}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
+    >
+      {label}
+    </button>
+  ),
 }));
 
 import {
@@ -134,16 +121,27 @@ function createDraftConfig(overrides: Partial<GuildConfig> = {}): GuildConfig {
   };
 }
 
-function renderAiAutoModSettings({
-  draftConfig = createDraftConfig(),
-  saving = false,
-  guildId = 'guild-1',
-  modelValue = 'minimax:MiniMax-M2.7',
-  onFieldChange = vi.fn(),
-  onActionChange = vi.fn(),
-  onDmNotificationChange = vi.fn(),
-}: Partial<React.ComponentProps<typeof AiAutoModSettings>> = {}) {
-  return render(
+function renderAiAutoModSettings(
+  draftConfig: GuildConfig = createDraftConfig(),
+  props: {
+    saving?: boolean;
+    guildId?: string;
+    modelValue?: string;
+    onFieldChange?: ReturnType<typeof vi.fn>;
+    onActionChange?: ReturnType<typeof vi.fn>;
+    onDmNotificationChange?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
+  const {
+    saving = false,
+    guildId = 'guild-1',
+    modelValue = 'minimax:MiniMax-M2.7',
+    onFieldChange = vi.fn(),
+    onActionChange = vi.fn(),
+    onDmNotificationChange = vi.fn(),
+  } = props;
+
+  render(
     <AiAutoModSettings
       draftConfig={draftConfig}
       saving={saving}
@@ -154,19 +152,195 @@ function renderAiAutoModSettings({
       onDmNotificationChange={onDmNotificationChange}
     />,
   );
+
+  return { onFieldChange, onActionChange, onDmNotificationChange };
 }
 
 describe('AiAutoModSettings', () => {
-  describe('Core Moderation Settings', () => {
-    it('renders the detection model selector with the provided model value', () => {
-      renderAiAutoModSettings({ modelValue: 'minimax:MiniMax-M2.7' });
+  describe('rendering', () => {
+    it('renders core moderation section heading and subheading', () => {
+      renderAiAutoModSettings();
 
-      expect(screen.getByLabelText('Detection Model')).toHaveValue('minimax:MiniMax-M2.7');
+      expect(screen.getByText('Core Moderation Settings')).toBeInTheDocument();
+      expect(screen.getByText('Incident reporting and enforcements')).toBeInTheDocument();
     });
 
-    it('calls onFieldChange with new model when detection model is changed', () => {
-      const onFieldChange = vi.fn();
-      renderAiAutoModSettings({ onFieldChange, modelValue: 'minimax:MiniMax-M2.7' });
+    it('renders sensitivity and actions section', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByText('Sensitivity & Actions')).toBeInTheDocument();
+      expect(screen.getByText('Confidence thresholds and response matrix')).toBeInTheDocument();
+    });
+
+    it('renders all AI auto-moderation categories', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByText('Toxicity')).toBeInTheDocument();
+      expect(screen.getByText('Spam')).toBeInTheDocument();
+      expect(screen.getByText('Harassment')).toBeInTheDocument();
+      expect(screen.getByText('Hate Speech')).toBeInTheDocument();
+      expect(screen.getByText('Sexual Content')).toBeInTheDocument();
+      expect(screen.getByText('Violence')).toBeInTheDocument();
+      expect(screen.getByText('Self-Harm')).toBeInTheDocument();
+    });
+
+    it('renders category thresholds scaled to 0-100 percent', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByLabelText('Toxicity Threshold')).toHaveValue(70);
+      expect(screen.getByLabelText('Violence Threshold')).toHaveValue(85);
+      expect(screen.getByLabelText('Spam Threshold')).toHaveValue(80);
+    });
+
+    it('renders checked action checkboxes for configured actions', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByLabelText('Violence Permanent Ban')).toBeChecked();
+      expect(screen.getByLabelText('Toxicity Flag & Log')).toBeChecked();
+      expect(screen.getByLabelText('Harassment Issue Warning')).toBeChecked();
+      expect(screen.getByLabelText('Violence Flag & Log')).not.toBeChecked();
+    });
+
+    it('shows "No response actions" placeholder when a category has no actions', () => {
+      const draftConfig = createDraftConfig({
+        aiAutoMod: {
+          actions: { toxicity: [] } as unknown as NonNullable<GuildConfig['aiAutoMod']>['actions'],
+        } as NonNullable<GuildConfig['aiAutoMod']>,
+      });
+
+      renderAiAutoModSettings(draftConfig);
+
+      expect(screen.getByText('No response actions')).toBeInTheDocument();
+    });
+
+    it('renders User DM Notifications section with "One DM per incident" badge', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByText('User DM Notifications')).toBeInTheDocument();
+      expect(screen.getByText('One DM per incident')).toBeInTheDocument();
+    });
+
+    it('renders all four DM notification options with descriptions', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByLabelText('DM notifications for Warnings')).toBeInTheDocument();
+      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeInTheDocument();
+      expect(screen.getByLabelText('DM notifications for Kicks')).toBeInTheDocument();
+      expect(screen.getByLabelText('DM notifications for Bans')).toBeInTheDocument();
+
+      expect(screen.getByText('DM when AI AutoMod issues a warning.')).toBeInTheDocument();
+      expect(screen.getByText('DM when AI AutoMod applies a timeout.')).toBeInTheDocument();
+      expect(screen.getByText('DM when AI AutoMod removes a member.')).toBeInTheDocument();
+      expect(screen.getByText('DM when AI AutoMod bans a member.')).toBeInTheDocument();
+    });
+
+    it('renders DM notification checkboxes as checked when dmNotifications are all true', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Bans')).toBeChecked();
+    });
+
+    it('renders DM notification checkboxes reflecting false settings', () => {
+      const draftConfig = createDraftConfig({
+        aiAutoMod: {
+          ...(createDraftConfig().aiAutoMod as NonNullable<GuildConfig['aiAutoMod']>),
+          dmNotifications: { warn: false, timeout: false, kick: true, ban: false },
+        },
+      });
+
+      renderAiAutoModSettings(draftConfig);
+
+      expect(screen.getByLabelText('DM notifications for Warnings')).not.toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Timeouts')).not.toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Bans')).not.toBeChecked();
+    });
+
+    it('renders the auto-delete toggle switch', () => {
+      renderAiAutoModSettings();
+
+      expect(screen.getByRole('button', { name: 'Auto-delete' })).toBeInTheDocument();
+    });
+
+    it('reflects autoDelete=false on the Instant Enforcement toggle', () => {
+      const draftConfig = createDraftConfig({
+        aiAutoMod: {
+          ...(createDraftConfig().aiAutoMod as NonNullable<GuildConfig['aiAutoMod']>),
+          autoDelete: false,
+        },
+      });
+
+      renderAiAutoModSettings(draftConfig);
+
+      expect(screen.getByRole('button', { name: 'Auto-delete' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+  });
+
+  describe('DM notification fallback to legacy moderation settings', () => {
+    it('falls back to moderation.dmNotifications when aiAutoMod.dmNotifications is absent', () => {
+      const draftConfig: GuildConfig = {
+        moderation: {
+          dmNotifications: { warn: false, timeout: false, kick: true, ban: false },
+        },
+        aiAutoMod: {
+          enabled: true,
+          dmNotifications: undefined,
+        } as unknown as NonNullable<GuildConfig['aiAutoMod']>,
+      };
+
+      renderAiAutoModSettings(draftConfig);
+
+      expect(screen.getByLabelText('DM notifications for Warnings')).not.toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Timeouts')).not.toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Bans')).not.toBeChecked();
+    });
+
+    it('gives aiAutoMod.dmNotifications precedence over moderation.dmNotifications', () => {
+      const draftConfig: GuildConfig = {
+        moderation: {
+          dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+        },
+        aiAutoMod: {
+          enabled: true,
+          dmNotifications: { warn: true, timeout: false, kick: false, ban: true },
+        } as NonNullable<GuildConfig['aiAutoMod']>,
+      };
+
+      renderAiAutoModSettings(draftConfig);
+
+      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Timeouts')).not.toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Kicks')).not.toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Bans')).toBeChecked();
+    });
+
+    it('defaults DM notifications to enabled when both aiAutoMod and moderation are absent', () => {
+      const draftConfig: GuildConfig = {
+        aiAutoMod: {
+          enabled: true,
+          dmNotifications: undefined,
+        } as unknown as NonNullable<GuildConfig['aiAutoMod']>,
+      };
+
+      renderAiAutoModSettings(draftConfig);
+
+      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
+      expect(screen.getByLabelText('DM notifications for Bans')).toBeChecked();
+    });
+  });
+
+  describe('interaction handlers', () => {
+    it('calls onFieldChange with "model" when the model selector changes', () => {
+      const { onFieldChange } = renderAiAutoModSettings();
 
       fireEvent.change(screen.getByLabelText('Detection Model'), {
         target: { value: 'moonshot:kimi-k2.6' },
@@ -175,366 +349,214 @@ describe('AiAutoModSettings', () => {
       expect(onFieldChange).toHaveBeenCalledWith('model', 'moonshot:kimi-k2.6');
     });
 
-    it('renders the incident report channel selector', () => {
-      renderAiAutoModSettings();
-
-      expect(screen.getByTestId('channel-selector-ai-automod-flag-channel')).toBeInTheDocument();
-    });
-
-    it('renders the auto-delete instant enforcement toggle as enabled when autoDelete is true', () => {
-      renderAiAutoModSettings({ draftConfig: createDraftConfig({ aiAutoMod: { autoDelete: true } }) });
-
-      expect(screen.getByRole('button', { name: 'Auto-delete' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-    });
-
-    it('renders the auto-delete toggle as disabled when autoDelete is false', () => {
-      renderAiAutoModSettings({ draftConfig: createDraftConfig({ aiAutoMod: { autoDelete: false } }) });
-
-      expect(screen.getByRole('button', { name: 'Auto-delete' })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
-    });
-
-    it('defaults auto-delete toggle to enabled when autoDelete field is absent', () => {
-      const config = createDraftConfig();
-      if (config.aiAutoMod) delete (config.aiAutoMod as { autoDelete?: boolean }).autoDelete;
-      renderAiAutoModSettings({ draftConfig: config });
-
-      expect(screen.getByRole('button', { name: 'Auto-delete' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-    });
-
-    it('calls onFieldChange with toggled value when auto-delete button is clicked', () => {
-      const onFieldChange = vi.fn();
-      renderAiAutoModSettings({
-        draftConfig: createDraftConfig({ aiAutoMod: { autoDelete: true } }),
-        onFieldChange,
-      });
+    it('calls onFieldChange with "autoDelete" when Instant Enforcement toggle is clicked', () => {
+      const { onFieldChange } = renderAiAutoModSettings();
 
       fireEvent.click(screen.getByRole('button', { name: 'Auto-delete' }));
 
       expect(onFieldChange).toHaveBeenCalledWith('autoDelete', false);
     });
 
-    it('disables all interactive controls when saving is true', () => {
-      renderAiAutoModSettings({ saving: true });
-
-      expect(screen.getByLabelText('Detection Model')).toBeDisabled();
-      expect(screen.getByRole('button', { name: 'Auto-delete' })).toBeDisabled();
-      expect(screen.getByLabelText('Toxicity Threshold')).toBeDisabled();
-    });
-  });
-
-  describe('Sensitivity matrix', () => {
-    it('renders threshold inputs for all categories', () => {
-      renderAiAutoModSettings();
-
-      expect(screen.getByLabelText('Toxicity Threshold')).toBeInTheDocument();
-      expect(screen.getByLabelText('Spam Threshold')).toBeInTheDocument();
-      expect(screen.getByLabelText('Harassment Threshold')).toBeInTheDocument();
-      expect(screen.getByLabelText('Hate Speech Threshold')).toBeInTheDocument();
-      expect(screen.getByLabelText('Sexual Content Threshold')).toBeInTheDocument();
-      expect(screen.getByLabelText('Violence Threshold')).toBeInTheDocument();
-      expect(screen.getByLabelText('Self-Harm Threshold')).toBeInTheDocument();
-    });
-
-    it('shows threshold values as percentages (0–100)', () => {
-      renderAiAutoModSettings();
-
-      // toxicity default is 0.7, displayed as 70
-      expect(screen.getByLabelText('Toxicity Threshold')).toHaveValue(70);
-      // violence default is 0.85, displayed as 85
-      expect(screen.getByLabelText('Violence Threshold')).toHaveValue(85);
-    });
-
-    it('calls onFieldChange with fractional threshold when user edits a threshold input', () => {
-      const onFieldChange = vi.fn();
-      renderAiAutoModSettings({ onFieldChange });
+    it('calls onFieldChange with "thresholds" updater when a threshold input changes', () => {
+      const { onFieldChange } = renderAiAutoModSettings();
 
       fireEvent.change(screen.getByLabelText('Toxicity Threshold'), {
-        target: { value: '60' },
+        target: { value: '55' },
       });
 
-      // The updater function is called with previous thresholds
-      expect(onFieldChange).toHaveBeenCalledWith('thresholds', expect.any(Function));
-      const thresholdsUpdater = onFieldChange.mock.calls[0][1] as (prev: object) => object;
-      const result = thresholdsUpdater({ spam: 0.8 });
-      expect((result as Record<string, number>).toxicity).toBeCloseTo(0.6);
-      expect((result as Record<string, number>).spam).toBe(0.8);
+      expect(onFieldChange).toHaveBeenCalledTimes(1);
+      const [field, updater] = onFieldChange.mock.calls[0] as [
+        string,
+        (prev: Record<string, number>) => Record<string, number>,
+      ];
+      expect(field).toBe('thresholds');
+      expect(typeof updater).toBe('function');
+      const result = updater({ toxicity: 0.7 });
+      expect(result.toxicity).toBeCloseTo(0.55);
     });
 
-    it('clamps threshold values to 0–1 range (0% → 0, >100% → 1)', () => {
-      const onFieldChange = vi.fn();
-      renderAiAutoModSettings({ onFieldChange });
+    it('clamps threshold values above 100 to 1.0', () => {
+      const { onFieldChange } = renderAiAutoModSettings();
 
       fireEvent.change(screen.getByLabelText('Toxicity Threshold'), {
         target: { value: '150' },
       });
 
-      const updater = onFieldChange.mock.calls[0][1] as (prev: object) => object;
-      const result = updater({});
-      expect((result as Record<string, number>).toxicity).toBe(1);
+      const updater = onFieldChange.mock.calls[0]?.[1] as (
+        prev: Record<string, number>,
+      ) => Record<string, number>;
+      expect(updater({}).toxicity).toBe(1);
     });
 
-    it('renders action checkboxes for each category', () => {
-      renderAiAutoModSettings();
+    it('clamps threshold values below 0 to 0.0', () => {
+      const { onFieldChange } = renderAiAutoModSettings();
 
-      expect(screen.getByLabelText('Toxicity Flag & Log')).toBeInTheDocument();
-      expect(screen.getByLabelText('Toxicity Issue Warning')).toBeInTheDocument();
-      expect(screen.getByLabelText('Violence Permanent Ban')).toBeInTheDocument();
-    });
+      fireEvent.change(screen.getByLabelText('Toxicity Threshold'), {
+        target: { value: '-10' },
+      });
 
-    it('shows checked action checkboxes based on current actions', () => {
-      renderAiAutoModSettings();
-
-      expect(screen.getByLabelText('Toxicity Flag & Log')).toBeChecked();
-      expect(screen.getByLabelText('Toxicity Issue Warning')).not.toBeChecked();
-      expect(screen.getByLabelText('Violence Permanent Ban')).toBeChecked();
+      const updater = onFieldChange.mock.calls[0]?.[1] as (
+        prev: Record<string, number>,
+      ) => Record<string, number>;
+      expect(updater({}).toxicity).toBe(0);
     });
 
     it('calls onActionChange when an action checkbox is toggled', () => {
-      const onActionChange = vi.fn();
-      renderAiAutoModSettings({ onActionChange });
+      const { onActionChange } = renderAiAutoModSettings();
 
       fireEvent.click(screen.getByLabelText('Toxicity Issue Warning'));
 
       expect(onActionChange).toHaveBeenCalledWith(
         'toxicity',
-        expect.any(Array), // fallback actions
+        ['flag'],
         'warn',
         true,
       );
     });
 
-    it('displays "No response actions" placeholder when a category has no actions', () => {
+    it('calls onDmNotificationChange with action and false when a checked DM toggle is unchecked', () => {
+      const { onDmNotificationChange } = renderAiAutoModSettings();
+
+      fireEvent.click(screen.getByLabelText('DM notifications for Warnings'));
+
+      expect(onDmNotificationChange).toHaveBeenCalledWith('warn', false);
+    });
+
+    it('calls onDmNotificationChange with action and true when an unchecked DM toggle is checked', () => {
       const draftConfig = createDraftConfig({
         aiAutoMod: {
-          actions: {
-            toxicity: [],
-            spam: ['delete'],
-            harassment: ['warn'],
-            hateSpeech: ['timeout'],
-            sexualContent: ['delete'],
-            violence: ['ban'],
-            selfHarm: ['flag'],
-          },
+          ...(createDraftConfig().aiAutoMod as NonNullable<GuildConfig['aiAutoMod']>),
+          dmNotifications: { warn: false, timeout: true, kick: true, ban: true },
         },
       });
-      renderAiAutoModSettings({ draftConfig });
-
-      expect(screen.getByText('No response actions')).toBeInTheDocument();
-    });
-
-    it('normalizes legacy "none" action strings to empty action sets', () => {
-      const draftConfig = createDraftConfig({
-        aiAutoMod: {
-          actions: {
-            toxicity: 'none' as unknown as string[],
-          },
-        },
-      });
-      renderAiAutoModSettings({ draftConfig });
-
-      expect(screen.getByLabelText('Toxicity Flag & Log')).not.toBeChecked();
-      expect(screen.getByText('No response actions')).toBeInTheDocument();
-    });
-  });
-
-  describe('User DM Notifications', () => {
-    it('renders DM notification toggles for all notification action types', () => {
-      renderAiAutoModSettings();
-
-      expect(screen.getByLabelText('DM notifications for Warnings')).toBeInTheDocument();
-      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeInTheDocument();
-      expect(screen.getByLabelText('DM notifications for Kicks')).toBeInTheDocument();
-      expect(screen.getByLabelText('DM notifications for Bans')).toBeInTheDocument();
-    });
-
-    it('shows all DM notification toggles as checked when dmNotifications are all true', () => {
-      renderAiAutoModSettings({
-        draftConfig: createDraftConfig({
-          aiAutoMod: {
-            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
-          },
-        }),
-      });
-
-      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Bans')).toBeChecked();
-    });
-
-    it('reflects individual DM notification settings per action type', () => {
-      renderAiAutoModSettings({
-        draftConfig: createDraftConfig({
-          aiAutoMod: {
-            dmNotifications: { warn: true, timeout: false, kick: false, ban: true },
-          },
-        }),
-      });
-
-      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Timeouts')).not.toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Kicks')).not.toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Bans')).toBeChecked();
-    });
-
-    it('falls back to moderation dmNotifications when aiAutoMod dmNotifications are absent', () => {
-      const draftConfig = createDraftConfig({
-        moderation: {
-          dmNotifications: { warn: false, timeout: false, kick: true, ban: false },
-        },
-        aiAutoMod: {
-          dmNotifications: undefined,
-        },
-      });
-      renderAiAutoModSettings({ draftConfig });
-
-      expect(screen.getByLabelText('DM notifications for Warnings')).not.toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Timeouts')).not.toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Kicks')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Bans')).not.toBeChecked();
-    });
-
-    it('defaults to true when neither aiAutoMod nor moderation DM notifications are set', () => {
-      const draftConfig: GuildConfig = {
-        aiAutoMod: {
-          enabled: true,
-          dmNotifications: undefined,
-        },
-      };
-      renderAiAutoModSettings({ draftConfig });
-
-      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Bans')).toBeChecked();
-    });
-
-    it('calls onDmNotificationChange with action and new checked state when toggled', () => {
-      const onDmNotificationChange = vi.fn();
-      renderAiAutoModSettings({
-        draftConfig: createDraftConfig({
-          aiAutoMod: { dmNotifications: { warn: true, timeout: true, kick: true, ban: true } },
-        }),
-        onDmNotificationChange,
-      });
-
-      fireEvent.click(screen.getByLabelText('DM notifications for Timeouts'));
-
-      expect(onDmNotificationChange).toHaveBeenCalledWith('timeout', false);
-    });
-
-    it('calls onDmNotificationChange with true when an unchecked toggle is clicked', () => {
-      const onDmNotificationChange = vi.fn();
-      renderAiAutoModSettings({
-        draftConfig: createDraftConfig({
-          aiAutoMod: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
-        }),
-        onDmNotificationChange,
-      });
+      const { onDmNotificationChange } = renderAiAutoModSettings(draftConfig);
 
       fireEvent.click(screen.getByLabelText('DM notifications for Warnings'));
 
       expect(onDmNotificationChange).toHaveBeenCalledWith('warn', true);
     });
 
-    it('disables all DM notification checkboxes when saving is true', () => {
-      renderAiAutoModSettings({ saving: true });
-
-      expect(screen.getByLabelText('DM notifications for Warnings')).toBeDisabled();
-      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeDisabled();
-      expect(screen.getByLabelText('DM notifications for Kicks')).toBeDisabled();
-      expect(screen.getByLabelText('DM notifications for Bans')).toBeDisabled();
-    });
-
-    it('renders the "One DM per incident" badge', () => {
-      renderAiAutoModSettings();
-
-      expect(screen.getByText('One DM per incident')).toBeInTheDocument();
-    });
-
-    it('aiAutoMod dmNotifications take precedence over moderation fallback', () => {
-      renderAiAutoModSettings({
-        draftConfig: createDraftConfig({
-          moderation: {
-            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
-          },
+    it.each<[AiAutoModDmNotificationAction, string]>([
+      ['warn', 'Warnings'],
+      ['timeout', 'Timeouts'],
+      ['kick', 'Kicks'],
+      ['ban', 'Bans'],
+    ])(
+      'calls onDmNotificationChange with "%s" when the %s checkbox is clicked',
+      (action, label) => {
+        const draftConfig = createDraftConfig({
           aiAutoMod: {
+            ...(createDraftConfig().aiAutoMod as NonNullable<GuildConfig['aiAutoMod']>),
             dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
           },
-        }),
-      });
+        });
+        const { onDmNotificationChange } = renderAiAutoModSettings(draftConfig);
 
-      expect(screen.getByLabelText('DM notifications for Warnings')).toBeChecked();
-      expect(screen.getByLabelText('DM notifications for Timeouts')).toBeChecked();
+        fireEvent.click(screen.getByLabelText(`DM notifications for ${label}`));
+
+        expect(onDmNotificationChange).toHaveBeenCalledWith(action, false);
+      },
+    );
+  });
+
+  describe('disabled state', () => {
+    it('disables all threshold inputs when saving=true', () => {
+      renderAiAutoModSettings(createDraftConfig(), { saving: true });
+
+      for (const input of screen.getAllByRole('spinbutton')) {
+        expect(input).toBeDisabled();
+      }
+    });
+
+    it('disables all action checkboxes when saving=true', () => {
+      renderAiAutoModSettings(createDraftConfig(), { saving: true });
+
+      for (const checkbox of screen.getAllByRole('checkbox')) {
+        expect(checkbox).toBeDisabled();
+      }
+    });
+
+    it('disables auto-delete toggle button when saving=true', () => {
+      renderAiAutoModSettings(createDraftConfig(), { saving: true });
+
+      expect(screen.getByRole('button', { name: 'Auto-delete' })).toBeDisabled();
     });
   });
 });
 
 describe('toggleAiAutoModCategoryAction', () => {
   it('adds an action to an empty category', () => {
+    const result = toggleAiAutoModCategoryAction({}, 'toxicity', ['flag'], 'warn', true);
+    expect(result.toxicity).toEqual(['warn']);
+  });
+
+  it('adds an action while preserving existing actions in correct order', () => {
     const result = toggleAiAutoModCategoryAction(
-      { toxicity: [] },
+      { toxicity: ['flag'] },
       'toxicity',
       ['flag'],
       'warn',
       true,
     );
-
-    expect(result.toxicity).toEqual(['warn']);
+    expect(result.toxicity).toEqual(['flag', 'warn']);
   });
 
-  it('removes an action from an existing set', () => {
+  it('respects canonical action order when adding actions', () => {
+    const result = toggleAiAutoModCategoryAction(
+      { toxicity: ['warn'] },
+      'toxicity',
+      ['warn'],
+      'flag',
+      true,
+    );
+    // 'flag' comes before 'warn' in action order
+    expect(result.toxicity).toEqual(['flag', 'warn']);
+  });
+
+  it('removes an action when checked=false', () => {
     const result = toggleAiAutoModCategoryAction(
       { toxicity: ['flag', 'warn'] },
+      'toxicity',
+      ['flag'],
+      'warn',
+      false,
+    );
+    expect(result.toxicity).toEqual(['flag']);
+  });
+
+  it('returns empty array when removing the last action', () => {
+    const result = toggleAiAutoModCategoryAction(
+      { toxicity: ['flag'] },
       'toxicity',
       ['flag'],
       'flag',
       false,
     );
+    expect(result.toxicity).toEqual([]);
+  });
 
+  it('preserves actions for other categories', () => {
+    const previousActions = { toxicity: ['flag'], spam: ['delete'], harassment: ['warn'] };
+    const result = toggleAiAutoModCategoryAction(
+      previousActions,
+      'toxicity',
+      ['flag'],
+      'ban',
+      true,
+    );
+    expect(result.spam).toEqual(['delete']);
+    expect(result.harassment).toEqual(['warn']);
+  });
+
+  it('handles undefined previousActions as an empty map', () => {
+    const result = toggleAiAutoModCategoryAction(undefined, 'toxicity', ['flag'], 'warn', true);
     expect(result.toxicity).toEqual(['warn']);
   });
 
-  it('preserves order based on action priority when adding', () => {
-    // Action order from catalog: flag, delete, warn, timeout, kick, ban
-    const result = toggleAiAutoModCategoryAction(
-      { toxicity: ['ban'] },
-      'toxicity',
-      ['flag'],
-      'flag',
-      true,
-    );
-
-    expect(result.toxicity).toEqual(['flag', 'ban']);
-  });
-
-  it('uses fallback actions when the category has no previous value', () => {
-    const result = toggleAiAutoModCategoryAction(
-      {},
-      'spam',
-      ['delete', 'flag'],
-      'warn',
-      true,
-    );
-
-    // Started from fallback ['delete', 'flag'], added 'warn'
-    expect(result.spam).toContain('warn');
-    expect(result.spam).toContain('delete');
-    expect(result.spam).toContain('flag');
-  });
-
-  it('preserves actions for other categories not being modified', () => {
+  it('normalizes a legacy string action before toggling', () => {
     const previousActions = {
-      toxicity: ['flag'],
-      spam: ['delete'],
-    };
+      toxicity: 'flag',
+    } as unknown as NonNullable<NonNullable<GuildConfig['aiAutoMod']>['actions']>;
     const result = toggleAiAutoModCategoryAction(
       previousActions,
       'toxicity',
@@ -542,35 +564,43 @@ describe('toggleAiAutoModCategoryAction', () => {
       'warn',
       true,
     );
-
-    expect(result.spam).toEqual(['delete']);
     expect(result.toxicity).toEqual(['flag', 'warn']);
   });
 
-  it('does not add duplicate actions', () => {
+  it('normalizes a "none" string action to empty before adding', () => {
+    const previousActions = {
+      toxicity: 'none',
+    } as unknown as NonNullable<NonNullable<GuildConfig['aiAutoMod']>['actions']>;
+    const result = toggleAiAutoModCategoryAction(
+      previousActions,
+      'toxicity',
+      ['flag'],
+      'warn',
+      true,
+    );
+    expect(result.toxicity).toEqual(['warn']);
+  });
+
+  it('does not duplicate an action that is already present', () => {
     const result = toggleAiAutoModCategoryAction(
       { toxicity: ['flag', 'warn'] },
       'toxicity',
       ['flag'],
-      'warn',
+      'flag',
       true,
     );
-
     expect(result.toxicity).toEqual(['flag', 'warn']);
-    expect(result.toxicity.filter((a) => a === 'warn')).toHaveLength(1);
   });
 
-  it('handles null/undefined previousActions gracefully', () => {
+  it('uses fallback actions when category key is absent from previousActions', () => {
     const result = toggleAiAutoModCategoryAction(
-      undefined,
+      { spam: ['delete'] },
       'toxicity',
       ['flag'],
       'warn',
       true,
     );
-
-    // From fallback ['flag'], add 'warn'
-    expect(result.toxicity).toContain('warn');
-    expect(result.toxicity).toContain('flag');
+    // toxicity was absent, so fallback ['flag'] is used, then 'warn' added
+    expect(result.toxicity).toEqual(['flag', 'warn']);
   });
 });

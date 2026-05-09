@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { GuildConfig } from '@/components/dashboard/config-editor-utils';
+import type { ChannelMode } from '@/types/config';
 
 vi.mock('@/components/dashboard/system-prompt-editor', () => ({
   SystemPromptEditor: ({
@@ -10,14 +11,14 @@ vi.mock('@/components/dashboard/system-prompt-editor', () => ({
     maxLength,
   }: {
     value: string;
-    onChange: (value: string) => void;
+    onChange: (v: string) => void;
     disabled?: boolean;
     maxLength?: number;
   }) => (
     <textarea
       aria-label="system prompt"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(event) => onChange(event.target.value)}
       disabled={disabled}
       maxLength={maxLength}
     />
@@ -36,28 +37,40 @@ vi.mock('@/components/dashboard/config-sections/ChannelModeSection', () => ({
 
 import { AiChatSettings } from '@/components/dashboard/config-categories/ai-chat-settings';
 
-function createDraftConfig(overrides: Partial<GuildConfig> = {}): GuildConfig {
+function createDefaultDraftConfig(overrides: Partial<GuildConfig> = {}): GuildConfig {
   return {
     ai: {
       enabled: true,
-      systemPrompt: 'Test prompt',
+      systemPrompt: 'You are a helpful assistant.',
       blockedChannelIds: [],
     },
     ...overrides,
   };
 }
 
-function renderAiChatSettings({
-  draftConfig = createDraftConfig(),
-  saving = false,
-  guildId = 'guild-1',
-  onSystemPromptChange = vi.fn(),
-  onBlockedChannelsChange = vi.fn(),
-  onChannelModeChange = vi.fn(),
-  onDefaultChannelModeChange = vi.fn(),
-  onResetAllChannelModes = vi.fn(),
-}: Partial<React.ComponentProps<typeof AiChatSettings>> = {}) {
-  return render(
+function renderAiChatSettings(
+  draftConfig: GuildConfig = createDefaultDraftConfig(),
+  props: {
+    saving?: boolean;
+    guildId?: string;
+    onSystemPromptChange?: ReturnType<typeof vi.fn>;
+    onBlockedChannelsChange?: ReturnType<typeof vi.fn>;
+    onChannelModeChange?: ReturnType<typeof vi.fn>;
+    onDefaultChannelModeChange?: ReturnType<typeof vi.fn>;
+    onResetAllChannelModes?: ReturnType<typeof vi.fn>;
+  } = {},
+) {
+  const {
+    saving = false,
+    guildId = 'guild-1',
+    onSystemPromptChange = vi.fn(),
+    onBlockedChannelsChange = vi.fn(),
+    onChannelModeChange = vi.fn(),
+    onDefaultChannelModeChange = vi.fn(),
+    onResetAllChannelModes = vi.fn(),
+  } = props;
+
+  render(
     <AiChatSettings
       draftConfig={draftConfig}
       saving={saving}
@@ -69,63 +82,70 @@ function renderAiChatSettings({
       onResetAllChannelModes={onResetAllChannelModes}
     />,
   );
+
+  return {
+    onSystemPromptChange,
+    onBlockedChannelsChange,
+    onChannelModeChange,
+    onDefaultChannelModeChange,
+    onResetAllChannelModes,
+  };
 }
 
 describe('AiChatSettings', () => {
   it('renders the system prompt editor with the current system prompt value', () => {
-    renderAiChatSettings({
-      draftConfig: createDraftConfig({ ai: { systemPrompt: 'Hello, I am your assistant.' } }),
-    });
+    renderAiChatSettings();
 
-    expect(screen.getByLabelText('system prompt')).toHaveValue('Hello, I am your assistant.');
+    expect(screen.getByLabelText('system prompt')).toHaveValue('You are a helpful assistant.');
   });
 
-  it('renders with empty system prompt when systemPrompt is not set', () => {
-    const draftConfig: GuildConfig = { ai: {} };
-    renderAiChatSettings({ draftConfig });
+  it('renders the system prompt editor with an empty string when systemPrompt is absent', () => {
+    const draftConfig = createDefaultDraftConfig({ ai: { enabled: true } });
+
+    renderAiChatSettings(draftConfig);
 
     expect(screen.getByLabelText('system prompt')).toHaveValue('');
   });
 
   it('renders the blocked channels selector when guildId is provided', () => {
-    renderAiChatSettings({ guildId: 'guild-1' });
+    renderAiChatSettings();
 
     expect(screen.getByTestId('channel-selector-ai-blocked-channels')).toBeInTheDocument();
   });
 
   it('renders the channel mode section when guildId is provided', () => {
-    renderAiChatSettings({ guildId: 'guild-1' });
+    renderAiChatSettings();
 
     expect(screen.getByTestId('channel-mode-section')).toBeInTheDocument();
   });
 
-  it('does not render the blocked channels selector when guildId is empty', () => {
-    renderAiChatSettings({ guildId: '' });
+  it('does not render the blocked channels or channel mode section when guildId is empty', () => {
+    renderAiChatSettings(createDefaultDraftConfig(), { guildId: '' });
 
     expect(screen.queryByTestId('channel-selector-ai-blocked-channels')).not.toBeInTheDocument();
-  });
-
-  it('does not render the channel mode section when guildId is empty', () => {
-    renderAiChatSettings({ guildId: '' });
-
     expect(screen.queryByTestId('channel-mode-section')).not.toBeInTheDocument();
   });
 
-  it('disables the system prompt editor when saving is true', () => {
-    renderAiChatSettings({ saving: true });
-
-    expect(screen.getByLabelText('system prompt')).toBeDisabled();
-  });
-
-  it('renders a "Response Boundaries" section heading when guildId is provided', () => {
-    renderAiChatSettings({ guildId: 'guild-1' });
+  it('renders Response Boundaries section heading when guildId is provided', () => {
+    renderAiChatSettings();
 
     expect(screen.getByText('Response Boundaries')).toBeInTheDocument();
   });
 
-  it('passes all required props through without errors when config is empty', () => {
-    const draftConfig: GuildConfig = {};
-    expect(() => renderAiChatSettings({ draftConfig })).not.toThrow();
-    expect(screen.getByLabelText('system prompt')).toBeInTheDocument();
+  it('passes saving=true to the system prompt editor to disable it', () => {
+    renderAiChatSettings(createDefaultDraftConfig(), { saving: true });
+
+    expect(screen.getByLabelText('system prompt')).toBeDisabled();
+  });
+
+  it('passes onSystemPromptChange through to the system prompt editor', () => {
+    const onSystemPromptChange = vi.fn();
+    renderAiChatSettings(createDefaultDraftConfig(), { onSystemPromptChange });
+
+    fireEvent.change(screen.getByLabelText('system prompt'), {
+      target: { value: 'New prompt' },
+    });
+
+    expect(onSystemPromptChange).toHaveBeenCalledWith('New prompt');
   });
 });

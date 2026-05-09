@@ -1192,4 +1192,168 @@ describe('modules/config', () => {
       expect(configModule.getConfig().ai).toEqual({ enabled: true, model: 'test-model' });
     });
   });
+
+  describe('setMultipleConfigValues', () => {
+    it('should not persist derived AI AutoMod DM fallback when patching aiAutoMod without dmNotifications', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: { enabled: false, model: 'test-model' },
+        }),
+      );
+      const mockClient = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockResolvedValueOnce({ rows: [] }) // SELECT existing aiAutoMod row (missing)
+          .mockResolvedValueOnce({}) // INSERT
+          .mockResolvedValueOnce({}), // COMMIT
+        release: vi.fn(),
+      };
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
+            },
+          ],
+        }),
+        connect: vi.fn().mockResolvedValue(mockClient),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      await configModule.loadConfig();
+      await configModule.setMultipleConfigValues([
+        { path: 'aiAutoMod.enabled', value: true },
+        { path: 'aiAutoMod.autoDelete', value: false },
+      ]);
+
+      const insertCall = mockClient.query.mock.calls.find((call) =>
+        call[0].startsWith('INSERT INTO config'),
+      );
+      const persistedValue = JSON.parse(insertCall[1][2]);
+      expect(persistedValue).not.toHaveProperty('dmNotifications');
+    });
+
+    it('should persist dmNotifications when they are explicitly included in patches', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: { enabled: false, model: 'test-model' },
+        }),
+      );
+      const mockClient = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockResolvedValueOnce({ rows: [] }) // SELECT existing aiAutoMod row (missing)
+          .mockResolvedValueOnce({}) // INSERT
+          .mockResolvedValueOnce({}), // COMMIT
+        release: vi.fn(),
+      };
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
+            },
+          ],
+        }),
+        connect: vi.fn().mockResolvedValue(mockClient),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      await configModule.loadConfig();
+      await configModule.setMultipleConfigValues([
+        { path: 'aiAutoMod.enabled', value: true },
+        { path: 'aiAutoMod.dmNotifications.warn', value: true },
+      ]);
+
+      const insertCall = mockClient.query.mock.calls.find((call) =>
+        call[0].startsWith('INSERT INTO config'),
+      );
+      const persistedValue = JSON.parse(insertCall[1][2]);
+      expect(persistedValue).toHaveProperty('dmNotifications');
+      expect(persistedValue.dmNotifications).toMatchObject({ warn: true });
+    });
+
+    it('should update in-memory DM fallback when moderation.dmNotifications is patched', async () => {
+      const mod = await importConfigWithMocks({
+        fileContents: JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+          aiAutoMod: { enabled: false },
+        }),
+        getPool: vi.fn(() => {
+          throw new Error('no db');
+        }),
+      });
+
+      await mod.loadConfig();
+
+      await mod.setMultipleConfigValues([
+        { path: 'moderation.dmNotifications.warn', value: false },
+        { path: 'moderation.dmNotifications.ban', value: false },
+      ]);
+
+      expect(mod.getConfig().aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: true,
+        kick: true,
+        ban: false,
+      });
+    });
+
+    it('should mark global AI AutoMod DM notifications as explicit when dmNotifications patch is included', async () => {
+      const mod = await importConfigWithMocks({
+        fileContents: JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+          },
+          aiAutoMod: { enabled: false },
+        }),
+        getPool: vi.fn(() => {
+          throw new Error('no db');
+        }),
+      });
+
+      await mod.loadConfig();
+
+      // Before explicit set, should follow moderation fallback
+      expect(mod.getConfig().aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: false,
+        ban: false,
+      });
+
+      // Explicitly set aiAutoMod DM notifications via setMultipleConfigValues
+      await mod.setMultipleConfigValues([
+        { path: 'aiAutoMod.dmNotifications.warn', value: true },
+      ]);
+
+      // After explicit set, moderation changes should not override the explicit AI DM settings
+      await mod.setMultipleConfigValues([
+        { path: 'moderation.dmNotifications.warn', value: false },
+      ]);
+
+      // The in-memory aiAutoMod.dmNotifications.warn was set to true explicitly, should stay
+      expect(mod.getConfig().aiAutoMod.dmNotifications.warn).toBe(true);
+    });
+  });
+
 });
+
