@@ -59,6 +59,60 @@ let globalConfigGeneration = 0;
 let fileConfigCache = null;
 
 /**
+ * Whether the global config source explicitly set AI AutoMod DM notifications.
+ *
+ * `aiAutoMod.dmNotifications` was added after moderation DM preferences existed. Config default
+ * merging can inject the new AI defaults into older guild configs and make them look explicit.
+ * Track explicit global AI DM settings so guild-level moderation DM preferences can keep falling
+ * back unless an AI-specific override really exists.
+ * @type {boolean}
+ */
+let globalAiAutoModDmNotificationsExplicit = false;
+
+function hasOwn(object, key) {
+  return Object.hasOwn(object, key);
+}
+
+function getExplicitAiAutoModDmNotifications(configSection) {
+  if (!isPlainObject(configSection) || !hasOwn(configSection, 'dmNotifications')) {
+    return undefined;
+  }
+  return configSection.dmNotifications;
+}
+
+function hasExplicitAiAutoModDmNotifications(configSection) {
+  return getExplicitAiAutoModDmNotifications(configSection) !== undefined;
+}
+
+function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
+  const merged = structuredClone(fallbackNotifications);
+
+  if (isPlainObject(overrideNotifications)) {
+    for (const [key, value] of Object.entries(overrideNotifications)) {
+      if (DANGEROUS_KEYS.has(key)) continue;
+      merged[key] = structuredClone(value);
+    }
+  }
+
+  return merged;
+}
+
+function preserveLegacyAiAutoModDmFallback(config, explicitAiDmNotifications) {
+  const moderationDmNotifications = config?.moderation?.dmNotifications;
+  if (!isPlainObject(moderationDmNotifications)) return config;
+
+  if (!isPlainObject(config.aiAutoMod)) {
+    config.aiAutoMod = {};
+  }
+
+  config.aiAutoMod.dmNotifications = overlayDmNotifications(
+    moderationDmNotifications,
+    explicitAiDmNotifications,
+  );
+  return config;
+}
+
+/**
  * Deep merge guild overrides onto global defaults.
  * For each key, if both source and target have plain objects, merge recursively.
  * Otherwise the source (guild override) value wins.
@@ -161,6 +215,7 @@ export async function loadConfig() {
   // previously merged guild snapshots are invalid.
   mergedConfigCache.clear();
   globalConfigGeneration++;
+  globalAiAutoModDmNotificationsExplicit = false;
 
   // Try loading config.json — DB may have valid config even if file is missing
   let fileConfig;
@@ -184,7 +239,9 @@ export async function loadConfig() {
       }
       info('Database not available, using config.json');
       configCache = new Map();
-      configCache.set('global', structuredClone(fileConfig));
+      const fallbackConfig = structuredClone(fileConfig);
+      preserveLegacyAiAutoModDmFallback(fallbackConfig);
+      configCache.set('global', fallbackConfig);
       return configCache.get('global');
     }
 
@@ -218,7 +275,9 @@ export async function loadConfig() {
         await client.query('COMMIT');
         info('Config seeded to database');
         configCache = new Map();
-        configCache.set('global', structuredClone(fileConfig));
+        const seededGlobalConfig = structuredClone(fileConfig);
+        preserveLegacyAiAutoModDmFallback(seededGlobalConfig);
+        configCache.set('global', seededGlobalConfig);
 
         // Load any preexisting guild overrides that were already in the DB.
         // Without this, guild rows fetched above would be silently dropped.
@@ -258,6 +317,9 @@ export async function loadConfig() {
 
       // Build global config, using config.json as defaults for partial DB sections.
       const globalConfig = fileConfig ? structuredClone(fileConfig) : {};
+      globalAiAutoModDmNotificationsExplicit = globalRows.some(
+        (row) => row.key === 'aiAutoMod' && hasExplicitAiAutoModDmNotifications(row.value),
+      );
       for (const row of globalRows) {
         if (DANGEROUS_KEYS.has(row.key)) {
           logWarn('Skipping dangerous config key from database', {
@@ -268,6 +330,9 @@ export async function loadConfig() {
         }
 
         globalConfig[row.key] = mergeDbValueWithDefaults(globalConfig[row.key], row.value);
+      }
+      if (!globalAiAutoModDmNotificationsExplicit) {
+        preserveLegacyAiAutoModDmFallback(globalConfig);
       }
       configCache.set('global', globalConfig);
 
@@ -300,7 +365,9 @@ export async function loadConfig() {
     }
     logError('Failed to load config from database, using config.json', { error: err.message });
     configCache = new Map();
-    configCache.set('global', structuredClone(fileConfig));
+    const fallbackConfig = structuredClone(fileConfig);
+    preserveLegacyAiAutoModDmFallback(fallbackConfig);
+    configCache.set('global', fallbackConfig);
   }
 
   return configCache.get('global');
@@ -358,6 +425,12 @@ export function getConfig(guildId) {
   }
 
   const merged = deepMerge(structuredClone(globalConfig), guildOverrides);
+  if (!globalAiAutoModDmNotificationsExplicit) {
+    preserveLegacyAiAutoModDmFallback(
+      merged,
+      getExplicitAiAutoModDmNotifications(guildOverrides.aiAutoMod),
+    );
+  }
   cacheMergedResult(guildId, merged);
   return structuredClone(merged);
 }
@@ -650,6 +723,18 @@ export async function setConfigValue(path, value, guildId = 'global') {
   }
   setNestedValue(cacheEntry[section], nestedParts, parsedVal);
 
+  if (guildId === 'global') {
+    if (section === 'aiAutoMod' && nestedParts[0] === 'dmNotifications') {
+      globalAiAutoModDmNotificationsExplicit = true;
+    } else if (
+      !globalAiAutoModDmNotificationsExplicit &&
+      (section === 'aiAutoMod' ||
+        (section === 'moderation' && nestedParts[0] === 'dmNotifications'))
+    ) {
+      preserveLegacyAiAutoModDmFallback(cacheEntry);
+    }
+  }
+
   // Invalidate merged config cache for this guild (will be rebuilt on next getConfig)
   // When global config changes, ALL merged entries are stale (they depend on global)
   if (guildId === 'global') {
@@ -773,8 +858,14 @@ export async function setMultipleConfigValues(patches, guildId = 'global') {
       cacheEntry[section] === undefined ? undefined : structuredClone(cacheEntry[section]),
     ]),
   );
+  const setsGlobalAiAutoModDmNotifications =
+    guildId === 'global' &&
+    patches.some((patch) => patch.path.startsWith('aiAutoMod.dmNotifications'));
 
   if (guildId === 'global') {
+    if (setsGlobalAiAutoModDmNotifications) {
+      globalAiAutoModDmNotificationsExplicit = true;
+    }
     mergedConfigCache.clear();
     globalConfigGeneration++;
   } else {
@@ -783,6 +874,18 @@ export async function setMultipleConfigValues(patches, guildId = 'global') {
 
   for (const [section, dbSection] of persistedSections) {
     cacheEntry[section] = structuredClone(dbSection);
+  }
+
+  if (
+    guildId === 'global' &&
+    !globalAiAutoModDmNotificationsExplicit &&
+    !setsGlobalAiAutoModDmNotifications &&
+    patches.some(
+      (patch) =>
+        patch.path.startsWith('aiAutoMod.') || patch.path.startsWith('moderation.dmNotifications'),
+    )
+  ) {
+    preserveLegacyAiAutoModDmFallback(cacheEntry);
   }
 
   for (const patch of patches) {
@@ -981,6 +1084,16 @@ export async function resetConfig(section, guildId = 'global') {
       }
     }
     info('All config reset to defaults');
+  }
+
+  if (!section || section === 'aiAutoMod') {
+    globalAiAutoModDmNotificationsExplicit = false;
+  }
+  if (
+    !globalAiAutoModDmNotificationsExplicit &&
+    (!section || section === 'aiAutoMod' || section === 'moderation')
+  ) {
+    preserveLegacyAiAutoModDmFallback(globalConfig);
   }
 
   // Global config changed — all guild merged entries are stale

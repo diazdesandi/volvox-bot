@@ -273,6 +273,117 @@ describe('modules/config', () => {
       );
     });
 
+    it('should preserve legacy moderation DM preferences when AI AutoMod DM defaults are merged', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+        }),
+      );
+
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+              },
+            },
+            {
+              guild_id: 'guild-legacy',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+          ],
+        }),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+      const { getAiAutoModConfig } = await import('../../src/modules/aiAutoMod.js');
+
+      await configModule.loadConfig();
+
+      const guildConfig = configModule.getConfig('guild-legacy');
+      expect(guildConfig.aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: false,
+        ban: false,
+      });
+      expect(getAiAutoModConfig(guildConfig).dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: false,
+        ban: false,
+      });
+    });
+
+    it('should keep explicit AI AutoMod DM settings above moderation fallback after merging defaults', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+          aiAutoMod: {
+            enabled: false,
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+        }),
+      );
+
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+              },
+            },
+            {
+              guild_id: 'guild-explicit-ai-dm',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+            {
+              guild_id: 'guild-explicit-ai-dm',
+              key: 'aiAutoMod',
+              value: {
+                dmNotifications: { warn: true, ban: true },
+              },
+            },
+          ],
+        }),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+      const { getAiAutoModConfig } = await import('../../src/modules/aiAutoMod.js');
+
+      await configModule.loadConfig();
+
+      const guildConfig = configModule.getConfig('guild-explicit-ai-dm');
+      expect(getAiAutoModConfig(guildConfig).dmNotifications).toEqual({
+        warn: true,
+        timeout: false,
+        kick: false,
+        ban: true,
+      });
+    });
+
     it('should handle DB error and fall back to config.json', async () => {
       const mockPool = {
         query: vi.fn().mockRejectedValue(new Error('DB connection failed')),
