@@ -23,7 +23,7 @@ const { visibleModelOptions } = vi.hoisted(() => ({
   ],
 }));
 
-vi.mock('@/components/ui/select', () => import('../../helpers/mock-select'));
+vi.mock('@/components/ui/select', () => import('../../../helpers/mock-select'));
 
 vi.mock('@/lib/provider-model-options', () => ({
   DEFAULT_AI_MODEL: 'minimax:MiniMax-M2.7',

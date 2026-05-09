@@ -8,7 +8,7 @@ import { SystemPromptEditor } from '../system-prompt-editor';
 /**
  * Render controls for configuring AI chat settings for a guild.
  *
- * Renders a system prompt editor bound to `draftConfig.ai?.systemPrompt`. When `guildId` is provided, also renders a "Response Boundaries" channel selector for `draftConfig.ai?.blockedChannelIds` and a channel mode configuration section.
+ * Renders a system prompt editor bound to `draftConfig.ai?.systemPrompt`. When `guildId` is provided, also renders a 'Response Boundaries' channel selector for `draftConfig.ai?.blockedChannelIds` and a channel mode configuration section.
  *
  * @param draftConfig - Draft guild configuration used to populate the controls (e.g., `ai.systemPrompt`, `ai.blockedChannelIds`).
  * @param saving - If true, input controls are disabled to reflect an in-progress save.

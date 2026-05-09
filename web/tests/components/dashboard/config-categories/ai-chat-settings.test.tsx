@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { GuildConfig } from '@/components/dashboard/config-editor-utils';
-import type { ChannelMode } from '@/types/config';
 
 vi.mock('@/components/dashboard/system-prompt-editor', () => ({
   SystemPromptEditor: ({
@@ -25,11 +24,23 @@ vi.mock('@/components/dashboard/system-prompt-editor', () => ({
   ),
 }));
 
-vi.mock('@/components/ui/channel-selector', () => ({
-  ChannelSelector: ({ id }: { id?: string }) => (
-    <div data-testid={id ? `channel-selector-${id}` : 'channel-selector'} />
-  ),
-}));
+vi.mock('@/components/ui/channel-selector', () => {
+  function serializeSelected(selected: unknown): string {
+    if (!Array.isArray(selected)) return 'not-array';
+    return JSON.stringify(
+      selected.map((value) => (typeof value === 'string' ? value : `[${typeof value}]`)),
+    );
+  }
+
+  return {
+    ChannelSelector: ({ id, selected }: { id?: string; selected?: unknown }) => (
+      <div
+        data-testid={id ? `channel-selector-${id}` : 'channel-selector'}
+        data-selected={serializeSelected(selected)}
+      />
+    ),
+  };
+});
 
 vi.mock('@/components/dashboard/config-sections/ChannelModeSection', () => ({
   ChannelModeSection: () => <div data-testid="channel-mode-section" />,
@@ -119,6 +130,29 @@ describe('AiChatSettings', () => {
     renderAiChatSettings();
 
     expect(screen.getByTestId('channel-selector-ai-blocked-channels')).toBeInTheDocument();
+  });
+
+  it('filters non-string blocked channel IDs before passing them to the selector', () => {
+    const blockedChannelIds = [
+      'channel-1',
+      123,
+      null,
+      'channel-2',
+      { id: 'bad' },
+    ] satisfies unknown[];
+    const draftConfig = createDefaultDraftConfig({
+      ai: {
+        enabled: true,
+        blockedChannelIds,
+      } as unknown as GuildConfig['ai'],
+    });
+
+    renderAiChatSettings(draftConfig);
+
+    expect(screen.getByTestId('channel-selector-ai-blocked-channels')).toHaveAttribute(
+      'data-selected',
+      JSON.stringify(['channel-1', 'channel-2']),
+    );
   });
 
   it('renders the channel mode section when guildId is provided', () => {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { GuildConfig } from '@/components/dashboard/config-editor-utils';
 import type { AiAutoModDmNotificationAction } from '@/types/config';
 
-vi.mock('@/components/ui/select', () => import('../../helpers/mock-select'));
+vi.mock('@/components/ui/select', () => import('../../../helpers/mock-select'));
 
 vi.mock('@/lib/provider-model-options', () => ({
   DEFAULT_AI_MODEL: 'minimax:MiniMax-M2.7',
@@ -19,6 +19,20 @@ vi.mock('@/lib/provider-model-options', () => ({
           providerDisplayName: 'MiniMax',
           modelName: 'MiniMax-M2.7',
           modelDisplayName: 'MiniMax M2.7',
+        },
+      ],
+    },
+    {
+      providerName: 'moonshot',
+      providerDisplayName: 'Moonshot',
+      options: [
+        {
+          value: 'moonshot:kimi-k2.6',
+          label: 'Kimi K2.6',
+          providerName: 'moonshot',
+          providerDisplayName: 'Moonshot',
+          modelName: 'kimi-k2.6',
+          modelDisplayName: 'Kimi K2.6',
         },
       ],
     },
@@ -490,9 +504,20 @@ describe('AiAutoModSettings', () => {
 });
 
 describe('toggleAiAutoModCategoryAction', () => {
-  it('adds an action to an empty category', () => {
-    const result = toggleAiAutoModCategoryAction({}, 'toxicity', ['flag'], 'warn', true);
+  it('adds an action to an explicitly empty category', () => {
+    const result = toggleAiAutoModCategoryAction(
+      { toxicity: [] },
+      'toxicity',
+      ['flag'],
+      'warn',
+      true,
+    );
     expect(result.toxicity).toEqual(['warn']);
+  });
+
+  it('uses fallback actions when the actions map is empty', () => {
+    const result = toggleAiAutoModCategoryAction({}, 'toxicity', ['flag'], 'warn', true);
+    expect(result.toxicity).toEqual(['flag', 'warn']);
   });
 
   it('adds an action while preserving existing actions in correct order', () => {
@@ -557,9 +582,9 @@ describe('toggleAiAutoModCategoryAction', () => {
     expect(result.harassment).toEqual(['warn']);
   });
 
-  it('handles undefined previousActions as an empty map', () => {
+  it('uses fallback actions when previousActions is undefined', () => {
     const result = toggleAiAutoModCategoryAction(undefined, 'toxicity', ['flag'], 'warn', true);
-    expect(result.toxicity).toEqual(['warn']);
+    expect(result.toxicity).toEqual(['flag', 'warn']);
   });
 
   it('normalizes a legacy string action before toggling', () => {

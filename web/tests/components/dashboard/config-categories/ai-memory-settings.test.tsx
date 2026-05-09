@@ -29,9 +29,11 @@ vi.mock('@/components/dashboard/toggle-switch', () => ({
 
 import { AiMemorySettings } from '@/components/dashboard/config-categories/ai-memory-settings';
 
+type AiMemorySettingsProps = Parameters<typeof AiMemorySettings>[0];
+
 function renderMemorySettings(
   draftConfig: GuildConfig = {},
-  onFieldChange = vi.fn(),
+  onFieldChange = vi.fn<AiMemorySettingsProps['onFieldChange']>(),
   saving = false,
 ) {
   render(
@@ -90,7 +92,8 @@ describe('AiMemorySettings', () => {
       target: { value: '15' },
     });
 
-    expect(onFieldChange).toHaveBeenCalledWith('maxContextMemories', 15);
+    expect(onFieldChange).toHaveBeenCalledTimes(1);
+    expect(onFieldChange).toHaveBeenLastCalledWith('maxContextMemories', 15);
   });
 
   it('calls onFieldChange with "autoExtract" and true when toggle is clicked while false', () => {
@@ -98,7 +101,8 @@ describe('AiMemorySettings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Auto-Extract' }));
 
-    expect(onFieldChange).toHaveBeenCalledWith('autoExtract', true);
+    expect(onFieldChange).toHaveBeenCalledTimes(1);
+    expect(onFieldChange).toHaveBeenLastCalledWith('autoExtract', true);
   });
 
   it('calls onFieldChange with "autoExtract" and false when toggle is clicked while true', () => {
@@ -106,7 +110,8 @@ describe('AiMemorySettings', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Auto-Extract' }));
 
-    expect(onFieldChange).toHaveBeenCalledWith('autoExtract', false);
+    expect(onFieldChange).toHaveBeenCalledTimes(1);
+    expect(onFieldChange).toHaveBeenLastCalledWith('autoExtract', false);
   });
 
   it('disables the maxContextMemories input when saving=true', () => {
