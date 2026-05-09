@@ -4,6 +4,20 @@ sidebarTitle: Changelog
 description: 'Release notes for Volvox.Bot covering new features, dashboard improvements, AI moderation updates, and bug fixes for the Discord bot platform.'
 ---
 
+<Update label="2026-05-11" description="May 2026" tags={["Features", "Improvements"]}>
+## New features
+
+**Triage config defaults documented** — Moderation docs now list the AI triage server config defaults and clamped ranges. `responseCooldownMs` is enforced as the minimum gap between bot replies in a channel. The related `triageDebounceMs` and `memoryTimeoutMs` values are normalized when config loads for compatibility, but they are not dashboard controls yet. See [Moderation](/features/moderation).
+
+## Improvements
+
+**Lower-latency mentions** — Direct @mentions and replies to the bot now trigger immediate triage evaluation and bypass the response cooldown for mentioned messages. They still run through the classifier and responder flow, so safety and relevance checks remain in place. See [Moderation](/features/moderation).
+
+**Documented triage defaults** — The default response cooldown remains `10000` ms. New server config uses 5 recent context messages by default; runtime triage only falls back to 10 when that value is unset.
+
+**Stricter triage model validation** — The dashboard now rejects unsupported or malformed `provider:model` strings when you save a triage config, so misconfigurations surface up front instead of failing at runtime. The bot still falls back gracefully if a legacy stored value drifts out of the supported list.
+</Update>
+
 <Update label="2026-05-10" description="May 2026" tags={["Improvements"]}>
 ## Improvements
 
