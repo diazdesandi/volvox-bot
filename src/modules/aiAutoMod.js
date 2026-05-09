@@ -155,14 +155,21 @@ function normalizeActionMap(rawActions = {}) {
   );
 }
 
-function normalizeDmNotificationMap(rawNotifications = {}) {
+function normalizeDmNotificationMap(rawNotifications = {}, fallbackNotifications = {}) {
   return Object.fromEntries(
-    AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.map((action) => [
-      action,
-      typeof rawNotifications[action] === 'boolean'
-        ? rawNotifications[action]
-        : DEFAULT_DM_NOTIFICATIONS[action],
-    ]),
+    AI_AUTOMOD_DM_NOTIFICATION_ACTIONS.map((action) => {
+      const rawValue = rawNotifications?.[action];
+      const fallbackValue = fallbackNotifications?.[action];
+
+      return [
+        action,
+        typeof rawValue === 'boolean'
+          ? rawValue
+          : typeof fallbackValue === 'boolean'
+            ? fallbackValue
+            : DEFAULT_DM_NOTIFICATIONS[action],
+      ];
+    }),
   );
 }
 
@@ -183,10 +190,6 @@ function getPrimaryAction(actions) {
  */
 export function getAiAutoModConfig(config) {
   const raw = config?.aiAutoMod ?? {};
-  const dmNotificationSource = {
-    ...(config?.moderation?.dmNotifications ?? {}),
-    ...(raw.dmNotifications ?? {}),
-  };
 
   return {
     ...DEFAULTS,
@@ -194,7 +197,10 @@ export function getAiAutoModConfig(config) {
     model: normalizeSupportedAiModel(raw.model),
     thresholds: { ...DEFAULTS.thresholds, ...(raw.thresholds ?? {}) },
     actions: normalizeActionMap(raw.actions ?? {}),
-    dmNotifications: normalizeDmNotificationMap(dmNotificationSource),
+    dmNotifications: normalizeDmNotificationMap(
+      raw.dmNotifications,
+      config?.moderation?.dmNotifications,
+    ),
   };
 }
 

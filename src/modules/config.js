@@ -89,8 +89,8 @@ function overlayDmNotifications(fallbackNotifications, overrideNotifications) {
 
   if (isPlainObject(overrideNotifications)) {
     for (const [key, value] of Object.entries(overrideNotifications)) {
-      if (DANGEROUS_KEYS.has(key)) continue;
-      merged[key] = structuredClone(value);
+      if (DANGEROUS_KEYS.has(key) || typeof value !== 'boolean') continue;
+      merged[key] = value;
     }
   }
 

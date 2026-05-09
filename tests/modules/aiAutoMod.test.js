@@ -248,6 +248,24 @@ describe('getAiAutoModConfig', () => {
       ban: true,
     });
   });
+
+  it('ignores invalid AI auto-mod DM notification overrides before moderation fallback', () => {
+    const cfg = getAiAutoModConfig({
+      moderation: {
+        dmNotifications: { warn: false, timeout: false, kick: 'invalid', ban: null },
+      },
+      aiAutoMod: {
+        dmNotifications: { warn: null, timeout: 'false', kick: false, ban: null },
+      },
+    });
+
+    expect(cfg.dmNotifications).toEqual({
+      warn: false,
+      timeout: false,
+      kick: false,
+      ban: true,
+    });
+  });
 });
 
 describe('extractFirstBalancedJsonObject', () => {

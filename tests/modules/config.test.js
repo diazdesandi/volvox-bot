@@ -384,6 +384,57 @@ describe('modules/config', () => {
       });
     });
 
+    it('should ignore invalid per-action AI AutoMod DM settings while preserving moderation fallback', async () => {
+      const { readFileSync: mockRead } = await import('node:fs');
+      mockRead.mockReturnValue(
+        JSON.stringify({
+          moderation: {
+            dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+          },
+          aiAutoMod: { enabled: false },
+        }),
+      );
+
+      const mockPool = {
+        query: vi.fn().mockResolvedValue({
+          rows: [
+            {
+              guild_id: 'global',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: true, timeout: true, kick: true, ban: true },
+              },
+            },
+            {
+              guild_id: 'guild-invalid-ai-dm',
+              key: 'moderation',
+              value: {
+                dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+              },
+            },
+            {
+              guild_id: 'guild-invalid-ai-dm',
+              key: 'aiAutoMod',
+              value: {
+                dmNotifications: { warn: null, timeout: 'false', kick: true },
+              },
+            },
+          ],
+        }),
+      };
+      const { getPool: mockGetPool } = await import('../../src/db.js');
+      mockGetPool.mockReturnValue(mockPool);
+
+      await configModule.loadConfig();
+
+      expect(configModule.getConfig('guild-invalid-ai-dm').aiAutoMod.dmNotifications).toEqual({
+        warn: false,
+        timeout: false,
+        kick: true,
+        ban: false,
+      });
+    });
+
     it('should preserve explicit file AI AutoMod DM settings when DB is not initialized', async () => {
       const getPool = vi.fn(() => {
         throw new Error('Database not initialized');
