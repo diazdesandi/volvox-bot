@@ -175,6 +175,39 @@ describe('configValidation', () => {
       );
     });
 
+    it('should accept valid boolean values for all AI AutoMod DM notification action types', () => {
+      expect(validateSingleValue('aiAutoMod.dmNotifications.timeout', true)).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.timeout', false)).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.kick', true)).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.kick', false)).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.ban', true)).toEqual([]);
+      expect(validateSingleValue('aiAutoMod.dmNotifications.ban', false)).toEqual([]);
+    });
+
+    it('should reject non-boolean values for AI AutoMod DM notification actions', () => {
+      for (const action of ['timeout', 'kick', 'ban']) {
+        expect(validateSingleValue(`aiAutoMod.dmNotifications.${action}`, 'yes')).toEqual(
+          expect.arrayContaining([expect.stringContaining('expected boolean')]),
+        );
+        expect(validateSingleValue(`aiAutoMod.dmNotifications.${action}`, 1)).toEqual(
+          expect.arrayContaining([expect.stringContaining('expected boolean')]),
+        );
+        // null is not a valid boolean and should produce a validation error
+        expect(validateSingleValue(`aiAutoMod.dmNotifications.${action}`, null)).not.toEqual([]);
+      }
+    });
+
+    it('should accept valid AI AutoMod dmNotifications object at the parent path', () => {
+      expect(
+        validateSingleValue('aiAutoMod.dmNotifications', {
+          warn: true,
+          timeout: false,
+          kick: true,
+          ban: false,
+        }),
+      ).toEqual([]);
+    });
+
     it('should validate new welcome onboarding fields', () => {
       expect(validateSingleValue('welcome.rulesChannel', null)).toEqual([]);
       expect(validateSingleValue('welcome.roleMenuChannel', null)).toEqual([]);

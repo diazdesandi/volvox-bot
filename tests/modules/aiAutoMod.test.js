@@ -266,6 +266,29 @@ describe('getAiAutoModConfig', () => {
       ban: true,
     });
   });
+
+  it('returns hardcoded defaults when both aiAutoMod and moderation dmNotifications are absent', () => {
+    const cfg = getAiAutoModConfig({ aiAutoMod: {} });
+    expect(cfg.dmNotifications).toEqual({ warn: true, timeout: true, kick: true, ban: true });
+  });
+
+  it('returns hardcoded defaults when config is null', () => {
+    const cfg = getAiAutoModConfig(null);
+    expect(cfg.dmNotifications).toEqual({ warn: true, timeout: true, kick: true, ban: true });
+    expect(cfg.enabled).toBe(false);
+  });
+
+  it('aiAutoMod dmNotification true overrides moderation false for the same action', () => {
+    const cfg = getAiAutoModConfig({
+      moderation: { dmNotifications: { warn: false, timeout: false, kick: false, ban: false } },
+      aiAutoMod: { dmNotifications: { warn: true } },
+    });
+    expect(cfg.dmNotifications.warn).toBe(true);
+    // Other actions fall back to moderation
+    expect(cfg.dmNotifications.timeout).toBe(false);
+    expect(cfg.dmNotifications.kick).toBe(false);
+    expect(cfg.dmNotifications.ban).toBe(false);
+  });
 });
 
 describe('extractFirstBalancedJsonObject', () => {
@@ -1188,14 +1211,10 @@ describe('checkAiAutoMod', () => {
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
       action,
-      `Planned actions: ${action}
+      `Actions taken: ${action}
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
-      { title: 'Moderation action pending in guild-1', colorAction: action },
-    );
-    expect(vi.mocked(sendDmNotification).mock.calls[0][2]).not.toContain(
-      `Actions taken: ${action}`,
     );
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
       destructiveActionMock.mock.invocationCallOrder[0],
@@ -1221,13 +1240,11 @@ Reason: toxic`,
     expect(sendDmNotification).toHaveBeenCalledTimes(1);
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
-      'ban',
-      `Actions taken: warning
-Planned actions: kick and ban
+      'kick',
+      `Actions taken: warning and kick
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
-      { title: 'Moderation action pending in guild-1', colorAction: 'ban' },
     );
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
       message.member.kick.mock.invocationCallOrder[0],
@@ -1237,7 +1254,7 @@ Reason: toxic`,
     );
   });
 
-  it('sends one ban-relevant pre-DM when an earlier destructive action fails and ban succeeds', async () => {
+  it('sends a ban-relevant DM when an earlier destructive pre-DM action fails and ban succeeds', async () => {
     message.member.kick.mockRejectedValueOnce(new Error('Missing Permissions'));
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
@@ -1254,21 +1271,26 @@ Reason: toxic`,
       action: 'ban',
       actions: ['ban'],
     });
-    expect(sendDmNotification).toHaveBeenCalledTimes(1);
-    expect(sendDmNotification).toHaveBeenCalledWith(
+    expect(sendDmNotification).toHaveBeenCalledTimes(2);
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      1,
       message.member,
-      'ban',
-      `Planned actions: kick and ban
+      'kick',
+      `Actions taken: kick
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
-      { title: 'Moderation action pending in guild-1', colorAction: 'ban' },
     );
-    expect(vi.mocked(sendDmNotification).mock.calls[0][2]).not.toContain('Actions taken: kick');
-    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
-      message.member.kick.mock.invocationCallOrder[0],
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      2,
+      message.member,
+      'ban',
+      `Actions taken: ban
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
     );
-    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeLessThan(
       message.guild.members.ban.mock.invocationCallOrder[0],
     );
     expect(logAuditEvent).toHaveBeenCalledWith(
@@ -1301,11 +1323,10 @@ Reason: toxic`,
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
       'ban',
-      `Planned actions: ban
+      `Actions taken: ban
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
-      { title: 'Moderation action pending in guild-1', colorAction: 'ban' },
     );
     expect(message.member.kick.mock.invocationCallOrder[0]).toBeLessThan(
       sendDmNotification.mock.invocationCallOrder[0],
@@ -1338,12 +1359,10 @@ Reason: toxic`,
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
       'ban',
-      `Actions taken: warning
-Planned actions: ban
+      `Actions taken: warning and ban
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
-      { title: 'Moderation action pending in guild-1', colorAction: 'ban' },
     );
     expect(message.member.kick.mock.invocationCallOrder[0]).toBeLessThan(
       sendDmNotification.mock.invocationCallOrder[0],
@@ -1841,5 +1860,53 @@ Reason: toxic`,
       mockFlagChannel,
       expect.objectContaining({ embeds: expect.any(Array) }),
     );
+  });
+
+  it('uses "No reason provided" in DM when AI response omits a reason field', async () => {
+    mockGenerate.mockResolvedValue(
+      makeAiResponse(JSON.stringify({ harassment: 0.9, toxicity: 0.1, spam: 0.1 })),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({}, { moderation: moderationWarnConfig });
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
+    const dmReason = vi.mocked(sendDmNotification).mock.calls[0][2];
+    expect(dmReason).toContain('No reason provided');
+  });
+
+  it('sends no DM when all applicable AI auto-mod DM notification types are disabled', async () => {
+    mockGenerate.mockResolvedValue(
+      makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
+    );
+    const guildConfig = makeAiAutoModGuildConfig({
+      actions: { toxicity: ['warn', 'timeout', 'kick', 'ban'] },
+      dmNotifications: { warn: false, timeout: false, kick: false, ban: false },
+    });
+
+    const result = await checkAiAutoMod(message, client, guildConfig);
+
+    expect(result.flagged).toBe(true);
+    expect(sendDmNotification).not.toHaveBeenCalled();
+  });
+
+  it('DM reason lists multiple triggered categories when several thresholds are exceeded', async () => {
+    mockGenerate.mockResolvedValue(
+      makeAiResponse(
+        JSON.stringify({ toxicity: 0.9, spam: 0.9, harassment: 0.1, reason: 'multi-category' }),
+      ),
+    );
+    // Trigger both toxicity (warn) and spam (delete) actions
+    const guildConfig = makeAiAutoModGuildConfig(
+      { actions: { toxicity: 'warn', spam: 'warn' } },
+      { moderation: moderationWarnConfig },
+    );
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    expect(sendDmNotification).toHaveBeenCalledTimes(1);
+    const dmReason = vi.mocked(sendDmNotification).mock.calls[0][2];
+    expect(dmReason).toContain('Toxicity');
+    expect(dmReason).toContain('Spam');
   });
 });
