@@ -23,7 +23,7 @@ A built-in support ticket system for your Discord server. Your members can open 
 5. The bot saves the transcript so you can view it in the dashboard
 
 <Callout type="tip">
-Select the ticket category and support role so new tickets land where your team expects.
+Select the ticket category and support staff roles so new tickets land where your team expects.
 </Callout>
 
 ## Configuration
@@ -33,5 +33,18 @@ Select the ticket category and support role so new tickets land where your team 
 | Ticket category | Root category where the bot creates ticket channels |
 | Auto-close | Automatically close stale tickets after N hours |
 | Transcript channel | Where the bot posts transcripts |
-| Support role | Which role can see and manage tickets |
+| Support staff roles | One or more roles that can see and manage tickets |
 | Welcome message | The message the bot sends automatically when a ticket opens |
+
+## Support staff roles
+
+Tickets support multiple staff roles, so you can grant access to several teams — for example, **Support**, **Senior Support**, and **Moderators** — without merging them into a single role.
+
+- Open **Config → Tickets** and use the **Support Staff Roles** picker to add every role that should see new tickets.
+- The bot grants ticket access to all selected roles. In channel-mode tickets, each role gets a permission overwrite; in thread-mode tickets, members of every selected role are added automatically (each member is only added once, even if they belong to multiple roles).
+- Stale role IDs (roles that no longer exist on the server) are skipped automatically.
+- Discord caps channel permission overwrites at 100. Volvox.Bot reserves three for `@everyone`, the ticket opener, and itself, so up to **97 support roles** are applied per channel-mode ticket. Any extras are ignored.
+
+<Callout type="info">
+Configurations that previously stored a single **Support role** continue to work. The legacy field stays in sync with the first entry in **Support Staff Roles**, so existing setups keep their staff access without changes.
+</Callout>
