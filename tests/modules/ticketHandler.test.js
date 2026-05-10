@@ -111,6 +111,12 @@ function createMockGuild(overrides = {}) {
   const role = {
     members: new Map([['member1', { id: 'member1' }]]),
   };
+  const role2 = {
+    members: new Map([
+      ['member1', { id: 'member1' }],
+      ['member2', { id: 'member2' }],
+    ]),
+  };
 
   return {
     id: 'guild1',
@@ -119,7 +125,12 @@ function createMockGuild(overrides = {}) {
       fetch: vi.fn(),
       create: vi.fn().mockResolvedValue(createMockChannel()),
     },
-    roles: { cache: new Map([['role1', role]]) },
+    roles: {
+      cache: new Map([
+        ['role1', role],
+        ['role2', role2],
+      ]),
+    },
     members: { me: botMember },
     ...overrides,
   };
@@ -154,6 +165,7 @@ describe('ticketHandler', () => {
       expect(config.enabled).toBe(true);
       expect(config.mode).toBe('thread');
       expect(config.supportRole).toBe('role1');
+      expect(config.supportRoles).toEqual(['role1']);
       expect(config.autoCloseHours).toBe(48);
       expect(config.maxOpenPerUser).toBe(3);
     });
@@ -164,8 +176,65 @@ describe('ticketHandler', () => {
       expect(config.enabled).toBe(false);
       expect(config.mode).toBe('thread');
       expect(config.supportRole).toBeNull();
+      expect(config.supportRoles).toEqual([]);
       expect(config.autoCloseHours).toBe(48);
       expect(config.maxOpenPerUser).toBe(3);
+    });
+
+    it('should normalize multiple support roles while deriving legacy supportRole from the first role', () => {
+      getConfig.mockReturnValueOnce({
+        tickets: {
+          supportRole: 'role1',
+          supportRoles: ['role1', 'role2', 'role2'],
+        },
+      });
+
+      const config = getTicketConfig('guild3');
+
+      expect(config.supportRole).toBe('role1');
+      expect(config.supportRoles).toEqual(['role1', 'role2']);
+    });
+
+    it('should trim and dedupe support roles before returning config', () => {
+      getConfig.mockReturnValueOnce({
+        tickets: {
+          supportRole: 'legacy-role',
+          supportRoles: [' role1 ', 'role2', 'role2 ', ' ', null, 'role1'],
+        },
+      });
+
+      const config = getTicketConfig('guild4');
+
+      expect(config.supportRole).toBe('role1');
+      expect(config.supportRoles).toEqual(['role1', 'role2']);
+    });
+
+    it('should trim legacy supportRole when falling back to single-role config', () => {
+      getConfig.mockReturnValueOnce({
+        tickets: {
+          supportRole: ' role1 ',
+          supportRoles: [' ', null],
+        },
+      });
+
+      const config = getTicketConfig('guild5');
+
+      expect(config.supportRole).toBe('role1');
+      expect(config.supportRoles).toEqual(['role1']);
+    });
+
+    it('should keep supportRole consistent with normalized supportRoles when fields diverge', () => {
+      getConfig.mockReturnValueOnce({
+        tickets: {
+          supportRole: 'role1',
+          supportRoles: [' role2 '],
+        },
+      });
+
+      const config = getTicketConfig('guild6');
+
+      expect(config.supportRole).toBe('role2');
+      expect(config.supportRoles).toEqual(['role2']);
     });
   });
 
@@ -256,6 +325,39 @@ describe('ticketHandler', () => {
       expect(thread.members.add).toHaveBeenCalledWith('member1');
     });
 
+    it('should add members from all configured support roles to thread once', async () => {
+      getConfig.mockReturnValueOnce({
+        tickets: {
+          enabled: true,
+          mode: 'thread',
+          supportRole: 'role1',
+          supportRoles: ['role1', 'role2'],
+          category: null,
+          autoCloseHours: 48,
+          transcriptChannel: null,
+          maxOpenPerUser: 3,
+        },
+      });
+      const guild = createMockGuild();
+      const user = createMockUser();
+      const thread = createMockThread();
+      guild.channels.cache.get('ch1').threads.create.mockResolvedValue(thread);
+
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 0 }] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          { id: 1, guild_id: 'guild1', user_id: 'user1', topic: 'test', thread_id: 'thread1' },
+        ],
+      });
+
+      await openTicket(guild, user, 'test', 'ch1');
+
+      expect(thread.members.add).toHaveBeenCalledWith('user1');
+      expect(thread.members.add).toHaveBeenCalledWith('member1');
+      expect(thread.members.add).toHaveBeenCalledWith('member2');
+      expect(thread.members.add.mock.calls.filter(([id]) => id === 'member1')).toHaveLength(1);
+    });
+
     it('should work without topic', async () => {
       const guild = createMockGuild();
       const user = createMockUser();
@@ -342,6 +444,96 @@ describe('ticketHandler', () => {
       // Support role allow
       const roleOverwrite = overwrites.find((o) => o.id === 'role1');
       expect(roleOverwrite).toBeDefined();
+    });
+
+    it('should grant channel permissions to existing support roles and skip stale role ids', async () => {
+      getConfig.mockReturnValue({
+        tickets: {
+          enabled: true,
+          mode: 'channel',
+          supportRole: 'role1',
+          supportRoles: ['role1', 'missing-role', 'role2'],
+          category: null,
+          autoCloseHours: 48,
+          transcriptChannel: null,
+          maxOpenPerUser: 3,
+        },
+      });
+      const createdChannel = createMockChannel({ id: 'ticket-ch' });
+      const guild = createMockGuild();
+      guild.channels.create.mockResolvedValue(createdChannel);
+
+      const user = createMockUser();
+
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 0 }] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 10,
+            guild_id: 'guild1',
+            user_id: 'user1',
+            topic: 'help',
+            thread_id: 'ticket-ch',
+          },
+        ],
+      });
+
+      await openTicket(guild, user, 'help', 'ch1');
+
+      const createCall = guild.channels.create.mock.calls[0][0];
+      expect(createCall.permissionOverwrites).toHaveLength(5);
+      expect(createCall.permissionOverwrites.find((o) => o.id === 'role1')).toBeDefined();
+      expect(createCall.permissionOverwrites.find((o) => o.id === 'role2')).toBeDefined();
+      expect(createCall.permissionOverwrites.find((o) => o.id === 'missing-role')).toBeUndefined();
+    });
+
+    it('should cap support role overwrites at the Discord channel limit', async () => {
+      const supportRoleIds = Array.from({ length: 120 }, (_, index) => `role-${index}`);
+      getConfig.mockReturnValue({
+        tickets: {
+          enabled: true,
+          mode: 'channel',
+          supportRole: 'role-0',
+          supportRoles: supportRoleIds,
+          category: null,
+          autoCloseHours: 48,
+          transcriptChannel: null,
+          maxOpenPerUser: 3,
+        },
+      });
+      const createdChannel = createMockChannel({ id: 'ticket-ch' });
+      const guild = createMockGuild();
+      for (const roleId of supportRoleIds) {
+        guild.roles.cache.set(roleId, { members: new Map() });
+      }
+      guild.channels.create.mockResolvedValue(createdChannel);
+
+      const user = createMockUser();
+
+      mockQuery.mockResolvedValueOnce({ rows: [{ count: 0 }] });
+      mockQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            id: 10,
+            guild_id: 'guild1',
+            user_id: 'user1',
+            topic: 'help',
+            thread_id: 'ticket-ch',
+          },
+        ],
+      });
+
+      await openTicket(guild, user, 'help', 'ch1');
+
+      const createCall = guild.channels.create.mock.calls[0][0];
+      expect(createCall.permissionOverwrites).toHaveLength(100);
+
+      const supportRoleOverwrites = createCall.permissionOverwrites.filter((overwrite) =>
+        overwrite.id.startsWith('role-'),
+      );
+      expect(supportRoleOverwrites).toHaveLength(97);
+      expect(createCall.permissionOverwrites.find((o) => o.id === 'role-96')).toBeDefined();
+      expect(createCall.permissionOverwrites.find((o) => o.id === 'role-97')).toBeUndefined();
     });
 
     it('should not call thread.members.add in channel mode', async () => {

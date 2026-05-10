@@ -24,6 +24,7 @@ export const SAFE_CONFIG_KEYS = new Set([
   'engagement',
   'voice',
   'github',
+  'tickets',
   'challenges',
   'review',
   'auditLog',

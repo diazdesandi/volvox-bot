@@ -28,6 +28,7 @@ const TICKET_DEFAULTS = {
   enabled: false,
   mode: 'thread',
   supportRole: null,
+  supportRoles: [],
   category: null,
   autoCloseHours: 48,
   transcriptChannel: null,
@@ -49,6 +50,16 @@ const TICKET_PANEL_COLOR = 0x57f287;
 /** Delay (ms) before deleting a channel-mode ticket so the close message is visible */
 const CHANNEL_DELETE_DELAY_MS = 10_000;
 
+/** Discord channel permission overwrite limit */
+const DISCORD_CHANNEL_PERMISSION_OVERWRITE_LIMIT = 100;
+
+/** Ticket channel overwrites always include @everyone, opener, and bot */
+const BASE_TICKET_CHANNEL_OVERWRITE_COUNT = 3;
+
+/** Maximum support role overwrites available for a ticket channel */
+const MAX_TICKET_SUPPORT_ROLE_OVERWRITES =
+  DISCORD_CHANNEL_PERMISSION_OVERWRITE_LIMIT - BASE_TICKET_CHANNEL_OVERWRITE_COUNT;
+
 /** Track ticket IDs that have received an auto-close warning in this process run */
 const warningsSent = new Set();
 
@@ -60,7 +71,36 @@ const warningsSent = new Set();
  */
 export function getTicketConfig(guildId) {
   const cfg = getConfig(guildId);
-  return { ...TICKET_DEFAULTS, ...cfg.tickets };
+  const merged = { ...TICKET_DEFAULTS, ...cfg.tickets };
+  const supportRoles = normalizeSupportRoles(merged);
+
+  return {
+    ...merged,
+    supportRole: supportRoles[0] ?? null,
+    supportRoles,
+  };
+}
+
+/**
+ * Normalize legacy single-role and current multi-role ticket staff config.
+ *
+ * @param {{supportRole?: string|null, supportRoles?: unknown}} ticketConfig
+ * @returns {string[]} Unique support role IDs.
+ */
+function normalizeSupportRoles(ticketConfig) {
+  const roles = Array.isArray(ticketConfig.supportRoles)
+    ? ticketConfig.supportRoles
+        .map((roleId) => (typeof roleId === 'string' ? roleId.trim() : ''))
+        .filter(Boolean)
+    : [];
+  const legacySupportRole =
+    typeof ticketConfig.supportRole === 'string' ? ticketConfig.supportRole.trim() : '';
+
+  if (roles.length === 0 && legacySupportRole) {
+    roles.push(legacySupportRole);
+  }
+
+  return [...new Set(roles)];
 }
 
 /**
@@ -68,10 +108,10 @@ export function getTicketConfig(guildId) {
  *
  * @param {import('discord.js').Guild} guild
  * @param {string} userId - The ticket opener
- * @param {string|null} supportRoleId
+ * @param {string[]} supportRoleIds
  * @returns {Array<import('discord.js').OverwriteResolvable>}
  */
-function buildChannelPermissions(guild, userId, supportRoleId) {
+function buildChannelPermissions(guild, userId, supportRoleIds) {
   const overwrites = [
     // Deny @everyone
     {
@@ -97,7 +137,11 @@ function buildChannelPermissions(guild, userId, supportRoleId) {
     },
   ];
 
-  if (supportRoleId) {
+  const existingSupportRoleIds = supportRoleIds
+    .filter((supportRoleId) => guild.roles.cache.has(supportRoleId))
+    .slice(0, MAX_TICKET_SUPPORT_ROLE_OVERWRITES);
+
+  for (const supportRoleId of existingSupportRoleIds) {
     overwrites.push({
       id: supportRoleId,
       type: OverwriteType.Role,
@@ -169,7 +213,7 @@ export async function openTicket(guild, user, topic, channelId = null) {
       name: channelTicketName,
       type: ChannelType.GuildText,
       parent: parent?.id ?? undefined,
-      permissionOverwrites: buildChannelPermissions(guild, user.id, ticketConfig.supportRole),
+      permissionOverwrites: buildChannelPermissions(guild, user.id, ticketConfig.supportRoles),
       reason: `Support ticket opened by ${user.tag}`,
     });
   } else {
@@ -208,10 +252,13 @@ export async function openTicket(guild, user, topic, channelId = null) {
     await ticketChannel.members.add(user.id);
 
     // Add support role members if configured
-    if (ticketConfig.supportRole) {
-      const role = guild.roles.cache.get(ticketConfig.supportRole);
+    const addedSupportMembers = new Set();
+    for (const supportRoleId of ticketConfig.supportRoles) {
+      const role = guild.roles.cache.get(supportRoleId);
       if (role) {
         for (const [, member] of role.members) {
+          if (addedSupportMembers.has(member.id)) continue;
+          addedSupportMembers.add(member.id);
           try {
             await ticketChannel.members.add(member.id);
           } catch {

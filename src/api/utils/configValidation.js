@@ -311,6 +311,19 @@ export const CONFIG_SCHEMA = {
       enabled: { type: 'boolean' },
     },
   },
+  tickets: {
+    type: 'object',
+    properties: {
+      enabled: { type: 'boolean' },
+      mode: { type: 'string', enum: ['thread', 'channel'] },
+      supportRole: { type: 'string', nullable: true },
+      supportRoles: { type: 'array', items: { type: 'string' } },
+      category: { type: 'string', nullable: true },
+      autoCloseHours: { type: 'number', integer: true, min: 1, max: 720 },
+      transcriptChannel: { type: 'string', nullable: true },
+      maxOpenPerUser: { type: 'number', integer: true, min: 1, max: 20 },
+    },
+  },
   challenges: {
     type: 'object',
     properties: {

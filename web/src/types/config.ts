@@ -430,7 +430,10 @@ export interface ReviewConfig extends ToggleSectionConfig {
 /** Ticket system settings. */
 export interface TicketsConfig extends ToggleSectionConfig {
   mode: 'thread' | 'channel';
+  /** Legacy single support role. Kept in sync with the first supportRoles entry. */
   supportRole: string | null;
+  /** All roles that should have support staff access to tickets. */
+  supportRoles: string[];
   category: string | null;
   autoCloseHours: number;
   transcriptChannel: string | null;

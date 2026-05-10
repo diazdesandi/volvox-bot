@@ -87,23 +87,30 @@ export function SupportIntegrationsCategory() {
                   htmlFor="support-role-id"
                   className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
                 >
-                  Support Staff Role
+                  Support Staff Roles
                 </label>
                 <RoleSelector
                   id="support-role-id"
                   guildId={guildId}
                   selected={
-                    draftConfig.tickets?.supportRole ? [draftConfig.tickets.supportRole] : []
+                    draftConfig.tickets?.supportRoles?.length
+                      ? draftConfig.tickets.supportRoles
+                      : draftConfig.tickets?.supportRole
+                        ? [draftConfig.tickets.supportRole]
+                        : []
                   }
                   onChange={(selected) =>
                     updateDraftConfig((prev) => ({
                       ...prev,
-                      tickets: { ...prev.tickets, supportRole: selected[0] ?? null },
+                      tickets: {
+                        ...prev.tickets,
+                        supportRole: selected[0] ?? null,
+                        supportRoles: selected,
+                      },
                     }))
                   }
                   disabled={saving}
-                  placeholder="Select support role"
-                  maxSelections={1}
+                  placeholder="Select support roles"
                 />
               </div>
               <div className="space-y-2">

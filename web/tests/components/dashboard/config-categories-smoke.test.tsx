@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { GuildConfig } from '@/components/dashboard/config-editor-utils';
 
@@ -27,6 +27,7 @@ const baseConfig: GuildConfig = {
     mode: 'thread',
     category: 'tickets',
     supportRole: 'support',
+    supportRoles: ['support', 'senior'],
     transcriptChannel: 'transcripts',
     autoCloseHours: 48,
     maxOpenPerUser: 3,
@@ -81,7 +82,25 @@ vi.mock('@/components/ui/channel-selector', () => ({
 }));
 
 vi.mock('@/components/ui/role-selector', () => ({
-  RoleSelector: ({ id }: { id?: string }) => <div data-testid={id ?? 'role-selector'} />,
+  RoleSelector: ({
+    id,
+    selected,
+    maxSelections,
+    onChange,
+  }: {
+    id?: string;
+    selected: string[];
+    maxSelections?: number;
+    onChange: (selected: string[]) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid={id ?? 'role-selector'}
+      data-selected={selected.join(',')}
+      data-max-selections={maxSelections ?? 'none'}
+      onClick={() => onChange(['support', 'senior', 'admin'])}
+    />
+  ),
 }));
 
 vi.mock('@/components/ui/discord-markdown-editor', () => ({
@@ -203,6 +222,25 @@ describe('dashboard config coverage smoke tests', () => {
     render(<Component />);
 
     expect(document.body.textContent).toMatch(new RegExp(expectedText, 'i'));
+  });
+
+  it('keeps all selected ticket support roles in the role selector', () => {
+    updateDraftConfig.mockClear();
+    setConfigContext('tickets');
+
+    const { getByTestId } = render(<SupportIntegrationsCategory />);
+
+    const selector = getByTestId('support-role-id');
+    expect(selector).toHaveAttribute('data-selected', 'support,senior');
+    expect(selector).toHaveAttribute('data-max-selections', 'none');
+
+    fireEvent.click(selector);
+
+    const updater = updateDraftConfig.mock.calls.at(-1)?.[0];
+    expect(updater?.(baseConfig).tickets).toMatchObject({
+      supportRole: 'support',
+      supportRoles: ['support', 'senior', 'admin'],
+    });
   });
 
   it('renders the config landing and workspace navigation primitives', () => {

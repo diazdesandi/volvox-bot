@@ -238,6 +238,16 @@
       ]
     }
   },
+  "tickets": {
+    "enabled": false,
+    "mode": "thread",
+    "supportRole": null,
+    "supportRoles": [],
+    "category": null,
+    "autoCloseHours": 48,
+    "transcriptChannel": null,
+    "maxOpenPerUser": 3
+  },
   "tldr": {
     "enabled": true,
     "model": "minimax:MiniMax-M2.7",

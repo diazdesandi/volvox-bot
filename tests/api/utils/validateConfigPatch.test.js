@@ -213,6 +213,28 @@ describe('validateConfigPatch', () => {
       expect(result.value).toEqual(['channel1', 'channel2']);
     });
 
+    it('should allow ticket supportRoles arrays', () => {
+      const result = validateConfigPatchBody(
+        { path: 'tickets.supportRoles', value: ['staff', 'senior-staff'] },
+        SAFE_CONFIG_KEYS,
+      );
+
+      expect(result.error).toBeUndefined();
+      expect(result.topLevelKey).toBe('tickets');
+      expect(result.value).toEqual(['staff', 'senior-staff']);
+    });
+
+    it('should reject invalid ticket supportRoles values', () => {
+      const result = validateConfigPatchBody(
+        { path: 'tickets.supportRoles', value: 'staff' },
+        SAFE_CONFIG_KEYS,
+      );
+
+      expect(result.error).toBe('Value validation failed');
+      expect(result.status).toBe(400);
+      expect(result.details).toContain('tickets.supportRoles: expected array, got string');
+    });
+
     it('should handle object values', () => {
       const body = {
         path: 'welcome.dynamic',
