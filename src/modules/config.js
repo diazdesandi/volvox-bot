@@ -281,7 +281,7 @@ export function loadConfigFromFile() {
  * Initialize the in-memory configuration by loading global and per-guild entries from PostgreSQL,
  * seeding the database from config.json when the DB has no global rows, and falling back to config.json
  * when the database is unavailable.
- * @returns {Object} The global configuration object (the object stored under the 'global' guild id).
+ * @returns {Promise<Object>} The global configuration object (the object stored under the 'global' guild id).
  * @throws {Error} If neither the database nor config.json are available as a configuration source.
  */
 export async function loadConfig() {
@@ -846,7 +846,7 @@ export async function setConfigValue(path, value, guildId = 'global') {
  * Apply multiple dot-notated configuration patches as a single atomic update.
  *
  * Each patch must have a non-empty string `path` with at least two segments
- * (section + nested key, e.g. "aiAutoMod.dmNotifications.email") and a `value`.
+ * (section + nested key, e.g. "aiAutoMod.dmNotifications.ban") and a `value`.
  * All patches are validated and grouped by top-level section. When the database
  * is available, updates are persisted within a single transaction; otherwise
  * in-memory caches are updated and per-patch change events are emitted.

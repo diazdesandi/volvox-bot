@@ -1223,7 +1223,7 @@ Reason: toxic`,
     );
   });
 
-  it('does not duplicate AI auto-mod DMs for multi-action queues with destructive actions', async () => {
+  it('sends pre-destructive DMs only for completed actions and the current destructive action', async () => {
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
     );
@@ -1239,11 +1239,23 @@ Reason: toxic`,
       action: 'ban',
       actions: ['warn', 'kick', 'ban'],
     });
-    expect(sendDmNotification).toHaveBeenCalledTimes(1);
-    expect(sendDmNotification).toHaveBeenCalledWith(
+    expect(sendDmNotification).toHaveBeenCalledTimes(2);
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      1,
+      message.member,
+      'kick',
+      `Actions taken: warning
+Actions planned: kick
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+      { title: 'Moderation action update in guild-1', colorAction: 'kick' },
+    );
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      2,
       message.member,
       'ban',
-      `Actions planned: warning, kick and ban
+      `Actions planned: ban
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
@@ -1252,12 +1264,15 @@ Reason: toxic`,
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
       message.member.kick.mock.invocationCallOrder[0],
     );
-    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeLessThan(
       message.guild.members.ban.mock.invocationCallOrder[0],
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeGreaterThan(
+      message.member.kick.mock.invocationCallOrder[0],
     );
   });
 
-  it('sends one ban-relevant planned DM when an earlier destructive action fails and ban succeeds', async () => {
+  it('sends current-action planned DMs when an earlier destructive action fails and ban succeeds', async () => {
     message.member.kick.mockRejectedValueOnce(new Error('Missing Permissions'));
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
@@ -1274,11 +1289,22 @@ Reason: toxic`,
       action: 'ban',
       actions: ['ban'],
     });
-    expect(sendDmNotification).toHaveBeenCalledTimes(1);
-    expect(sendDmNotification).toHaveBeenCalledWith(
+    expect(sendDmNotification).toHaveBeenCalledTimes(2);
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      1,
+      message.member,
+      'kick',
+      `Actions planned: kick
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+      { title: 'Moderation actions planned in guild-1', colorAction: 'kick' },
+    );
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      2,
       message.member,
       'ban',
-      `Actions planned: kick and ban
+      `Actions planned: ban
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
@@ -1287,7 +1313,10 @@ Reason: toxic`,
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
       message.member.kick.mock.invocationCallOrder[0],
     );
-    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeGreaterThan(
+      message.member.kick.mock.invocationCallOrder[0],
+    );
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeLessThan(
       message.guild.members.ban.mock.invocationCallOrder[0],
     );
     expect(logAuditEvent).toHaveBeenCalledWith(
@@ -1300,7 +1329,8 @@ Reason: toxic`,
     );
   });
 
-  it('attempts a planned DM before the first destructive action when a later action has DMs enabled', async () => {
+  it('waits until a later DM-enabled destructive action is current before sending its planned DM', async () => {
+    message.guild.members.ban.mockRejectedValueOnce(new Error('Missing Permissions'));
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.9, spam: 0.1, harassment: 0.1, reason: 'toxic' }),
     );
@@ -1313,8 +1343,8 @@ Reason: toxic`,
 
     expect(result).toMatchObject({
       flagged: true,
-      action: 'ban',
-      actions: ['kick', 'ban'],
+      action: 'kick',
+      actions: ['kick'],
     });
     expect(sendDmNotification).toHaveBeenCalledTimes(1);
     expect(sendDmNotification).toHaveBeenCalledWith(
@@ -1326,7 +1356,7 @@ Reason: toxic`,
       'guild-1',
       { title: 'Moderation actions planned in guild-1', colorAction: 'ban' },
     );
-    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeGreaterThan(
       message.member.kick.mock.invocationCallOrder[0],
     );
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
@@ -1353,11 +1383,22 @@ Reason: toxic`,
       action: 'ban',
       actions: ['warn', 'kick', 'ban'],
     });
-    expect(sendDmNotification).toHaveBeenCalledTimes(1);
-    expect(sendDmNotification).toHaveBeenCalledWith(
+    expect(sendDmNotification).toHaveBeenCalledTimes(2);
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      1,
+      message.member,
+      'warn',
+      `Actions taken: warning
+Triggered categories: Toxicity
+Reason: toxic`,
+      'guild-1',
+      { title: 'Moderation action update in guild-1', colorAction: 'warn' },
+    );
+    expect(sendDmNotification).toHaveBeenNthCalledWith(
+      2,
       message.member,
       'ban',
-      `Actions planned: warning and ban
+      `Actions planned: ban
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
@@ -1366,7 +1407,7 @@ Reason: toxic`,
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
       message.member.kick.mock.invocationCallOrder[0],
     );
-    expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(sendDmNotification.mock.invocationCallOrder[1]).toBeLessThan(
       message.guild.members.ban.mock.invocationCallOrder[0],
     );
   });
@@ -1394,11 +1435,11 @@ Reason: toxic`,
     expect(sendDmNotification).toHaveBeenCalledWith(
       message.member,
       'warn',
-      `Actions planned: warning
+      `Actions taken: warning
 Triggered categories: Toxicity
 Reason: toxic`,
       'guild-1',
-      { title: 'Moderation actions planned in guild-1', colorAction: 'warn' },
+      { title: 'Moderation action update in guild-1', colorAction: 'warn' },
     );
     expect(sendDmNotification.mock.invocationCallOrder[0]).toBeLessThan(
       message.member.kick.mock.invocationCallOrder[0],

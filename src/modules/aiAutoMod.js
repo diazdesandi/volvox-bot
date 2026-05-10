@@ -882,7 +882,7 @@ function truncateEmbedFieldValue(value, maxLength = DISCORD_EMBED_FIELD_VALUE_LI
  * Builds the DM message body summarizing DM-capable actions, triggered categories, and the AI-provided reason.
  * @param {Object} result - Analysis result from the AI auto-mod run; expects `categories` (string[]) and `reason` (string).
  * @param {string[]} dmActions - Ordered list of DM-capable actions to summarize (e.g., `['warn','kick']`).
- * @param {{ planned?: boolean }} [options] - Formatting options; `planned` uses pending/planned wording for pre-enforcement DMs.
+ * @param {{ planned?: boolean, actionLines?: string[] }} [options] - Formatting options; `planned` uses pending/planned wording for pre-enforcement DMs; `actionLines` can provide preformatted taken/planned action summary lines.
  * @returns {string} A sanitized, truncated multiline string suitable for an embed field describing actions, categories, and reason.
  */
 function buildAiAutoModDmReason(result, dmActions, options = {}) {
@@ -896,13 +896,10 @@ function buildAiAutoModDmReason(result, dmActions, options = {}) {
   );
 
   const actionLabel = options.planned ? 'Actions planned' : 'Actions taken';
+  const actionLines = options.actionLines ?? [`${actionLabel}: ${actionSummary}`];
 
   return truncateEmbedFieldValue(
-    [
-      `${actionLabel}: ${actionSummary}`,
-      `Triggered categories: ${categorySummary}`,
-      `Reason: ${reason}`,
-    ].join('\n'),
+    [...actionLines, `Triggered categories: ${categorySummary}`, `Reason: ${reason}`].join('\n'),
   );
 }
 
@@ -920,6 +917,33 @@ function getEnabledDmNotificationActions(autoModConfig, executedActions) {
 }
 
 /**
+ * Build enabled DM action groups for mixed taken/planned pre-enforcement notifications.
+ * @param {object} autoModConfig - Merged AI automod configuration; may include a `dmNotifications` map of action→boolean.
+ * @param {Array<{label: string, actions: string[]}>} actionGroups - Action groups to include in the DM.
+ * @returns {Array<{label: string, actions: string[]}>} Groups with disabled/empty actions removed.
+ */
+function getEnabledDmActionGroups(autoModConfig, actionGroups) {
+  return actionGroups
+    .map((group) => ({
+      label: group.label,
+      actions: getEnabledDmNotificationActions(autoModConfig, group.actions),
+    }))
+    .filter((group) => group.actions.length > 0);
+}
+
+/**
+ * Mark enabled DM actions as already notified to avoid duplicate incident DMs.
+ * @param {object} autoModConfig - Merged AI automod configuration; may include a `dmNotifications` map of action→boolean.
+ * @param {Set<string>} notifiedActions - Set of actions already covered by a DM notification attempt.
+ * @param {string[]} actions - Candidate actions to mark.
+ */
+function markNotifiedDmActions(autoModConfig, notifiedActions, actions) {
+  for (const action of getEnabledDmNotificationActions(autoModConfig, actions)) {
+    notifiedActions.add(action);
+  }
+}
+
+/**
  * Send a single DM to the message author summarizing which moderation actions were executed or planned and which categories triggered those actions when any configured DM notifications are enabled.
  *
  * Errors encountered while sending are caught and logged; they do not throw.
@@ -928,7 +952,7 @@ function getEnabledDmNotificationActions(autoModConfig, executedActions) {
  * @param {Object} result - Analysis result containing triggered categories, scores, and provider reason.
  * @param {Object} autoModConfig - Merged AI auto-moderation configuration that controls which actions trigger DMs.
  * @param {string[]} actionsToSummarize - List of moderation actions that were executed or are planned.
- * @param {{ planned?: boolean }} [options] - Formatting options; `planned` uses non-past-tense title and summary wording for pre-enforcement DMs.
+ * @param {{ planned?: boolean, actionGroups?: Array<{label: string, actions: string[]}> }} [options] - Formatting options; `planned` uses non-past-tense title and summary wording for pre-enforcement DMs, and `actionGroups` separates already-taken actions from the current planned action.
  * @returns {boolean} `true` if a DM was attempted (or sent), `false` if no DM was sent because the member/guild was missing or no enabled DM actions were present.
  */
 async function sendAiAutoModDmNotification(
@@ -941,14 +965,29 @@ async function sendAiAutoModDmNotification(
   const { member, guild } = message;
   if (!member || !guild) return false;
 
-  const enabledDmActions = getEnabledDmNotificationActions(autoModConfig, actionsToSummarize);
+  const enabledActionGroups = Array.isArray(options.actionGroups)
+    ? getEnabledDmActionGroups(autoModConfig, options.actionGroups)
+    : null;
+  const enabledDmActions = enabledActionGroups
+    ? [...new Set(enabledActionGroups.flatMap((group) => group.actions))]
+    : getEnabledDmNotificationActions(autoModConfig, actionsToSummarize);
   if (enabledDmActions.length === 0) return false;
 
   const primaryDmAction = getPrimaryAction(enabledDmActions);
-  const dmReason = buildAiAutoModDmReason(result, enabledDmActions, options);
+  const actionLines = enabledActionGroups?.map(
+    (group) =>
+      `${group.label}: ${formatList(group.actions.map((action) => DM_ACTION_LABELS[action]))}`,
+  );
+  const dmReason = buildAiAutoModDmReason(result, enabledDmActions, { ...options, actionLines });
   const guildName = guild.name ?? guild.id;
+  const hasTakenActionLine = enabledActionGroups?.some((group) => group.label === 'Actions taken');
   const dmOptions = options.planned
-    ? { title: `Moderation actions planned in ${guildName}`, colorAction: primaryDmAction }
+    ? {
+        title: hasTakenActionLine
+          ? `Moderation action update in ${guildName}`
+          : `Moderation actions planned in ${guildName}`,
+        colorAction: primaryDmAction,
+      }
     : undefined;
 
   try {
@@ -1012,7 +1051,7 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
   );
   const executedActions = [];
   const successfulAuditEvents = [];
-  let aiAutoModDmAttempted = false;
+  const notifiedDmActions = new Set();
 
   if (actions.length === 0) {
     logAiAutoModAuditEvent(message, result, autoModConfig, {
@@ -1028,20 +1067,29 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
     return executedActions;
   }
 
-  for (const [actionIndex, action] of actions.entries()) {
-    const incidentActionsToSummarize = [...executedActions, ...actions.slice(actionIndex)];
-    if (
-      !aiAutoModDmAttempted &&
-      AI_AUTOMOD_DESTRUCTIVE_ACTIONS.has(action) &&
-      getEnabledDmNotificationActions(autoModConfig, incidentActionsToSummarize).length > 0
-    ) {
-      aiAutoModDmAttempted = await sendAiAutoModDmNotification(
+  for (const action of actions) {
+    if (AI_AUTOMOD_DESTRUCTIVE_ACTIONS.has(action)) {
+      const takenActionsToSummarize = executedActions.filter(
+        (executedAction) => !notifiedDmActions.has(executedAction),
+      );
+      const plannedActionsToSummarize = notifiedDmActions.has(action) ? [] : [action];
+      const incidentActionsToSummarize = [...takenActionsToSummarize, ...plannedActionsToSummarize];
+      const dmAttempted = await sendAiAutoModDmNotification(
         message,
         result,
         autoModConfig,
         incidentActionsToSummarize,
-        { planned: true },
+        {
+          planned: true,
+          actionGroups: [
+            { label: 'Actions taken', actions: takenActionsToSummarize },
+            { label: 'Actions planned', actions: plannedActionsToSummarize },
+          ],
+        },
       );
+      if (dmAttempted) {
+        markNotifiedDmActions(autoModConfig, notifiedDmActions, incidentActionsToSummarize);
+      }
     }
 
     const { success, caseData } = await executeSingleAction({
@@ -1075,13 +1123,19 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
     return executedActions;
   }
 
-  if (!aiAutoModDmAttempted) {
-    aiAutoModDmAttempted = await sendAiAutoModDmNotification(
+  const unnotifiedExecutedActions = executedActions.filter(
+    (action) => !notifiedDmActions.has(action),
+  );
+  if (unnotifiedExecutedActions.length > 0) {
+    const dmAttempted = await sendAiAutoModDmNotification(
       message,
       result,
       autoModConfig,
-      executedActions,
+      unnotifiedExecutedActions,
     );
+    if (dmAttempted) {
+      markNotifiedDmActions(autoModConfig, notifiedDmActions, unnotifiedExecutedActions);
+    }
   }
 
   for (const { action, caseData } of successfulAuditEvents) {
