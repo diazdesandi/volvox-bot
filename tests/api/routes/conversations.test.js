@@ -24,6 +24,10 @@ vi.mock('../../../src/api/middleware/oauthJwt.js', () => ({
   stopJwtCleanup: vi.fn(),
 }));
 
+import {
+  MAX_CONVERSATION_DETAIL_MESSAGES,
+  MAX_CONVERSATION_MEMBERSHIP_HOPS,
+} from '../../../src/api/repositories/conversationRepository.js';
 import { groupMessagesIntoConversations } from '../../../src/api/routes/conversations.js';
 import { createApp } from '../../../src/api/server.js';
 import * as logger from '../../../src/logger.js';
@@ -330,6 +334,13 @@ describe('conversations routes', () => {
       expect(res.body.conversations[0]).toHaveProperty('preview', 'Hello world');
       expect(res.body.conversations[0].participants).toBeInstanceOf(Array);
       expect(res.body.conversations[0].participants).toHaveLength(2);
+      expect(mockPool.query.mock.calls[0][0]).toContain(')) > $3');
+      expect(mockPool.query.mock.calls[0][0]).not.toContain(')) > 900');
+      expect(mockPool.query.mock.calls[0][0]).toContain(
+        '(ARRAY_AGG(id ORDER BY created_at, id))[1]::int',
+      );
+      expect(mockPool.query.mock.calls[0][0]).not.toContain('MIN(id)::int');
+      expect(mockPool.query.mock.calls[0][1][2]).toBe(900);
     });
 
     it('should support search query', async () => {
@@ -417,7 +428,7 @@ describe('conversations routes', () => {
       expect(queryCall[1]).toContain('alice');
     });
 
-    it('should support date range filters', async () => {
+    it('should support date range filters with date-only to as an inclusive full day', async () => {
       mockPool.query.mockResolvedValueOnce({ rows: [] });
 
       const res = await authed(
@@ -427,7 +438,24 @@ describe('conversations routes', () => {
       expect(res.status).toBe(200);
       const queryCall = mockPool.query.mock.calls[0];
       expect(queryCall[0]).toContain('created_at >=');
+      expect(queryCall[0]).toContain('created_at <');
+      expect(queryCall[0]).not.toContain('created_at <=');
+      expect(queryCall[1]).toContain('2024-02-01T00:00:00.000Z');
+    });
+
+    it('should preserve inclusive operator for date-time to filters', async () => {
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+      const res = await authed(
+        request(app).get(
+          '/api/v1/guilds/guild1/conversations?from=2024-01-01&to=2024-01-31T12:34:56.789Z',
+        ),
+      );
+
+      expect(res.status).toBe(200);
+      const queryCall = mockPool.query.mock.calls[0];
       expect(queryCall[0]).toContain('created_at <=');
+      expect(queryCall[1]).toContain('2024-01-31T12:34:56.789Z');
     });
 
     it('should handle pagination params', async () => {
@@ -510,6 +538,79 @@ describe('conversations routes', () => {
       expect(res.body).toHaveProperty('duration');
       expect(res.body).toHaveProperty('tokenEstimate');
       expect(res.body.tokenEstimate).toBeGreaterThan(0);
+      const detailQueryCall = mockPool.query.mock.calls[1];
+      expect(detailQueryCall[0]).not.toContain("interval '2 hours'");
+      expect(detailQueryCall[0]).not.toContain(' OVER ');
+      expect(detailQueryCall[0]).toContain('WITH RECURSIVE anchor');
+      expect(detailQueryCall[0]).toContain('JOIN LATERAL');
+      expect(detailQueryCall[1]).toEqual([
+        'guild1',
+        'ch1',
+        1,
+        900,
+        MAX_CONVERSATION_DETAIL_MESSAGES + 1,
+      ]);
+    });
+
+    it('should include conversation messages beyond two hours when gaps stay within threshold', async () => {
+      const baseTime = new Date('2024-01-15T10:00:00Z');
+      const rows = Array.from({ length: 11 }, (_, index) => ({
+        id: index + 1,
+        channel_id: 'ch1',
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        content: `Message ${index + 1}`,
+        username: index % 2 === 0 ? 'alice' : 'bot',
+        created_at: new Date(baseTime.getTime() + index * 14 * 60 * 1000).toISOString(),
+      }));
+
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 1, channel_id: 'ch1', created_at: baseTime.toISOString() }],
+      });
+      mockPool.query.mockResolvedValueOnce({ rows });
+      mockPool.query.mockResolvedValueOnce({ rows: [] });
+
+      const res = await authed(request(app).get('/api/v1/guilds/guild1/conversations/1'));
+
+      expect(res.status).toBe(200);
+      expect(res.body.messages).toHaveLength(11);
+      expect(res.body.messages.at(-1)).toMatchObject({ id: 11, content: 'Message 11' });
+      expect(new Date(res.body.messages.at(-1).createdAt).getTime() - baseTime.getTime()).toBe(
+        140 * 60 * 1000,
+      );
+      const detailQueryCall = mockPool.query.mock.calls[1];
+      expect(detailQueryCall[0]).not.toContain("interval '2 hours'");
+      expect(detailQueryCall[0]).toContain('WITH RECURSIVE anchor');
+      expect(detailQueryCall[0]).toContain('ORDER BY created_at ASC, id ASC');
+      expect(detailQueryCall[1]).toEqual([
+        'guild1',
+        'ch1',
+        1,
+        900,
+        MAX_CONVERSATION_DETAIL_MESSAGES + 1,
+      ]);
+    });
+
+    it('should return 413 instead of truncating oversized conversation details', async () => {
+      const baseTime = new Date('2024-01-15T10:00:00Z');
+      const rows = Array.from({ length: MAX_CONVERSATION_DETAIL_MESSAGES + 1 }, (_, index) => ({
+        id: index + 1,
+        channel_id: 'ch1',
+        role: 'user',
+        content: `Message ${index + 1}`,
+        username: 'alice',
+        created_at: new Date(baseTime.getTime() + index * 60 * 1000).toISOString(),
+      }));
+
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 1, channel_id: 'ch1', created_at: baseTime.toISOString() }],
+      });
+      mockPool.query.mockResolvedValueOnce({ rows });
+
+      const res = await authed(request(app).get('/api/v1/guilds/guild1/conversations/1'));
+
+      expect(res.status).toBe(413);
+      expect(res.body).toEqual({ error: 'Conversation too large to return' });
+      expect(mockPool.query).toHaveBeenCalledTimes(2);
     });
 
     it('should include flag status on messages', async () => {
@@ -619,6 +720,7 @@ describe('conversations routes', () => {
       mockPool.query.mockResolvedValueOnce({
         rows: [{ id: 1, channel_id: 'ch1', created_at: new Date().toISOString() }],
       }); // anchor check
+      mockPool.query.mockResolvedValueOnce({ rows: [{ belongs: true }] }); // membership check
       mockPool.query.mockResolvedValueOnce({
         rows: [{ id: 1, status: 'open' }],
       }); // insert
@@ -632,6 +734,82 @@ describe('conversations routes', () => {
       expect(res.status).toBe(201);
       expect(res.body).toHaveProperty('flagId', 1);
       expect(res.body).toHaveProperty('status', 'open');
+    });
+
+    it('should flag messages beyond the former fixed conversation window cap', async () => {
+      const createdAt = new Date().toISOString();
+
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 501, channel_id: 'ch1', created_at: createdAt }],
+      }); // msg check
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 1, channel_id: 'ch1', created_at: createdAt }],
+      }); // anchor check
+      mockPool.query.mockResolvedValueOnce({ rows: [{ belongs: true }] }); // membership check
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 1, status: 'open' }],
+      }); // insert
+
+      const res = await authed(
+        request(app)
+          .post('/api/v1/guilds/guild1/conversations/1/flag')
+          .send({ messageId: 501, reason: 'inaccurate' }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(res.body).toHaveProperty('flagId', 1);
+      expect(mockPool.query.mock.calls[2][0]).toContain('WITH RECURSIVE endpoints');
+      expect(mockPool.query.mock.calls[2][0]).not.toContain('content');
+      expect(mockPool.query.mock.calls[2][1]).toEqual([
+        'guild1',
+        'ch1',
+        1,
+        501,
+        900,
+        MAX_CONVERSATION_MEMBERSHIP_HOPS,
+      ]);
+    });
+
+    it('should return 413 when membership validation exceeds the hop cutoff', async () => {
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 2005, channel_id: 'ch1', created_at: new Date().toISOString() }],
+      }); // msg check
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 1, channel_id: 'ch1', created_at: new Date().toISOString() }],
+      }); // anchor check
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ belongs: false, limit_exceeded: true }],
+      }); // membership hit safety cap
+
+      const res = await authed(
+        request(app)
+          .post('/api/v1/guilds/guild1/conversations/1/flag')
+          .send({ messageId: 2005, reason: 'review this' }),
+      );
+
+      expect(res.status).toBe(413);
+      expect(res.body).toEqual({ error: 'Conversation too large to validate' });
+      expect(mockPool.query).toHaveBeenCalledTimes(3);
+    });
+
+    it('should reject same-channel messages outside the anchored conversation window', async () => {
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 5, channel_id: 'ch1', created_at: new Date().toISOString() }],
+      }); // msg check
+      mockPool.query.mockResolvedValueOnce({
+        rows: [{ id: 1, channel_id: 'ch1', created_at: new Date().toISOString() }],
+      }); // anchor check
+      mockPool.query.mockResolvedValueOnce({ rows: [{ belongs: false }] }); // membership excludes messageId 5
+
+      const res = await authed(
+        request(app)
+          .post('/api/v1/guilds/guild1/conversations/1/flag')
+          .send({ messageId: 5, reason: 'wrong conversation' }),
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: 'Message does not belong to this conversation' });
+      expect(mockPool.query).toHaveBeenCalledTimes(3);
     });
 
     it('should return 400 for invalid conversation ID', async () => {
@@ -650,6 +828,7 @@ describe('conversations routes', () => {
       mockPool.query.mockResolvedValueOnce({
         rows: [{ id: 1, channel_id: 'ch1', created_at: new Date().toISOString() }],
       }); // anchor check
+      mockPool.query.mockResolvedValueOnce({ rows: [{ belongs: true }] }); // membership check
       mockPool.query.mockResolvedValueOnce({
         rows: [{ id: 1, status: 'open' }],
       });

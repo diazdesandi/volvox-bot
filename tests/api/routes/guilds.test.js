@@ -65,9 +65,15 @@ vi.mock('../../../src/utils/safeSend.js', () => ({
 
 import { _resetSecretCache } from '../../../src/api/middleware/verifyJwt.js';
 import { createApp } from '../../../src/api/server.js';
+import {
+  AnalyticsRangeValidationError,
+  getErrorMessage,
+  parseAnalyticsRange,
+  UNKNOWN_ERROR_MESSAGE,
+} from '../../../src/api/services/analyticsService.js';
 import { guildCache } from '../../../src/api/utils/discordApi.js';
 import { sessionStore } from '../../../src/api/utils/sessionStore.js';
-import { warn } from '../../../src/logger.js';
+import { error, warn } from '../../../src/logger.js';
 import { getConfig, setConfigValue, setMultipleConfigValues } from '../../../src/modules/config.js';
 import { cacheGetOrSet } from '../../../src/utils/cache.js';
 import { safeSend } from '../../../src/utils/safeSend.js';
@@ -1194,10 +1200,15 @@ describe('guilds routes', () => {
       expect(res.body.kpis.newMembers).toBeTypeOf('number');
       expect(res.body.realtime.activeAiConversations).toBe(3);
       expect(cacheGetOrSet).toHaveBeenCalledWith(
-        expect.stringMatching(/^analytics:v2:guild1:/),
+        expect.stringMatching(/^analytics:v3:guild1:/),
         expect.any(Function),
         expect.any(Number),
       );
+      const kpiQuery = mockPool.query.mock.calls.find(([sql]) =>
+        String(sql).includes('AS active_users'),
+      )?.[0];
+      expect(kpiQuery).toContain("COALESCE('id:' || NULLIF(user_id, '')");
+      expect(kpiQuery).toContain("'name:' || NULLIF(username, '')");
       const peakHourQuery = mockPool.query.mock.calls.find(([sql]) =>
         String(sql).includes('AS peak_hour'),
       )?.[0];
@@ -1230,7 +1241,7 @@ describe('guilds routes', () => {
           String(sql).includes('FROM command_usage') && String(sql).includes('LEFT JOIN LATERAL'),
       )?.[0];
       expect(recentCommandsQuery).toContain(
-        "COALESCE(command_actor.username, '<@' || command_usage.user_id || '>') as actor",
+        "COALESCE(command_actor.username, '<@' || NULLIF(command_usage.user_id, '') || '>', 'Unknown user') as actor",
       );
       expect(recentCommandsQuery).toContain('conversations.user_id = command_usage.user_id');
       expect(res.body.aiUsage).toMatchObject({
@@ -1558,6 +1569,110 @@ describe('guilds routes', () => {
       expect(res.body.error).toMatch(/from/i);
     });
 
+    it('should normalize unexpected range parser failures to validation errors', () => {
+      expect(() => parseAnalyticsRange()).toThrow(AnalyticsRangeValidationError);
+      expect(() => parseAnalyticsRange()).toThrow('Invalid range parameter');
+    });
+
+    it('should extract message strings from error-like objects', () => {
+      expect(getErrorMessage({ message: 'query failed', code: 'ECONNRESET' })).toBe('query failed');
+    });
+
+    it('should include full custom range timestamps in analytics cache keys', async () => {
+      const analyticsKeys = [];
+      cacheGetOrSet.mockImplementation((key, factory) => {
+        if (String(key).startsWith('analytics:v3:')) {
+          analyticsKeys.push(String(key));
+        }
+        return factory();
+      });
+
+      await request(app)
+        .get(
+          '/api/v1/guilds/guild1/analytics?range=custom&from=2026-01-01T00:00:01.000Z&to=2026-01-02T00:00:01.000Z',
+        )
+        .set('x-api-secret', SECRET);
+      await request(app)
+        .get(
+          '/api/v1/guilds/guild1/analytics?range=custom&from=2026-01-01T00:00:30.000Z&to=2026-01-02T00:00:30.000Z',
+        )
+        .set('x-api-secret', SECRET);
+
+      expect(analyticsKeys).toHaveLength(2);
+      expect(analyticsKeys[0]).toContain('2026-01-01T00:00:01.000Z_2026-01-02T00:00:01.000Z');
+      expect(analyticsKeys[1]).toContain('2026-01-01T00:00:30.000Z_2026-01-02T00:00:30.000Z');
+      expect(analyticsKeys[0]).not.toBe(analyticsKeys[1]);
+    });
+
+    it('should build a non-overlapping comparison window ending before the current from boundary', async () => {
+      const fromDate = '2026-01-08T00:00:00.000Z';
+      const toDate = '2026-01-15T00:00:00.000Z';
+
+      const res = await request(app)
+        .get(`/api/v1/guilds/guild1/analytics?range=custom&compare=1&from=${fromDate}&to=${toDate}`)
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      const comparisonValues = mockPool.query.mock.calls[1]?.[1];
+      expect(comparisonValues[1]).toBe('2025-12-31T23:59:59.999Z');
+      expect(comparisonValues[2]).toBe('2026-01-07T23:59:59.999Z');
+      expect(res.body.comparison.previousRange).toEqual({
+        from: '2025-12-31T23:59:59.999Z',
+        to: '2026-01-07T23:59:59.999Z',
+      });
+    });
+
+    it('should log analytics failure context with resolved range filters', async () => {
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('AS total_messages')) {
+          return Promise.reject(new Error('analytics exploded'));
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get(
+          '/api/v1/guilds/guild1/analytics?range=custom&from=2026-01-01T00:00:00.000Z&to=2026-01-02T00:00:00.000Z&interval=hour&channelId=123456789012345678',
+        )
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(500);
+      expect(error).toHaveBeenCalledWith(
+        'Failed to fetch analytics',
+        expect.objectContaining({
+          error: 'analytics exploded',
+          guild: 'guild1',
+          range: 'custom',
+          from: '2026-01-01T00:00:00.000Z',
+          to: '2026-01-02T00:00:00.000Z',
+          interval: 'hour',
+          channelId: '123456789012345678',
+        }),
+      );
+    });
+
+    it('should safely warn and return null when active AI conversation lookup rejects null', async () => {
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('COUNT(DISTINCT channel_id)')) {
+          return Promise.reject(null);
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/analytics?range=week')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.realtime.activeAiConversations).toBeNull();
+      expect(warn).toHaveBeenCalledWith(
+        'Failed to fetch active AI conversations',
+        expect.objectContaining({ error: UNKNOWN_ERROR_MESSAGE, guild: 'guild1' }),
+      );
+    });
+
     it('should anchor today range to UTC midnight', async () => {
       const setUTCHoursSpy = vi.spyOn(Date.prototype, 'setUTCHours');
 
@@ -1750,7 +1865,7 @@ describe('guilds routes', () => {
       expect(res.body.commandUsage).toEqual({ source: 'unavailable', items: [] });
     });
 
-    it('should not query persisted logs and should mark AI usage unavailable for analytics', async () => {
+    it('should not query persisted logs and should mark empty AI usage results as available', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ total_messages: 1, ai_requests: 1, active_users: 1 }] })
         .mockResolvedValueOnce({ rows: [] })
@@ -1771,13 +1886,38 @@ describe('guilds routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.aiUsage).toMatchObject({
-        source: 'unavailable',
+        source: 'ai_usage',
         byModel: [],
         tokens: { prompt: null, completion: null },
       });
       expect(res.body.kpis.aiCostUsd).toBeNull();
       expect(res.body.kpis.newMembers).toBeTypeOf('number');
       expect(mockPool.query.mock.calls.map(([sql]) => sql).join('\n')).not.toMatch(/FROM logs/i);
+    });
+
+    it('should mark AI usage unavailable only when the ai_usage query fails', async () => {
+      mockPool.query.mockImplementation((sql) => {
+        const query = String(sql);
+        if (query.includes('FROM ai_usage')) {
+          return Promise.reject(new Error('ai_usage missing'));
+        }
+        return Promise.resolve({ rows: [] });
+      });
+
+      const res = await request(app)
+        .get('/api/v1/guilds/guild1/analytics?range=week')
+        .set('x-api-secret', SECRET);
+
+      expect(res.status).toBe(200);
+      expect(res.body.aiUsage).toMatchObject({
+        source: 'unavailable',
+        byModel: [],
+        tokens: { prompt: null, completion: null },
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'AI usage query failed; returning empty dataset',
+        expect.objectContaining({ guild: 'guild1', error: 'ai_usage missing' }),
+      );
     });
 
     it('should include source field in aiUsage response for all analytics requests', async () => {
@@ -1802,7 +1942,7 @@ describe('guilds routes', () => {
         .set('x-api-secret', SECRET);
 
       expect(res.status).toBe(200);
-      expect(res.body.aiUsage).toHaveProperty('source', 'unavailable');
+      expect(res.body.aiUsage).toHaveProperty('source', 'ai_usage');
       expect(res.body.aiUsage.tokens).toEqual({ prompt: null, completion: null });
       expect(res.body.aiUsage.byModel).toEqual([]);
       // aiCostUsd should be null (not 0) so clients can render a dedicated "unavailable" state
