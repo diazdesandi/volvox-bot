@@ -64,7 +64,7 @@ The first DM in an incident uses the title **Moderation actions planned in {serv
 
 The bot records every triggered AI auto-moderation response in the audit log, with one entry per action that actually runs. If a message crosses a threshold but no action runs, the bot still records a "no action" entry so you can audit the decision. Global instant enforcement and the incident report channel can still produce delete or flag actions. This applies even when you haven't selected a category-specific response action.
 
-Triage model settings are in **Config → AI & Automation → Triage**. The classifier and response engines use the same supported model dropdown as Content Safety. The dashboard validates `provider:model` strings when you save, so it rejects unsupported or malformed selections up front. If a stored config still contains an invalid value at runtime, the bot logs a warning and falls back through your configured models in order. When none are supported, it uses the default AI model.
+Triage model settings are in **Config → AI & Automation → Triage**. The classifier and response engines use the same supported model dropdown as Content Safety. The dashboard validates `provider:model` strings when you save, so it rejects unsupported or malformed selections up front. If a stored config still contains an invalid value at runtime, the bot logs a warning. It falls back through your configured models in order. When none are supported, it uses the default AI model.
 
 ### Triage latency tuning
 
