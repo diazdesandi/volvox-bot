@@ -41,7 +41,7 @@ Select the ticket category and support staff roles so new tickets land where you
 Tickets support multiple staff roles. You can grant access to several teams — for example, **Support**, **Senior Support**, and **Moderators** — without merging them into one role.
 
 - Open **Config → Tickets** and use the **Support Staff Roles** picker to add every role that should see new tickets.
-  - Volvox.Bot grants ticket access to all selected roles. In channel-mode tickets, each role gets its own permission overwrite. In thread-mode tickets, Volvox.Bot adds members of every selected role only once, even if they hold multiple roles.
+  - Volvox.Bot grants ticket access to all selected roles. In channel-mode tickets, each role gets a permission overwrite. In thread-mode tickets, Volvox.Bot adds members of every selected role only once, even if they hold multiple roles.
   - Volvox.Bot automatically skips stale role IDs (roles that no longer exist on the server).
   - Discord caps channel permission overwrites at 100. Volvox.Bot reserves three for `@everyone`, the ticket opener, and itself. That leaves up to **97 support roles** per channel-mode ticket; Volvox.Bot ignores any extras.
 

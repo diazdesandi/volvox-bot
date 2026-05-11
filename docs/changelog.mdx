@@ -13,13 +13,13 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-12" description="May 2026" tags={["Improvements"]}>
 ## Improvements
 
-**Step-by-step AI auto-mod DMs** — When Active Sentry queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step now sends its own pre-action DM. Each DM lists **Actions taken** so far and the single **Actions planned** step coming next. Members see exactly where they are in the sequence instead of one combined list. Follow-up DMs use a new **Moderation action update in <server name>** title to make it clear they are continuing an existing incident. DM toggles in **Config → Moderation & Safety → Content Safety → User DM Notifications** still control which actions notify, and you'll never receive duplicate DMs for the same action. See [Moderation](/features/moderation).
+**Step-by-step AI auto-mod DMs** — When Active Sentry queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step now sends its own pre-action DM. Each DM lists **Actions taken** so far and the single **Actions planned** step coming next. Members see exactly where they are in the sequence instead of getting one combined list. Follow-up DMs use a new title like **Moderation action update in <server name>** to make it clear this is the same ongoing incident. DM toggles in **Config → Moderation & Safety → Content Safety → User DM Notifications** still control which actions notify members, and members never receive duplicate DMs for the same action. See [Moderation](/features/moderation).
 </Update>
 
 <Update label="2026-05-11" description="May 2026" tags={["Features", "Improvements"]}>
 ## New features
 
-**Triage config defaults documented** — Moderation docs now list the AI triage server config defaults and clamped ranges. `responseCooldownMs` is enforced as the minimum gap between bot replies in a channel. The related `triageDebounceMs` and `memoryTimeoutMs` values are normalized when config loads for compatibility, but they are not dashboard controls yet. See [Moderation](/features/moderation).
+**Triage config defaults documented** — Moderation docs now list the AI triage server config defaults and clamped ranges. `responseCooldownMs` enforces the minimum gap between bot replies in a channel. Config loading also normalizes the related `triageDebounceMs` and `memoryTimeoutMs` values for compatibility, but they aren't dashboard controls yet. See [Moderation](/features/moderation).
 
 ## Improvements
 
@@ -65,7 +65,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Improvements
 
-**More reliable welcome publishing** — Welcome publish routes are rate-limited and validate channels per server, so misconfigured publishes fail fast with a useful error. The dashboard also surfaces persistence warnings when Discord delivery succeeds but state can't be saved, so you know to retry.
+**More reliable welcome publishing** — Welcome publish routes now rate-limit requests and validate channels per server, so misconfigured publishes fail fast with a useful error. The dashboard also surfaces persistence warnings when Discord delivery succeeds but state can't be saved, so you know to retry.
 
 **Friendlier timezone inputs** — Challenge schedule timezones now accept UTC/GMT offsets like `GMT+3` or `UTC-05`, in addition to IANA names like `America/New_York`. Offsets normalize to their canonical IANA equivalent (for example, `GMT+3` → `Etc/GMT-3`) when you save.
 
@@ -237,5 +237,5 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **More reliable bot responses** — Reminders, moderation, reaction roles, and other features now handle command-response failures gracefully (for example, blocked DMs or deleted channels) instead of failing silently.
 
-**Bot owners setting removed** — We removed the "Bot Owners" editor from dashboard Permissions settings. You now manage bot ownership via environment configuration only.
+**Removed the Bot Owners setting** — We removed the "Bot Owners" editor from dashboard Permissions settings. You now manage bot ownership via environment configuration only.
 </Update>
