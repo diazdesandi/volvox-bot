@@ -13,7 +13,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-12" description="May 2026" tags={["Improvements"]}>
 ## Improvements
 
-**Step-by-step AI auto-mod DMs** — When Active Sentry queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step now sends its own pre-action DM. Each DM lists **Actions taken** so far and the single **Actions planned** step coming next. Members see exactly where they are in the sequence instead of getting one combined list. Follow-up DMs use a new title like **Moderation action update in `<server name>`** to make it clear this is the same ongoing incident. DM toggles in **Config → Moderation & Safety → Content Safety → User DM Notifications** still control which actions notify members, and members never receive duplicate DMs for the same action. See [Moderation](/features/moderation).
+**Step-by-step AI auto-mod DMs** — When Active Sentry queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step now sends its own pre-action DM. Each DM lists **Actions taken** so far and the single **Actions planned** step coming next. Members see exactly where they are in the sequence instead of getting one combined list. Follow-up DMs use a new title like **Moderation action update in `<server name>`**. The new title makes clear this is the same ongoing incident. DM toggles in **Config → Moderation & Safety → Content Safety → User DM Notifications** still control which actions notify members, and members never receive duplicate DMs for the same action. See [Moderation](/features/moderation).
 </Update>
 
 <Update label="2026-05-11" description="May 2026" tags={["Features", "Improvements"]}>
@@ -23,7 +23,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Improvements
 
-**Lower-latency mentions** — Direct @mentions and replies to the bot now trigger immediate triage evaluation and bypass the response cooldown for mentioned messages. They still run through the classifier and responder flow, so safety and relevance checks remain in place. See [Moderation](/features/moderation).
+**Lower-latency mentions** — Direct @mentions and replies to the bot now trigger immediate triage evaluation and bypass the response cooldown for mentioned messages. They still run through the classifier and responder flow. Safety and relevance checks remain in place. See [Moderation](/features/moderation).
 
 **Documented triage defaults** — The default response cooldown remains `10000` ms. New server config uses 5 recent context messages by default; runtime triage only falls back to 10 when that value is unset.
 
@@ -33,7 +33,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-10" description="May 2026" tags={["Improvements"]}>
 ## Improvements
 
-**Community features on by default** — TL;DR summaries, engagement tracking, and the reputation XP system now ship enabled out of the box. New servers see leaderboards, badges, and `/tldr` working immediately, and you can still toggle each feature off from the dashboard. See [Community](/features/community) and [TL;DR](/features/tldr).
+**Community features on by default** — TL;DR summaries, engagement tracking, and the reputation XP system now ship enabled out of the box. New servers see leaderboards, badges, and `/tldr` working immediately. You can still toggle each feature off from the dashboard. See [Community](/features/community) and [TL;DR](/features/tldr).
 
 **No more pre-seeded channel IDs** — Welcome, moderation alert, and triage moderation log channels start empty until you select a channel for your server. Earlier defaults referenced channels from a single test server, which could surface confusing errors on first install. Configure each channel from **Config → Onboarding & Growth** and **Config → Moderation & Safety**.
 </Update>
@@ -71,7 +71,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Fixes
 
-**Stricter timezone validation** — The dashboard now rejects unsupported timezone strings up front with a clear error (`expected a valid IANA timezone or UTC/GMT offset`), instead of letting bad values reach the scheduler. Existing servers fall back to a supported timezone automatically, so daily challenges keep posting on time.
+**Stricter timezone validation** — The dashboard now rejects unsupported timezone strings up front with a clear error (`expected a valid IANA timezone or UTC/GMT offset`). This stops bad values from reaching the scheduler. Existing servers fall back to a supported timezone automatically, so daily challenges keep posting on time.
 
 **Steadier server list** — The dashboard server selector no longer drops servers when a single server lookup fails. Loading falls back to bot-side data so admins still see and manage every server they have access to.
 </Update>
@@ -79,7 +79,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-07" description="May 2026" tags={["Improvements", "Fixes"]}>
 ## Improvements
 
-**Dark mode by default** — The [dashboard](/dashboard) and the documentation site now load in dark mode on first visit, matching the rest of the Volvox.Bot brand. You can still switch to light mode or follow your system preference from the theme toggle. We remember your choice across sessions. Charts, toasts, and other themed surfaces pick up the new default automatically.
+**Dark mode by default** — The [dashboard](/dashboard) and the documentation site now load in dark mode on first visit, matching the rest of the Volvox.Bot brand. You can still switch to light mode or follow your system preference from the theme toggle. Your choice persists across sessions. Charts, toasts, and other themed surfaces pick up the new default automatically.
 
 ## Fixes
 
@@ -99,7 +99,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **More reliable AI auto-moderation** — [AI auto-moderation](/features/moderation) now parses model responses more robustly. The bot scores and acts on messages correctly, even when the model buries its verdict in extra text or nested formatting. Fewer skipped messages, fewer "no decision" outcomes.
 
-**Stronger link filter and phishing detection** — The link filter now extracts URLs more accurately from messages, catching more obfuscated and disguised links. We hardened phishing detection against common evasion tricks (extra punctuation, mixed casing, embedded characters), so the filter flags suspicious links even when posters try to sneak them past.
+**Stronger link filter and phishing detection** — The link filter now extracts URLs more accurately from messages, catching more obfuscated and disguised links. Phishing detection resists common evasion tricks (extra punctuation, mixed casing, embedded characters), so the filter flags suspicious links even when posters try to sneak them past.
 </Update>
 
 <Update label="2026-05-02" description="May 2026" tags={["Improvements", "Fixes"]}>
@@ -107,7 +107,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Stronger phishing and link filtering** — The link filter now catches malicious URLs hidden inside markdown links (`[click here](https://...)`), angle-bracket links (`<https://...>`), and links wedged against punctuation. It also detects phishing keywords in URL query strings (for example, `?gift=nitro` on a `.xyz` domain). See [moderation](/features/moderation) for the full set of safeguards.
 
-**Better reliability monitoring** — Volvox.Bot now tracks dashboard errors and performance issues in the background, so we spot and fix problems faster. It scrubs sensitive data — Discord IDs, message content, tokens, query params, headers, and request bodies — before anything leaves your browser. Your server's data stays private by default.
+**Better reliability monitoring** — Volvox.Bot now tracks dashboard errors and performance issues in the background, so problems surface and get fixed faster. It scrubs sensitive data — Discord IDs, message content, tokens, query params, headers, and request bodies — before anything leaves your browser. Your server's data stays private by default.
 
 ## Fixes
 
@@ -147,15 +147,15 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Cleaner model selectors** — Dashboard provider/model pickers now hide models that aren't available to your server, so you only see options you can actually use. The dashboard preserves saved selections with `provider:model` IDs, including ones containing colons.
 
-**Streamlined dashboard overview** — We removed the AI cost tile from the dashboard overview to keep the page focused on activity and health metrics.
+**Streamlined dashboard overview** — The AI cost tile is gone from the dashboard overview, keeping the page focused on activity and health metrics.
 
 ## Fixes
 
 **Auto-mod flag embeds** — Flag embeds now show the global actions that ran for an auto-mod violation, so moderators can see which actions ran at a glance.
 
-**Welcome publish reliability** — We resolved several welcome-panel publishing edge cases: split payloads, status mismatches, persistence gaps, channel-change cleanup, and rate-limited publish routes. The bot now handles them gracefully.
+**Welcome publish reliability** — Welcome-panel publishing now handles several edge cases gracefully: split payloads, status mismatches, persistence gaps, channel-change cleanup, and rate-limited publish routes.
 
-**AI auto-moderation stability** — We hardened prompt handling, action reporting, and case/flag log writes so AI auto-moderation behaves predictably under unusual server conditions.
+**AI auto-moderation stability** — Prompt handling, action reporting, and case/flag log writes are now more resilient, so AI auto-moderation behaves predictably under unusual server conditions.
 </Update>
 
 <Update label="2026-04-26" description="April 2026" tags={["Features", "Improvements"]}>
@@ -165,7 +165,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Improvements
 
-**Landing page navigation and feedback polish** — In-page navigation on [the landing page](https://volvox.bot) now scrolls smoothly to each section. It also respects reduced-motion preferences and lines up correctly under the sticky navbar. The footer, feature grid, pricing table, and stats sections also got a round of visual refinements for cleaner spacing, contrast, and interactive states.
+**Landing page navigation and feedback polish** — In-page navigation on [the landing page](https://volvox.bot) now scrolls smoothly to each section. It also respects reduced-motion preferences and lines up correctly under the sticky navbar. The footer, feature grid, pricing table, and stats sections also got visual refinements. The result is cleaner spacing, contrast, and interactive states.
 </Update>
 
 <Update label="2026-04-25" description="April 2026" tags={["Fixes"]}>
@@ -179,13 +179,13 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **More AI providers** — Moonshot and OpenRouter are now first-class providers for [AI automation](/features/ai-conversations) and [TL;DR](/features/tldr). Select models from these providers in your AI settings using the `provider:model` format (for example, `moonshot:kimi-k2.6`).
 
-**TL;DR is now front and center** — We now highlight `/tldr` on the landing page, and it has a [dedicated docs page](/features/tldr) covering setup, configuration, and examples.
+**TL;DR is now front and center** — `/tldr` now gets top billing on the landing page, with a [dedicated docs page](/features/tldr) covering setup, configuration, and examples.
 
 ## Improvements
 
 **Faster dashboard selectors** — Role and channel pickers across the dashboard load faster and refresh without a full page reload when Discord updates. New roles and channels appear sooner, and switching between pages reuses cached data.
 
-**We moved Starboard to Community Tools** — Starboard settings now live under **Community Tools** in the [dashboard](/dashboard) instead of **Moderation & Safety**, grouping it with other member-facing utilities.
+**Starboard moved to Community Tools** — Starboard settings now live under **Community Tools** in the [dashboard](/dashboard) instead of **Moderation & Safety**, grouping them with other member-facing utilities.
 
 **Version label in the dashboard** — The dashboard sidebar and landing footer now display the current Volvox.Bot version, making it easier to confirm which build you're on.
 </Update>
@@ -205,7 +205,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-04-21" description="April 2026" tags={["Features", "Improvements", "Fixes"]}>
 ## New features
 
-**Role-based triage filtering** — You can now control which members the AI responds to by role. Set allowed roles (whitelist) or excluded roles (blacklist) in your AI Automation settings. The triage filter automatically ignores bot, webhook, and system messages.
+**Role-based triage filtering** — You can now control which members the AI responds to by role. Set allowed roles (allowlist) or excluded roles (denylist) in your AI Automation settings. The triage filter automatically ignores bot, webhook, and system messages.
 
 **Configurable level-up DMs** — You can now set custom DM messages sent to members when they level up. Supports per-level message overrides, a live Discord-style preview, and built-in rate limiting to prevent spam.
 
@@ -219,9 +219,9 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Improvements
 
-**Landing page redesign** — We completely rebuilt the landing page with a new visual style, interactive feature previews in a bento-box grid, animated stats, and a redesigned pricing section.
+**Landing page redesign** — The landing page now sports a new visual style, with interactive feature previews in a bento-box grid, animated stats, and a redesigned pricing section.
 
-**Dashboard polish** — We added row hover highlighting on tables, animated KPI counters, and visible heatmap tooltips. We also made member rows clickable, corrected XP progress bars, and added a live commands-served counter. Inputs and dropdowns now use thin scrollbars for a cleaner look.
+**Dashboard polish** — Tables now have row hover highlighting, KPI counters animate, and heatmap tooltips are visible. Member rows are clickable, XP progress bars are corrected, and a live commands-served counter is in place. Inputs and dropdowns now use thin scrollbars for a cleaner look.
 
 **Identity resolution** — Conversation replays now show real Discord profile icons. Volvox.Bot resolves mentions to actual usernames, and audit logs display rich user identity (display name + username).
 
@@ -229,13 +229,13 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Mobile experience** — The settings save toolbar, header, and sidebar are now fully responsive on smaller screens. Every animated component now supports reduced-motion preferences.
 
-**OpenGraph previews** — Sharing Volvox.Bot links now shows rich previews on social media, Discord, and Slack. We added a sitemap and robots.txt for better search engine discoverability.
+**OpenGraph previews** — Sharing Volvox.Bot links now shows rich previews on social media, Discord, and Slack. A sitemap and robots.txt are now in place for better search engine discoverability.
 
-**Branding update** — We standardized all visible branding to "Volvox.Bot" across the product.
+**Branding update** — Visible branding is now consistent as "Volvox.Bot" across the product.
 
 ## Fixes
 
 **More reliable bot responses** — Reminders, moderation, reaction roles, and other features now handle command-response failures gracefully (for example, blocked DMs or deleted channels) instead of failing silently.
 
-**Removed the Bot Owners setting** — We removed the "Bot Owners" editor from dashboard Permissions settings. You now manage bot ownership via environment configuration only.
+**Removed the Bot Owners setting** — The "Bot Owners" editor is gone from dashboard Permissions settings. You now manage bot ownership via environment configuration only.
 </Update>
