@@ -7,13 +7,13 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-10" description="May 2026" tags={["Improvements"]}>
 ## Improvements
 
-**Multiple support staff roles for tickets** — The **Support role** picker on **Config → Tickets** is now **Support Staff Roles** and accepts as many roles as you need. The bot grants ticket access to every selected role, dedupes members across roles when adding them to thread tickets, and skips roles that no longer exist. Existing single-role setups continue to work unchanged. See [Tickets](/features/tickets).
+**Multiple support staff roles for tickets** — The **Support role** picker on **Config → Tickets** is now **Support Staff Roles** and accepts as many roles as you need. The bot grants ticket access to every selected role. It dedupes members across roles when adding them to thread tickets, and skips roles that no longer exist. Existing single-role setups continue to work unchanged. See [Tickets](/features/tickets).
 </Update>
 
 <Update label="2026-05-12" description="May 2026" tags={["Improvements"]}>
 ## Improvements
 
-**Step-by-step AI auto-mod DMs** — When Active Sentry queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step now sends its own pre-action DM. Each DM lists **Actions taken** so far and the single **Actions planned** step coming next. Members see exactly where they stand in the sequence, instead of staring down one combined list. Follow-up DMs use a new **Moderation action update in {server}** title to make it clear they are continuing an existing incident. DM toggles in **Config → Moderation & Safety → Content Safety → User DM Notifications** still control which actions notify, and you'll never receive duplicate DMs for the same action. See [Moderation](/features/moderation).
+**Step-by-step AI auto-mod DMs** — When Active Sentry queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step now sends its own pre-action DM. Each DM lists **Actions taken** so far and the single **Actions planned** step coming next. Members see exactly where they are in the sequence, instead of a single combined list. Follow-up DMs use a new **Moderation action update in {server}** title to make it clear they are continuing an existing incident. DM toggles in **Config → Moderation & Safety → Content Safety → User DM Notifications** still control which actions notify, and you'll never receive duplicate DMs for the same action. See [Moderation](/features/moderation).
 </Update>
 
 <Update label="2026-05-11" description="May 2026" tags={["Features", "Improvements"]}>
