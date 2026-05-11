@@ -11,10 +11,6 @@ vi.mock('../../src/modules/config.js', () => ({
   getConfig: vi.fn(),
 }));
 
-vi.mock('../../src/modules/afkHandler.js', () => ({
-  handleAfkMentions: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../src/modules/rateLimit.js', () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ limited: false }),
 }));

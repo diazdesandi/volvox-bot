@@ -477,7 +477,6 @@ export interface BotConfig {
   tldr?: TldrConfig;
   reputation?: ReputationConfig;
   xp?: XpConfig;
-  afk?: ToggleSectionConfig;
   engagement?: EngagementConfig;
   github?: GithubConfig;
   review?: ReviewConfig;
@@ -505,7 +504,6 @@ export type ConfigSection =
   | 'tldr'
   | 'reputation'
   | 'xp'
-  | 'afk'
   | 'engagement'
   | 'github'
   | 'review'

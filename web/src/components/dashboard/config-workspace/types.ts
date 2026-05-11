@@ -18,7 +18,7 @@ export type ConfigFeatureId =
   | 'reputation'
   | 'xp-level-actions'
   | 'engagement'
-  | 'tldr-afk'
+  | 'tldr'
   | 'challenges'
   | 'moderation'
   | 'starboard'

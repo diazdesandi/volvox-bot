@@ -27,7 +27,6 @@ const COMMUNITY_FEATURES = [
     desc: '/review peer code review requests with claim workflow',
   },
   { key: 'tldr', label: 'TL;DR Summaries', desc: '/tldr for AI channel summaries' },
-  { key: 'afk', label: 'AFK System', desc: '/afk auto-respond when members are away' },
   {
     key: 'engagement',
     label: 'Engagement Tracking',

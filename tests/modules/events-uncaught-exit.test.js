@@ -59,9 +59,6 @@ vi.mock('../../src/modules/rateLimit.js', () => ({
 vi.mock('../../src/modules/reputation.js', () => ({
   handleXpGain: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../../src/modules/afkHandler.js', () => ({
-  handleAfkMentions: vi.fn().mockResolvedValue(undefined),
-}));
 vi.mock('../../src/modules/reviewHandler.js', () => ({
   handleReviewClaim: vi.fn().mockResolvedValue(undefined),
 }));

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { SAFE_CONFIG_KEYS } from '../src/api/utils/configAllowlist.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const configPath = join(__dirname, '..', 'config.json');
@@ -117,14 +118,15 @@ describe('config.json', () => {
     expect(config.permissions).toHaveProperty('allowedCommands');
   });
 
-  it('should enable engagement and AI summary defaults while leaving AFK off', () => {
+  it('should enable engagement and AI summary defaults without AFK config', () => {
     expect(config).toHaveProperty('engagement');
     expect(config.engagement.enabled).toBe(true);
     expect(config.engagement.trackMessages).toBe(true);
     expect(config.engagement.trackReactions).toBe(true);
     expect(config.reputation.enabled).toBe(true);
     expect(config.tldr.enabled).toBe(true);
-    expect(config.afk.enabled).toBe(false);
+    expect(config).not.toHaveProperty('afk');
+    expect(SAFE_CONFIG_KEYS.has('afk')).toBe(false);
   });
 
   it('should have a logging section', () => {

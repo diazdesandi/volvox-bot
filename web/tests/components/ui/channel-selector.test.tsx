@@ -18,6 +18,11 @@ const TEXT_CHANNELS = [
   { id: 'ch-3', name: 'off-topic', type: 0 },
 ];
 
+const MIXED_CHANNELS = [
+  { id: 'ch-1', name: 'general', type: 0 },
+  { id: 'cat-1', name: 'Support Tickets', type: 4 },
+];
+
 describe('ChannelSelector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -200,5 +205,58 @@ describe('ChannelSelector', () => {
     });
 
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('allows category channels to be selected when filtering for categories', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <ChannelDirectoryProvider>
+        <ChannelSelector
+          guildId="guild-1"
+          selected={[]}
+          onChange={onChange}
+          channels={MIXED_CHANNELS}
+          filter="category"
+          maxSelections={1}
+        />
+      </ChannelDirectoryProvider>,
+    );
+
+    await user.click(screen.getByRole('combobox'));
+
+    const categoryItem = await screen.findByRole('option', { name: /Support Tickets/i });
+    expect(categoryItem).not.toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(categoryItem);
+
+    expect(onChange).toHaveBeenCalledWith(['cat-1']);
+  });
+
+  it('keeps category channels disabled when filter is not category', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <ChannelDirectoryProvider>
+        <ChannelSelector
+          guildId="guild-1"
+          selected={[]}
+          onChange={onChange}
+          channels={MIXED_CHANNELS}
+          filter="all"
+        />
+      </ChannelDirectoryProvider>,
+    );
+
+    await user.click(screen.getByRole('combobox'));
+
+    const categoryItem = await screen.findByRole('option', { name: /Support Tickets/i });
+    expect(categoryItem).toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(categoryItem);
+
+    expect(onChange).not.toHaveBeenCalled();
   });
 });

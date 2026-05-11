@@ -16,6 +16,10 @@ describe('command files', () => {
     expect(commandFiles.length).toBeGreaterThan(0);
   });
 
+  it('should not register the removed AFK command', () => {
+    expect(commandFiles).not.toContain('afk.js');
+  });
+
   for (const file of commandFiles) {
     describe(file, () => {
       let mod;

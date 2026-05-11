@@ -19,7 +19,6 @@ export const SAFE_CONFIG_KEYS = new Set([
   'poll',
   'showcase',
   'tldr',
-  'afk',
   'reputation',
   'engagement',
   'voice',

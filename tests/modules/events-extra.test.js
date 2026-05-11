@@ -72,12 +72,8 @@ vi.mock('../../src/modules/rateLimit.js', () => ({
 vi.mock('../../src/modules/reputation.js', () => ({
   handleXpGain: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../../src/modules/afkHandler.js', () => ({
-  handleAfkMentions: vi.fn().mockResolvedValue(undefined),
-}));
 
 import { handleShowcaseModalSubmit, handleShowcaseUpvote } from '../../src/commands/showcase.js';
-import { handleAfkMentions } from '../../src/modules/afkHandler.js';
 import { handleHintButton, handleSolveButton } from '../../src/modules/challengeScheduler.js';
 import { getConfig } from '../../src/modules/config.js';
 import { registerMessageCreateHandler } from '../../src/modules/events/messageCreate.js';
@@ -470,19 +466,6 @@ describe('registerMessageCreateHandler — extra branches', () => {
     getConfig.mockReturnValue(config);
     registerMessageCreateHandler(client, config, null);
   }
-
-  it('should handle AFK handler errors gracefully', async () => {
-    setup();
-    handleAfkMentions.mockRejectedValueOnce(new Error('afk boom'));
-    await onCallbacks.messageCreate({
-      author: { bot: false, username: 'user', id: 'u1' },
-      guild: { id: 'g1' },
-      content: 'hello',
-      channel: { id: 'c1', sendTyping: vi.fn(), send: vi.fn() },
-      mentions: { has: vi.fn().mockReturnValue(false), repliedUser: null },
-      reference: null,
-    });
-  });
 
   it('should handle rate limit check errors gracefully', async () => {
     setup();

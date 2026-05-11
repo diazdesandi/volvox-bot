@@ -270,7 +270,6 @@ describe('OnboardingGrowthCategory', () => {
         maxMessages: 200,
         cooldownSeconds: 300,
       },
-      afk: { enabled: false },
     };
     const updateDraftConfig = vi.fn((updater) => updater(draftConfig));
 
@@ -278,8 +277,8 @@ describe('OnboardingGrowthCategory', () => {
       draftConfig,
       saving: false,
       guildId: 'guild-1',
-      visibleFeatureIds: new Set(['tldr-afk']),
-      activeTabId: 'tldr-afk',
+      visibleFeatureIds: new Set(['tldr']),
+      activeTabId: 'tldr',
       updateDraftConfig,
     });
 
@@ -287,6 +286,8 @@ describe('OnboardingGrowthCategory', () => {
 
     const modelSelect = screen.getByLabelText('TL;DR Model');
     expect(modelSelect).toHaveValue('moonshot:kimi-k2.6');
+    expect(screen.queryByText('AFK Responder')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('AFK')).not.toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Kimi K2.6' })).toHaveAttribute(
       'value',
       'moonshot:kimi-k2.6',
@@ -316,12 +317,11 @@ describe('OnboardingGrowthCategory', () => {
           maxMessages: 200,
           cooldownSeconds: 300,
         },
-        afk: { enabled: false },
       },
       saving: false,
       guildId: 'guild-1',
-      visibleFeatureIds: new Set(['tldr-afk']),
-      activeTabId: 'tldr-afk',
+      visibleFeatureIds: new Set(['tldr']),
+      activeTabId: 'tldr',
       updateDraftConfig,
     });
 
@@ -345,7 +345,6 @@ describe('OnboardingGrowthCategory', () => {
         maxMessages: 200,
         cooldownSeconds: 300,
       },
-      afk: { enabled: false },
     };
     const updateDraftConfig = vi.fn();
 
@@ -353,8 +352,8 @@ describe('OnboardingGrowthCategory', () => {
       draftConfig,
       saving: false,
       guildId: 'guild-1',
-      visibleFeatureIds: new Set(['tldr-afk']),
-      activeTabId: 'tldr-afk',
+      visibleFeatureIds: new Set(['tldr']),
+      activeTabId: 'tldr',
       updateDraftConfig,
     });
 
@@ -382,7 +381,6 @@ describe('OnboardingGrowthCategory', () => {
         maxMessages: 200,
         cooldownSeconds: 300,
       },
-      afk: { enabled: false },
     };
     const updateDraftConfig = vi.fn();
 
@@ -390,8 +388,8 @@ describe('OnboardingGrowthCategory', () => {
       draftConfig,
       saving: false,
       guildId: 'guild-1',
-      visibleFeatureIds: new Set(['tldr-afk']),
-      activeTabId: 'tldr-afk',
+      visibleFeatureIds: new Set(['tldr']),
+      activeTabId: 'tldr',
       updateDraftConfig,
     });
 
@@ -419,7 +417,6 @@ describe('OnboardingGrowthCategory', () => {
         maxMessages: 200,
         cooldownSeconds: 300,
       },
-      afk: { enabled: false },
     };
     const updateDraftConfig = vi.fn();
 
@@ -427,8 +424,8 @@ describe('OnboardingGrowthCategory', () => {
       draftConfig,
       saving: false,
       guildId: 'guild-1',
-      visibleFeatureIds: new Set(['tldr-afk']),
-      activeTabId: 'tldr-afk',
+      visibleFeatureIds: new Set(['tldr']),
+      activeTabId: 'tldr',
       updateDraftConfig,
     });
 

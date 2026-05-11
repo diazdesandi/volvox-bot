@@ -31,7 +31,7 @@ AI-powered Discord bot and dashboard — built by the [Volvox](https://volvox.de
 - **🎤 Voice Activity Tracking** — Voice channel metrics and leaderboards.
 - **🏆 Challenges** — Daily coding challenges with submissions and leaderboards.
 - **🎫 Tickets** — Support ticket system with threads.
-- **💬 Polls · ✂️ Snippets · ⏰ Reminders · 💤 AFK · 📌 Showcase · 👀 Code Review**
+- **💬 Polls · ✂️ Snippets · ⏰ Reminders · 📌 Showcase · 👀 Code Review**
 
 ### Moderation
 

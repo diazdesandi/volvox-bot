@@ -198,7 +198,6 @@
       "modlog": "moderator",
       "announce": "moderator",
       "tldr": "everyone",
-      "afk": "everyone",
       "github": "everyone",
       "rank": "everyone",
       "leaderboard": "everyone",
@@ -254,9 +253,6 @@
     "defaultMessages": 50,
     "maxMessages": 200,
     "cooldownSeconds": 300
-  },
-  "afk": {
-    "enabled": false
   },
   "engagement": {
     "enabled": true,

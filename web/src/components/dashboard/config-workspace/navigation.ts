@@ -97,10 +97,10 @@ export const CONFIG_NAVIGATION: ConfigCategoryNav[] = [
         desc: 'Configure automatic rewards when members level up.',
       },
       {
-        id: 'tldr-afk',
-        label: 'TL;DR & AFK',
+        id: 'tldr',
+        label: 'TL;DR',
         icon: MessageSquare,
-        desc: 'Quick toggles for summary and away-state features.',
+        desc: 'Enable AI summaries and tune summary defaults.',
       },
       {
         id: 'challenges',

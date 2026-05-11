@@ -7,7 +7,6 @@ import { Events } from 'discord.js';
 import { error as logError, warn } from '../../logger.js';
 import { getUserFriendlyMessage } from '../../utils/errors.js';
 import { safeReply } from '../../utils/safeSend.js';
-import { handleAfkMentions } from '../afkHandler.js';
 import { getChannelMode, isChannelBlocked } from '../ai.js';
 import { checkAiAutoMod } from '../aiAutoMod.js';
 import { getConfig } from '../config.js';
@@ -24,7 +23,7 @@ import { recordCommunityActivity } from '../welcome.js';
 /**
  * Register a MessageCreate handler that processes incoming messages for moderation, community activity, and AI triage routing.
  *
- * Handles per-guild configuration, AFK mentions, moderation checks (rate limits, link filtering, spam, AI auto-mod), community activity recording,
+ * Handles per-guild configuration, moderation checks (rate limits, link filtering, spam, AI auto-mod), community activity recording,
  * non-blocking engagement/XP tasks, and AI routing/triage (modes: off, mention, vibe) including immediate evaluation for mentions/replies and periodic accumulation.
  *
  * @param {Client} client - Discord client instance.
@@ -39,17 +38,6 @@ export function registerMessageCreateHandler(client, _config, healthMonitor) {
 
     // Resolve per-guild config so feature gates respect guild overrides
     const guildConfig = getConfig(message.guild.id);
-
-    // AFK handler — check if sender is AFK or if any mentioned user is AFK
-    try {
-      await handleAfkMentions(message);
-    } catch (afkErr) {
-      logError('AFK handler failed', {
-        channelId: message.channel.id,
-        userId: message.author.id,
-        error: afkErr?.message,
-      });
-    }
 
     // Rate limit + link filter — both gated on moderation.enabled.
     // Each check is isolated so a failure in one doesn't prevent the other from running.

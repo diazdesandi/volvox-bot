@@ -318,6 +318,7 @@ export function ChannelSelector({
                   const isSelected = selected.includes(channel.id);
                   const isDisabled = !isSelected && atMaxSelection && maxSelections !== 1;
                   const isCategory = channel.type === CHANNEL_TYPES.GUILD_CATEGORY;
+                  const isCategoryHeader = isCategory && filter !== 'category';
                   const icon = getChannelIcon(channel.type);
 
                   return (
@@ -325,14 +326,14 @@ export function ChannelSelector({
                       key={channel.id}
                       value={`${channel.name} ${getChannelTypeLabel(channel.type)}`}
                       onSelect={() => toggleChannel(channel.id)}
-                      disabled={isDisabled || isCategory}
+                      disabled={isDisabled || isCategoryHeader}
                       className={cn(
                         'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 cursor-pointer mb-1',
                         isSelected
                           ? 'bg-primary/10 text-primary shadow-[inset_0_0_12px_hsl(var(--primary)/0.1)] border border-primary/20'
                           : 'text-muted-foreground hover:bg-muted/10 border border-transparent',
-                        (isDisabled || isCategory) && 'cursor-not-allowed opacity-40',
-                        isCategory &&
+                        (isDisabled || isCategoryHeader) && 'cursor-not-allowed opacity-40',
+                        isCategoryHeader &&
                           'font-black uppercase tracking-[0.1em] text-[10px] text-muted-foreground bg-muted/20 mt-4 mb-2 border-border',
                       )}
                     >
@@ -347,7 +348,7 @@ export function ChannelSelector({
                         </span>
                       )}
                       <span className="flex-1 truncate font-medium">{channel.name}</span>
-                      {!isCategory && (
+                      {!isCategoryHeader && (
                         <div
                           className={cn(
                             'w-4 h-4 rounded-full border transition-all duration-300 flex items-center justify-center',

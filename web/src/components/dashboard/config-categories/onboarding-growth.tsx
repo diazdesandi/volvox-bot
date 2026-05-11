@@ -276,7 +276,7 @@ function showWelcomePublishOutcome(
 /**
  * Renders the Onboarding & Growth configuration category UI that allows editing multiple feature sections based on the active tab.
  *
- * Displays controls for Welcome, Engagement, Reputation, TL;DR & AFK, and Challenges features; reads from and updates the editable draft configuration from context, and disables inputs while saving.
+ * Displays controls for Welcome, Engagement, Reputation, TL;DR, and Challenges features; reads from and updates the editable draft configuration from context, and disables inputs while saving.
  *
  * @returns The configuration UI element for the selected onboarding/growth feature, or `null` if no draft configuration or active tab is available.
  */
@@ -545,7 +545,7 @@ export function OnboardingGrowthCategory() {
   const tldrModelValue = getVisibleProviderModelValue(currentTldrModel);
 
   useEffect(() => {
-    if (!draftConfig || activeTab !== 'tldr-afk' || !hasVisibleModelOptions) return;
+    if (!draftConfig || activeTab !== 'tldr' || !hasVisibleModelOptions) return;
     if (!shouldNormalizeSavedModel(currentTldrModel, tldrModelValue)) return;
 
     updateDraftConfig((prev) => {
@@ -604,14 +604,12 @@ export function OnboardingGrowthCategory() {
         reputation: { ...prev.reputation, enabled: v },
         xp: { ...prev.xp, enabled: v },
       }));
-  } else if (activeTab === 'tldr-afk') {
-    isCurrentFeatureEnabled =
-      (draftConfig.tldr?.enabled ?? false) || (draftConfig.afk?.enabled ?? false);
+  } else if (activeTab === 'tldr') {
+    isCurrentFeatureEnabled = draftConfig.tldr?.enabled ?? false;
     handleToggleCurrentFeature = (v) =>
       updateDraftConfig((prev) => ({
         ...prev,
         tldr: { ...prev.tldr, enabled: v },
-        afk: { ...prev.afk, enabled: v },
       }));
   } else if (activeTab === 'challenges') {
     isCurrentFeatureEnabled = draftConfig.challenges?.enabled ?? false;
@@ -1429,10 +1427,10 @@ export function OnboardingGrowthCategory() {
         </div>
       )}
 
-      {/* TL;DR & AFK Layout */}
-      {activeTab === 'tldr-afk' && (
+      {/* TL;DR Layout */}
+      {activeTab === 'tldr' && (
         <div className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid gap-6">
             <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
@@ -1475,33 +1473,6 @@ export function OnboardingGrowthCategory() {
                   className={cn(inputClasses, 'resize-none h-40')}
                   placeholder="Define how the AI should tone the summary..."
                 />
-              </div>
-            </div>
-
-            <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-foreground/90">AFK Responder</h3>
-                  <p className="text-[11px] text-muted-foreground font-medium">
-                    Automatic /afk status responses.
-                  </p>
-                </div>
-                <ToggleSwitch
-                  checked={draftConfig.afk?.enabled ?? false}
-                  onChange={(v) =>
-                    updateDraftConfig((p) => ({ ...p, afk: { ...p.afk, enabled: v } }))
-                  }
-                  label="AFK"
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2 text-xs text-muted-foreground px-2">
-                  <p>
-                    Members can set custom away messages and be automatically notified of mentions
-                    while offline.
-                  </p>
-                  <p className="pt-2 font-bold text-primary/80">Premium integration included.</p>
-                </div>
               </div>
             </div>
           </div>
