@@ -1,5 +1,8 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getGuildIconUrl } from "@/lib/discord";
+import { getBotInviteUrl, getGuildIconUrl } from "@/lib/discord";
 import {
   fetchUserGuilds,
   fetchBotGuilds,
@@ -8,6 +11,28 @@ import {
   BOT_GUILD_ACCESS_FALLBACK_TIMEOUT_MS,
   USER_GUILDS_REQUEST_TIMEOUT_MS,
 } from "@/lib/discord.server";
+
+const MANAGE_CHANNELS_PERMISSION = 1n << 4n;
+
+function getTestFilePath(importMetaUrl: string): string {
+  const url = new URL(importMetaUrl);
+
+  if (url.pathname.startsWith("/@fs/")) {
+    return fileURLToPath(new URL(`file://${url.pathname.slice("/@fs".length)}`));
+  }
+
+  return fileURLToPath(url);
+}
+
+const repoRoot = resolve(dirname(getTestFilePath(import.meta.url)), "../../..");
+const gettingStartedDocPath = resolve(repoRoot, "docs/getting-started.mdx");
+
+function getPermissionsFromInviteUrl(inviteUrl: string): bigint {
+  const permissions = new URL(inviteUrl).searchParams.get("permissions");
+  if (!permissions) throw new Error("Invite URL is missing permissions");
+
+  return BigInt(permissions);
+}
 
 describe("getGuildIconUrl", () => {
   it("returns null when no icon hash is provided", () => {
@@ -41,6 +66,121 @@ describe("getGuildIconUrl", () => {
   it("defaults to size 128", () => {
     const url = getGuildIconUrl("123", "abc123");
     expect(url).toContain("size=128");
+  });
+});
+
+describe("getBotInviteUrl", () => {
+  const originalClientId = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
+
+  afterEach(() => {
+    if (originalClientId === undefined) {
+      delete process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
+      return;
+    }
+
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = originalClientId;
+  });
+
+  it("requests Manage Channels so channel-mode tickets can create channels", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl();
+
+    expect(inviteUrl).not.toBeNull();
+    expect(getPermissionsFromInviteUrl(inviteUrl ?? "") & MANAGE_CHANNELS_PERMISSION).toBe(
+      MANAGE_CHANNELS_PERMISSION,
+    );
+  });
+
+  it("keeps the getting started invite link in sync with the generated permission mask", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl();
+    const permissions = inviteUrl ? new URL(inviteUrl).searchParams.get("permissions") : null;
+    const gettingStartedDoc = readFileSync(gettingStartedDocPath, "utf8");
+
+    expect(permissions).not.toBeNull();
+    expect(gettingStartedDoc).toContain(`permissions=${permissions}`);
+  });
+
+  it("returns null when NEXT_PUBLIC_DISCORD_CLIENT_ID is not set", () => {
+    delete process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID;
+
+    const inviteUrl = getBotInviteUrl();
+
+    expect(inviteUrl).toBeNull();
+  });
+
+  it("embeds the client ID in the generated URL", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "my-unique-client-99";
+
+    const inviteUrl = getBotInviteUrl();
+
+    expect(inviteUrl).not.toBeNull();
+    expect(new URL(inviteUrl!).searchParams.get("client_id")).toBe("my-unique-client-99");
+  });
+
+  it("includes bot and applications.commands in the scope", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl();
+
+    expect(inviteUrl).not.toBeNull();
+    const scope = new URL(inviteUrl!).searchParams.get("scope");
+    expect(scope).toContain("bot");
+    expect(scope).toContain("applications.commands");
+  });
+
+  it("encodes the exact permission value 1099511704598 (regression guard for permission mask)", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl();
+
+    expect(inviteUrl).not.toBeNull();
+    const permissions = getPermissionsFromInviteUrl(inviteUrl!);
+    expect(permissions).toBe(1099511704598n);
+  });
+
+  it("includes all required individual permissions in the mask", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl();
+    expect(inviteUrl).not.toBeNull();
+
+    const permissions = getPermissionsFromInviteUrl(inviteUrl!);
+
+    const KICK_MEMBERS      = 1n << 1n;   //           2
+    const BAN_MEMBERS       = 1n << 2n;   //           4
+    const MANAGE_CHANNELS   = 1n << 4n;   //          16
+    const VIEW_CHANNELS     = 1n << 10n;  //       1,024
+    const SEND_MESSAGES     = 1n << 11n;  //       2,048
+    const MANAGE_MESSAGES   = 1n << 13n;  //       8,192
+    const READ_MSG_HISTORY  = 1n << 16n;  //      65,536
+    const MODERATE_MEMBERS  = 1n << 40n;  // 1,099,511,627,776
+
+    for (const [name, bit] of [
+      ["Kick Members", KICK_MEMBERS],
+      ["Ban Members", BAN_MEMBERS],
+      ["Manage Channels", MANAGE_CHANNELS],
+      ["View Channels", VIEW_CHANNELS],
+      ["Send Messages", SEND_MESSAGES],
+      ["Manage Messages", MANAGE_MESSAGES],
+      ["Read Message History", READ_MSG_HISTORY],
+      ["Moderate Members", MODERATE_MEMBERS],
+    ] as [string, bigint][]) {
+      expect(permissions & bit, `Expected ${name} bit to be set`).toBe(bit);
+    }
+  });
+
+  it("uses the discord.com OAuth2 authorize endpoint", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl();
+
+    expect(inviteUrl).not.toBeNull();
+    const url = new URL(inviteUrl!);
+    expect(url.hostname).toBe("discord.com");
+    expect(url.pathname).toBe("/api/oauth2/authorize");
   });
 });
 

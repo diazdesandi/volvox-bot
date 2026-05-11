@@ -14,6 +14,7 @@ When you add Volvox.Bot to your server, it requests the permissions it needs to 
 |------------|----------------|
 | Kick Members | Moderation actions |
 | Ban Members | Moderation actions |
+| Manage Channels | Create and permission-lock channel-mode support tickets |
 | View Channels | Access channels for logging and AI conversations |
 | Send Messages | Bot responses, notifications |
 | Manage Messages | Auto-mod message deletion |
@@ -22,6 +23,10 @@ When you add Volvox.Bot to your server, it requests the permissions it needs to 
 
 <Callout type="info">
 Volvox.Bot only uses permissions when performing an action. It doesn't read or store messages unless a feature requires it.
+</Callout>
+
+<Callout type="tip">
+Channel-mode tickets require **Manage Channels** because Discord treats creating the ticket channel and applying its private permission overwrites as channel management.
 </Callout>
 
 ## Dashboard access

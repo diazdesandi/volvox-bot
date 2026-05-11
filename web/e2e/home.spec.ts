@@ -95,7 +95,7 @@ test.describe('Hero Section', () => {
     await expect(page.getByText('BOT', { exact: true })).toBeVisible();
     await expect(
       page.getByText(
-        'Where community insight, resilient moderation, and sustainable growth come together.',
+        'We bring AI to Discord. For free.',
       ),
     ).toBeVisible();
   });

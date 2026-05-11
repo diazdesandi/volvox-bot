@@ -139,7 +139,19 @@ function DataThreads() {
   );
 }
 
-// ─── MAIN HERO ───────────────────────────────────────────
+/**
+ * Render the main hero section with animated title, subtitle, CTA, and decorative background.
+ *
+ * The component displays the branded title, a short subtitle, a console-style call-to-action
+ * with an optional "Add to Server" link, and multiple layered visual decorations (prismatic
+ * background, animated data threads, parallax elements, and looping background particles).
+ *
+ * Animations and scroll-driven transforms are applied to the title, subtitle, CTA, and deep
+ * background layers to create entrance and parallax effects. The version label is shown at
+ * the top and the "Add to Server" button is rendered only when a bot invite URL is available.
+ *
+ * @returns The hero section React element.
+ */
 export function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -259,7 +271,7 @@ export function Hero() {
 
         {/* Subtitle */}
         <p className="hero-sub text-foreground/50 text-base md:text-lg max-w-md text-center font-medium leading-relaxed mb-16 tracking-tight">
-          Where community insight, resilient moderation, and sustainable growth come together.
+          We bring AI to Discord. For free.
         </p>
 
         {/* Console CTA */}
