@@ -36,13 +36,20 @@ vi.mock('next/image', () => ({
 
 vi.mock('framer-motion', async () => {
   const React = await import('react');
-  const MotionDiv = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-    ({ children, ...props }, ref) => (
+  const MotionDiv = React.forwardRef<
+    HTMLDivElement,
+    React.HTMLAttributes<HTMLDivElement> & {
+      animate?: unknown;
+      initial?: unknown;
+      transition?: unknown;
+    }
+  >(({ animate: _animate, initial: _initial, transition: _transition, children, ...props }, ref) => {
+    return (
       <div ref={ref} {...props}>
         {children}
       </div>
-    ),
-  );
+    );
+  });
   MotionDiv.displayName = 'MotionDiv';
 
   return {
