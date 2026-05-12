@@ -50,7 +50,7 @@ AI auto-moderation settings are in **Config → Moderation & Safety → Content 
 | Instant enforcement | Global auto-delete for messages that trigger AI auto-moderation |
 | Sensitivity thresholds | Per-category score required before action runs |
 | Response actions | Select any combination of flag, delete, warn, timeout, kick, or ban per category. Leave a category empty to skip category-specific responses. `warn` creates a warning record, sends the warning DM (when enabled), and applies your escalation rules. |
-| User DM notifications | Select whether AI auto-moderation warnings, timeouts, kicks, and bans send a direct message to the affected member. If you have not set AI-specific DM preferences, Content Safety follows your existing moderation DM notification settings. |
+| User DM notifications | Select whether AI auto-moderation warnings, timeouts, kicks, and bans send a direct message to the affected member. If you haven't set AI-specific DM preferences, Content Safety follows your existing moderation DM notification settings. |
 
 ### How the bot sends AI auto-mod DMs
 
@@ -68,7 +68,7 @@ Triage model settings are in **Config → AI & Automation → Triage**. The clas
 
 ### Triage latency tuning
 
-These are advanced tuning knobs; defaults work for most servers. Use the server config fields below to understand the current AI triage latency defaults. The dashboard UI does not currently expose these fields. Config loading normalizes each value and clamps it to the listed range. The runtime cooldown gate currently enforces `responseCooldownMs`.
+These are advanced tuning knobs; defaults work for most servers. Use the server config fields below to understand the current AI triage latency defaults. The dashboard UI doesn't currently expose these fields. Config loading normalizes each value and clamps it to the listed range. The runtime cooldown gate currently enforces `responseCooldownMs`.
 
 | Setting | Description | Default | Range |
 |---------|-------------|---------|-------|
