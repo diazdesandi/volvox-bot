@@ -68,16 +68,16 @@ Triage model settings are in **Config → AI & Automation → Triage**. The clas
 
 ### Triage latency tuning
 
-These are advanced tuning knobs; defaults work for most servers. Use the server config fields below to understand the current AI triage latency defaults. The dashboard UI doesn't currently expose these fields. Config loading normalizes each value and clamps it to the listed range. The runtime cooldown gate currently enforces `responseCooldownMs`.
+These are advanced tuning knobs; defaults work for most servers. The dashboard exposes these fields under **Config > AI & Automation > Triage > Performance**. Config loading normalizes each value and clamps it to the listed range. The runtime cooldown gate currently enforces `responseCooldownMs`.
 
 | Setting | Description | Default | Range |
 |---------|-------------|---------|-------|
-| `responseCooldownMs` | Minimum gap between bot replies in the same channel. Set to `0` to allow replies as fast as the model and other gates permit. Direct mentions bypass this cooldown. | 10000 | 0–60000 |
-| `triageDebounceMs` | Reserved for a future debounce feature; has no effect today. The current channel evaluation timer still uses `triage.defaultInterval`. | 500 | 0–2000 |
-| `memoryTimeoutMs` | Reserved for a future memory-timeout feature; has no effect today. A separate setting controls the current recent-message context. | 2000 | 500–30000 |
+| `responseCooldownMs` | Minimum gap between bot replies in the same channel. Set to `0` to allow replies as fast as the model and other gates permit. Direct mentions bypass this cooldown when fast direct replies are enabled. | 0 | 0-60000 |
+| `triageDebounceMs` | Reserved for a future debounce feature; has no effect today. The current channel evaluation timer still uses `triage.defaultInterval`. | 500 | 0-2000 |
+| `memoryTimeoutMs` | Reserved for a future memory-timeout feature; has no effect today. A separate setting controls the current recent-message context. | 2000 | 500-30000 |
 
 New server config uses `contextMessages: 5` by default. Runtime triage only falls back to 10 recent messages when you leave `contextMessages` unset.
 
-Direct @mentions and replies to the bot force immediate triage evaluation and bypass the response cooldown for mentioned messages. Classification still runs before the responder, so safety and relevance checks remain in place.
+Fast direct replies are enabled by default. With that toggle on, direct @mentions and replies to the bot force immediate triage evaluation and bypass the response cooldown for mentioned messages. Classification still runs before the responder, so safety and relevance checks remain in place.
 
 Config changes apply on reload or the next config refresh — you don't need to restart the bot process.

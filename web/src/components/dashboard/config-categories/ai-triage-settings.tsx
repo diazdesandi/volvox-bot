@@ -13,33 +13,88 @@ export type TriageConfigField = keyof TriageConfigDraft;
 type TriageConfigFieldValue = TriageConfigDraft[TriageConfigField];
 type TriageBooleanField = Extract<
   TriageConfigField,
-  'moderationResponse' | 'debugFooter' | 'statusReactions'
+  'moderationResponse' | 'debugFooter' | 'statusReactions' | 'directMentionFastPath'
 >;
+type TriageNumericField = Extract<
+  TriageConfigField,
+  'memoryTimeoutMs' | 'responseCooldownMs' | 'triageDebounceMs'
+>;
+
+const TRIAGE_NUMERIC_FIELDS = [
+  {
+    id: 'memory-timeout-ms',
+    label: 'Memory Timeout (ms)',
+    key: 'memoryTimeoutMs',
+    min: 500,
+    max: 30000,
+    defaultValue: 2000,
+    step: 100,
+  },
+  {
+    id: 'response-cooldown-ms',
+    label: 'Response Cooldown (ms)',
+    key: 'responseCooldownMs',
+    min: 0,
+    max: 60000,
+    defaultValue: 0,
+    step: 500,
+  },
+  {
+    id: 'triage-debounce-ms',
+    label: 'Triage Debounce (ms)',
+    key: 'triageDebounceMs',
+    min: 0,
+    max: 2000,
+    defaultValue: 500,
+    step: 50,
+  },
+] as const satisfies ReadonlyArray<{
+  id: string;
+  label: string;
+  key: TriageNumericField;
+  min: number;
+  max: number;
+  defaultValue: number;
+  step: number;
+}>;
 
 const TRIAGE_BOOLEAN_TOGGLES = [
   {
     id: 'moderationResponse',
     label: 'Enforce Safety Guardrails',
     key: 'moderationResponse',
+    defaultValue: true,
   },
-  { id: 'debugFooter', label: 'Show Debug Metadata', key: 'debugFooter' },
-  { id: 'statusReactions', label: 'Visual Status Feedback', key: 'statusReactions' },
+  { id: 'debugFooter', label: 'Show Debug Metadata', key: 'debugFooter', defaultValue: false },
+  {
+    id: 'statusReactions',
+    label: 'Visual Status Feedback',
+    key: 'statusReactions',
+    defaultValue: true,
+  },
+  {
+    id: 'directMentionFastPath',
+    label: 'Fast Direct Replies',
+    key: 'directMentionFastPath',
+    defaultValue: true,
+  },
 ] as const satisfies ReadonlyArray<{
   id: string;
   label: string;
   key: TriageBooleanField;
+  defaultValue: boolean;
 }>;
 
 /**
- * Render a UI for editing a guild's AI triage configuration.
+ * Renders the triage settings editor UI for a guild's AI configuration.
  *
- * @param draftConfig - Current guild configuration used to populate the form fields
+ * @param draftConfig - Current guild configuration used to populate form fields
  * @param saving - When true, disables inputs to prevent edits while saving
  * @param guildId - Guild identifier used by channel and role selectors
- * @param classifyModelValue - Currently selected classifier model id/value
- * @param respondModelValue - Currently selected responder model id/value
+ * @param classifyModelValue - Selected classifier model id/value
+ * @param respondModelValue - Selected responder model id/value
  * @param onFieldChange - Callback invoked when a triage field changes; receives the field key and the new value
- * @returns The settings editor UI as a JSX element
+ * @returns A JSX element containing the triage settings editor
  */
 export function AiTriageSettings({
   draftConfig,
@@ -213,6 +268,39 @@ export function AiTriageSettings({
 
         <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
           <div className="mb-6 space-y-1">
+            <h3 className="text-sm font-semibold tracking-wide text-foreground/90">Performance</h3>
+            <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
+              Latency tuning
+            </p>
+          </div>
+          <div className="space-y-4">
+            {TRIAGE_NUMERIC_FIELDS.map((field) => (
+              <div key={field.id} className="space-y-2">
+                <label htmlFor={field.id} className="text-xs font-bold text-foreground/80">
+                  {field.label}
+                </label>
+                <input
+                  id={field.id}
+                  type="number"
+                  min={field.min}
+                  max={field.max}
+                  step={field.step}
+                  value={draftConfig.triage?.[field.key] ?? field.defaultValue}
+                  onChange={(event) => {
+                    const num = parseNumberInput(event.target.value, field.min, field.max);
+                    if (num !== undefined) onFieldChange(field.key, num);
+                  }}
+                  onFocus={(event) => event.target.select()}
+                  disabled={saving}
+                  className={inputClasses}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
+          <div className="mb-6 space-y-1">
             <h3 className="text-sm font-semibold tracking-wide text-foreground/90">
               Operational Modes
             </h3>
@@ -228,7 +316,7 @@ export function AiTriageSettings({
               >
                 <span className="text-sm font-semibold text-foreground/80">{item.label}</span>
                 <ToggleSwitch
-                  checked={draftConfig.triage?.[item.key] ?? false}
+                  checked={draftConfig.triage?.[item.key] ?? item.defaultValue}
                   onChange={(value) => onFieldChange(item.key, value)}
                   disabled={saving}
                   label={item.label}

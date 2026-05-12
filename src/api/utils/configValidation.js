@@ -434,7 +434,10 @@ export const CONFIG_SCHEMA = {
       statusReactions: { type: 'boolean', nullable: true },
       dailyBudgetUsd: { type: 'number', min: 0, nullable: true },
       confidenceThreshold: { type: 'number', min: 0, max: 1, nullable: true },
-      responseCooldownMs: { type: 'number', min: 0, nullable: true },
+      responseCooldownMs: { type: 'number', min: 0, max: 60000, nullable: true },
+      triageDebounceMs: { type: 'number', min: 0, max: 2000, nullable: true },
+      memoryTimeoutMs: { type: 'number', min: 500, max: 30000, nullable: true },
+      directMentionFastPath: { type: 'boolean', nullable: true },
     },
   },
   aiAutoMod: {

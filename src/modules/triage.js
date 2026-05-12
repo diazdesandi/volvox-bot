@@ -123,6 +123,61 @@ function buildResponderConfig(evalConfig, resolved) {
   };
 }
 
+/**
+ * Determine whether the direct-mention fast path is enabled in the triage configuration.
+ * @param {Object} triageConfig - Triage configuration object (may be undefined).
+ * @returns {boolean} `true` if the fast-path is enabled, `false` otherwise.
+ */
+function isDirectMentionFastPathEnabled(triageConfig) {
+  return triageConfig?.directMentionFastPath !== false;
+}
+
+/**
+ * Produce mention tags for the bot suitable for plain-text matching in message content.
+ * @param {string|number|null|undefined} botId - The bot's Discord user ID; may be null or undefined.
+ * @returns {string[]} Array containing `<@id>` and `<@!id>` mention forms, or an empty array if `botId` is falsy.
+ */
+function getBotMentionTags(botId) {
+  if (!botId) return [];
+  return [`<@${botId}>`, `<@!${botId}>`];
+}
+
+/**
+ * Checks whether the message content contains a mention tag for the bot.
+ * @param {string} content - The message text to inspect.
+ * @param {string|null|undefined} botId - Discord user ID of the bot; if falsy, no mention is detected.
+ * @returns {boolean} `true` if the content includes a bot mention tag (`<@id>` or `<@!id>`), `false` otherwise.
+ */
+function isBotMentionedInContent(content, botId) {
+  if (!content) return false;
+  return getBotMentionTags(botId).some((tag) => content.includes(tag));
+}
+
+/**
+ * Determines whether a message directly targets the bot.
+ * @param {Object} message - The message payload; expected to include `content` and optional `replyTo.userId`.
+ * @param {?string} botId - The bot's user ID, or null/undefined if unknown.
+ * @returns {boolean} `true` if the message mentions the bot in content or is a direct reply to the bot, `false` otherwise.
+ */
+function isBotDirectTarget(message, botId) {
+  return (
+    isBotMentionedInContent(message.content, botId) ||
+    (botId != null && message.replyTo?.userId === botId)
+  );
+}
+
+/**
+ * Get message IDs from a snapshot that directly target the bot.
+ * @param {Array<Object>} snapshot - Buffered message entries to inspect.
+ * @param {string|null|undefined} botId - Bot user ID used to determine direct targets; when falsy, no messages are considered direct targets.
+ * @returns {string[]} The message IDs of entries that directly target the bot.
+ */
+function getBotDirectTargetMessageIds(snapshot, botId) {
+  return snapshot
+    .filter((message) => isBotDirectTarget(message, botId))
+    .map((message) => message.messageId);
+}
+
 // ── Budget alert/audit throttles ─────────────────────────────────────────────
 // Track the last time budget-exceeded side effects were recorded per guild so we
 // don't spam audit logs or moderation log channels on every evaluation attempt.
@@ -208,21 +263,20 @@ async function runClassification(channelId, snapshot, evalConfig, evalClient, ab
     totalMs: timings.classifyDone - timings.start,
   });
 
-  // Never ignore when the bot is @mentioned — override classifier mistakes.
+  // Never ignore direct bot mentions/replies when the fast path is enabled.
   let wasMentioned = false;
   const botId = evalClient.user?.id;
-  if (botId) {
-    const mentionTag = `<@${botId}>`;
-    wasMentioned = snapshot.some((m) => m.content?.includes(mentionTag));
-    if (classification.classification === 'ignore' && wasMentioned) {
-      info('Triage: overriding ignore → respond (bot was @mentioned)', {
+  if (isDirectMentionFastPathEnabled(evalConfig.triage) && botId) {
+    const directTargetIds = new Set(getBotDirectTargetMessageIds(snapshot, botId));
+    const hasDirectTarget = directTargetIds.size > 0;
+    if (classification.classification === 'ignore' && hasDirectTarget) {
+      info('Triage: overriding ignore → respond (bot was directly targeted)', {
         channelId,
       });
       classification.classification = 'respond';
-      classification.targetMessageIds = snapshot
-        .filter((m) => m.content?.includes(mentionTag))
-        .map((m) => m.messageId);
+      classification.targetMessageIds = [...directTargetIds];
     }
+    wasMentioned = (classification.targetMessageIds || []).some((id) => directTargetIds.has(id));
   }
 
   if (classification.classification === 'ignore') {
@@ -604,13 +658,14 @@ async function evaluateAndRespond(channelId, snapshot, evalConfig, evalClient, a
     const resolved = resolveTriageConfig(evalConfig.triage || {});
 
     // ── Response cooldown gate ───────────────────────────────────────────────
-    // Prevent rapid-fire responses. @mentions and moderation bypass the cooldown.
+    // Prevent rapid-fire responses. Direct bot targets and moderation bypass the cooldown.
     const cooldownMs = resolved.responseCooldownMs;
+    const canBypassCooldown = isDirectMentionFastPathEnabled(evalConfig.triage) && wasMentioned;
     if (
       buf?.lastResponseAt > 0 &&
       Date.now() - buf.lastResponseAt < cooldownMs &&
       classification.classification !== 'moderate' &&
-      !wasMentioned
+      !canBypassCooldown
     ) {
       info('Triage: cooldown active, skipping response', {
         channelId,
@@ -840,12 +895,9 @@ export function stopTriage() {
 }
 
 /**
- * Append a Discord message to the channel's triage buffer and trigger evaluation when appropriate.
+ * Append an eligible Discord message to the channel's triage buffer, record it in conversation history, and trigger evaluation immediately when configured (direct mention or trigger words) or schedule a deferred evaluation.
  *
- * Builds a sanitized buffer entry (truncating message content to 1000 characters), optionally attaches up to
- * 500 characters of referenced message context for replies, stores the entry in the per-channel ring buffer,
- * and records the message in conversation history. If configured trigger words are present, attempts an immediate
- * evaluation and falls back to scheduling; otherwise sets or refreshes the dynamic evaluation timer for the channel.
+ * Performs eligibility checks, stores a sanitized buffer entry for the channel, and either calls evaluateNow (with fallback to scheduling) or refreshes the dynamic evaluation timer.
  *
  * @param {import('discord.js').Message} message - The Discord message to accumulate.
  * @param {Object} [msgConfig] - Optional configuration override; when provided it is used instead of calling getConfig.
@@ -897,6 +949,7 @@ export async function accumulateMessage(message, msgConfig) {
   if (message.reference?.messageId) {
     try {
       const ref = await message.channel.messages.fetch(message.reference.messageId);
+      const botId = client?.user?.id;
       entry.replyTo = {
         author: ref.author.username,
         userId: ref.author.id,
@@ -904,7 +957,6 @@ export async function accumulateMessage(message, msgConfig) {
         messageId: ref.id,
       };
       // Mark replies to non-bot users so the classifier can deprioritize them
-      const botId = client?.user?.id;
       entry.replyToHuman = !ref.author.bot && ref.author.id !== botId;
     } catch (err) {
       debug('Referenced message fetch failed', {
@@ -930,11 +982,24 @@ export async function accumulateMessage(message, msgConfig) {
     entry.userId,
   );
 
-  // Check for trigger words -- instant evaluation
-  if (checkTriggerWords(message.content, liveConfig)) {
-    info('Trigger word detected, forcing evaluation', { channelId });
+  const directMentionFastPath =
+    isDirectMentionFastPathEnabled(triageConfig) && isBotDirectTarget(entry, client?.user?.id);
+
+  // Check for trigger words or direct mentions -- instant evaluation
+  if (directMentionFastPath || checkTriggerWords(message.content, liveConfig)) {
+    info(
+      directMentionFastPath
+        ? 'Direct mention detected, forcing evaluation'
+        : 'Trigger word detected, forcing evaluation',
+      { channelId },
+    );
     evaluateNow(channelId, liveConfig, client, healthMonitor).catch((err) => {
-      logError('Trigger word evaluateNow failed', { channelId, error: err.message });
+      logError(
+        directMentionFastPath
+          ? 'Direct mention evaluateNow failed'
+          : 'Trigger word evaluateNow failed',
+        { channelId, error: err.message },
+      );
       scheduleEvaluation(channelId, liveConfig);
     });
     return;

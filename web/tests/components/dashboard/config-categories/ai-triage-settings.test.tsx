@@ -107,6 +107,7 @@ function createTriageDraftConfig(overrides: Partial<GuildConfig> = {}): GuildCon
       moderationResponse: false,
       debugFooter: false,
       statusReactions: false,
+      directMentionFastPath: false,
     },
     ...overrides,
   };
@@ -198,6 +199,67 @@ describe('AiTriageSettings', () => {
       expect(screen.getByLabelText('Response Budget ($)')).toHaveValue(0);
     });
 
+    it('renders Performance section with latency tuning inputs', () => {
+      renderTriageSettings();
+
+      expect(screen.getByText('Performance')).toBeInTheDocument();
+      expect(screen.getByLabelText('Memory Timeout (ms)')).toHaveValue(2000);
+      expect(screen.getByLabelText('Response Cooldown (ms)')).toHaveValue(0);
+      expect(screen.getByLabelText('Triage Debounce (ms)')).toHaveValue(500);
+    });
+
+    it('renders configured latency values from draftConfig', () => {
+      renderTriageSettings({
+        triage: {
+          enabled: true,
+          memoryTimeoutMs: 5000,
+          responseCooldownMs: 15000,
+          triageDebounceMs: 1000,
+        },
+      });
+
+      expect(screen.getByLabelText('Memory Timeout (ms)')).toHaveValue(5000);
+      expect(screen.getByLabelText('Response Cooldown (ms)')).toHaveValue(15000);
+      expect(screen.getByLabelText('Triage Debounce (ms)')).toHaveValue(1000);
+    });
+
+    it('reflects directMentionFastPath=true on the Fast Direct Replies toggle', () => {
+      renderTriageSettings({ triage: { enabled: true, directMentionFastPath: true } });
+
+      expect(screen.getByRole('button', { name: 'Fast Direct Replies' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    it('reflects directMentionFastPath=false on the Fast Direct Replies toggle', () => {
+      renderTriageSettings(createTriageDraftConfig());
+
+      expect(screen.getByRole('button', { name: 'Fast Direct Replies' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+
+    it('renders latency inputs with correct html attributes (min, max, step)', () => {
+      renderTriageSettings();
+
+      const memInput = screen.getByLabelText('Memory Timeout (ms)');
+      expect(memInput).toHaveAttribute('min', '500');
+      expect(memInput).toHaveAttribute('max', '30000');
+      expect(memInput).toHaveAttribute('step', '100');
+
+      const cooldownInput = screen.getByLabelText('Response Cooldown (ms)');
+      expect(cooldownInput).toHaveAttribute('min', '0');
+      expect(cooldownInput).toHaveAttribute('max', '60000');
+      expect(cooldownInput).toHaveAttribute('step', '500');
+
+      const debounceInput = screen.getByLabelText('Triage Debounce (ms)');
+      expect(debounceInput).toHaveAttribute('min', '0');
+      expect(debounceInput).toHaveAttribute('max', '2000');
+      expect(debounceInput).toHaveAttribute('step', '50');
+    });
+
     it('renders configured budget values', () => {
       renderTriageSettings({
         triage: {
@@ -218,6 +280,7 @@ describe('AiTriageSettings', () => {
       expect(screen.getByRole('button', { name: 'Enforce Safety Guardrails' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Show Debug Metadata' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Visual Status Feedback' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Fast Direct Replies' })).toBeInTheDocument();
     });
 
     it('reflects moderationResponse=true on the Enforce Safety Guardrails toggle', () => {
@@ -228,7 +291,27 @@ describe('AiTriageSettings', () => {
       ).toHaveAttribute('aria-pressed', 'true');
     });
 
-    it('reflects moderationResponse=false on the toggle when unset', () => {
+    it('uses default values for toggles when unset', () => {
+      renderTriageSettings({ triage: { enabled: true } });
+
+      expect(
+        screen.getByRole('button', { name: 'Enforce Safety Guardrails' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Visual Status Feedback' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: 'Fast Direct Replies' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: 'Show Debug Metadata' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+
+    it('reflects moderationResponse=false when explicitly disabled', () => {
       renderTriageSettings();
 
       expect(
@@ -278,6 +361,42 @@ describe('AiTriageSettings', () => {
       expect(onFieldChange).toHaveBeenCalledWith('respondBudget', 2.5);
     });
 
+    it('calls onFieldChange with latency fields and numeric values', () => {
+      const { onFieldChange } = renderTriageSettings();
+
+      fireEvent.change(screen.getByLabelText('Memory Timeout (ms)'), {
+        target: { value: '2500' },
+      });
+      fireEvent.change(screen.getByLabelText('Response Cooldown (ms)'), {
+        target: { value: '7500' },
+      });
+      fireEvent.change(screen.getByLabelText('Triage Debounce (ms)'), {
+        target: { value: '750' },
+      });
+
+      expect(onFieldChange).toHaveBeenCalledWith('memoryTimeoutMs', 2500);
+      expect(onFieldChange).toHaveBeenCalledWith('responseCooldownMs', 7500);
+      expect(onFieldChange).toHaveBeenCalledWith('triageDebounceMs', 750);
+    });
+
+    it('clamps latency field values to configured ranges', () => {
+      const { onFieldChange } = renderTriageSettings();
+
+      fireEvent.change(screen.getByLabelText('Memory Timeout (ms)'), {
+        target: { value: '100' },
+      });
+      fireEvent.change(screen.getByLabelText('Response Cooldown (ms)'), {
+        target: { value: '70000' },
+      });
+      fireEvent.change(screen.getByLabelText('Triage Debounce (ms)'), {
+        target: { value: '-1' },
+      });
+
+      expect(onFieldChange).toHaveBeenCalledWith('memoryTimeoutMs', 500);
+      expect(onFieldChange).toHaveBeenCalledWith('responseCooldownMs', 60000);
+      expect(onFieldChange).toHaveBeenCalledWith('triageDebounceMs', 0);
+    });
+
     it('calls onFieldChange with "moderationResponse" toggled', () => {
       const { onFieldChange } = renderTriageSettings();
 
@@ -302,6 +421,14 @@ describe('AiTriageSettings', () => {
       expect(onFieldChange).toHaveBeenCalledWith('statusReactions', true);
     });
 
+    it('calls onFieldChange with "directMentionFastPath" toggled', () => {
+      const { onFieldChange } = renderTriageSettings();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fast Direct Replies' }));
+
+      expect(onFieldChange).toHaveBeenCalledWith('directMentionFastPath', true);
+    });
+
     it('does not call onFieldChange for non-numeric budget input', () => {
       const { onFieldChange } = renderTriageSettings();
 
@@ -310,6 +437,70 @@ describe('AiTriageSettings', () => {
       });
 
       expect(onFieldChange).not.toHaveBeenCalled();
+    });
+
+    it('does not call onFieldChange for non-numeric latency input', () => {
+      const { onFieldChange } = renderTriageSettings();
+
+      fireEvent.change(screen.getByLabelText('Memory Timeout (ms)'), {
+        target: { value: 'abc' },
+      });
+      fireEvent.change(screen.getByLabelText('Response Cooldown (ms)'), {
+        target: { value: '' },
+      });
+
+      expect(onFieldChange).not.toHaveBeenCalled();
+    });
+
+    it('calls onFieldChange with false when directMentionFastPath is toggled off', () => {
+      const { onFieldChange } = renderTriageSettings({ triage: { enabled: true, directMentionFastPath: true } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Fast Direct Replies' }));
+
+      expect(onFieldChange).toHaveBeenCalledWith('directMentionFastPath', false);
+    });
+
+    it('calls onFieldChange with latency values at exact field minimums', () => {
+      const { onFieldChange } = renderTriageSettings({
+        triage: {
+          enabled: true,
+          memoryTimeoutMs: 1000,
+          responseCooldownMs: 500,
+          triageDebounceMs: 50,
+        },
+      });
+
+      fireEvent.change(screen.getByLabelText('Memory Timeout (ms)'), {
+        target: { value: '500' },
+      });
+      fireEvent.change(screen.getByLabelText('Response Cooldown (ms)'), {
+        target: { value: '0' },
+      });
+      fireEvent.change(screen.getByLabelText('Triage Debounce (ms)'), {
+        target: { value: '0' },
+      });
+
+      expect(onFieldChange).toHaveBeenCalledWith('memoryTimeoutMs', 500);
+      expect(onFieldChange).toHaveBeenCalledWith('responseCooldownMs', 0);
+      expect(onFieldChange).toHaveBeenCalledWith('triageDebounceMs', 0);
+    });
+
+    it('calls onFieldChange with latency values at exact field maximums', () => {
+      const { onFieldChange } = renderTriageSettings();
+
+      fireEvent.change(screen.getByLabelText('Memory Timeout (ms)'), {
+        target: { value: '30000' },
+      });
+      fireEvent.change(screen.getByLabelText('Response Cooldown (ms)'), {
+        target: { value: '60000' },
+      });
+      fireEvent.change(screen.getByLabelText('Triage Debounce (ms)'), {
+        target: { value: '2000' },
+      });
+
+      expect(onFieldChange).toHaveBeenCalledWith('memoryTimeoutMs', 30000);
+      expect(onFieldChange).toHaveBeenCalledWith('responseCooldownMs', 60000);
+      expect(onFieldChange).toHaveBeenCalledWith('triageDebounceMs', 2000);
     });
   });
 
@@ -327,6 +518,7 @@ describe('AiTriageSettings', () => {
       expect(screen.getByRole('button', { name: 'Enforce Safety Guardrails' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Show Debug Metadata' })).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Visual Status Feedback' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Fast Direct Replies' })).toBeDisabled();
     });
 
     it('disables budget inputs when saving=true', () => {
@@ -334,6 +526,14 @@ describe('AiTriageSettings', () => {
 
       expect(screen.getByLabelText('Classify Budget ($)')).toBeDisabled();
       expect(screen.getByLabelText('Response Budget ($)')).toBeDisabled();
+    });
+
+    it('disables latency inputs when saving=true', () => {
+      renderTriageSettings(createTriageDraftConfig(), { saving: true });
+
+      expect(screen.getByLabelText('Memory Timeout (ms)')).toBeDisabled();
+      expect(screen.getByLabelText('Response Cooldown (ms)')).toBeDisabled();
+      expect(screen.getByLabelText('Triage Debounce (ms)')).toBeDisabled();
     });
   });
 });

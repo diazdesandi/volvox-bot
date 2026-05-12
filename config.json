@@ -45,6 +45,10 @@
     "debugFooterLevel": "verbose",
     "moderationLogChannel": null,
     "statusReactions": true,
+    "directMentionFastPath": true,
+    "memoryTimeoutMs": 2000,
+    "responseCooldownMs": 0,
+    "triageDebounceMs": 500,
     "dailyBudgetUsd": 10
   },
   "welcome": {

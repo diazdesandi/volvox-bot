@@ -6,6 +6,6 @@
 
 export const TRIAGE_NUMERIC_FIELDS = Object.freeze({
   memoryTimeoutMs: { min: 500, max: 30000, default: 2000 },
-  responseCooldownMs: { min: 0, max: 60000, default: 10000 },
+  responseCooldownMs: { min: 0, max: 60000, default: 0 },
   triageDebounceMs: { min: 0, max: 2000, default: 500 },
 });

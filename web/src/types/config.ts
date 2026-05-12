@@ -262,6 +262,9 @@ export interface TriageConfig {
   dailyBudgetUsd?: number | null;
   confidenceThreshold?: number | null;
   responseCooldownMs?: number | null;
+  triageDebounceMs?: number | null;
+  memoryTimeoutMs?: number | null;
+  directMentionFastPath?: boolean | null;
 }
 
 /** Generic enabled-flag section used by several community features. */

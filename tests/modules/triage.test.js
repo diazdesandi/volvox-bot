@@ -1538,6 +1538,297 @@ describe('triage module', () => {
       });
     });
 
+    it('should call evaluateNow on direct bot mention by default', async () => {
+      const classResult = {
+        classification: 'respond',
+        reasoning: 'direct mention',
+        targetMessageIds: ['msg-default'],
+      };
+      const respondResult = {
+        responses: [{ targetMessageId: 'msg-default', targetUser: 'testuser', response: 'Here!' }],
+      };
+      mockGenerate.mockResolvedValue(mockClassifyResult(classResult));
+      mockStream.mockResolvedValue(mockRespondResult(respondResult));
+
+      accumulateMessage(makeMessage('ch1', '<@bot-id> can you help?'), config);
+
+      await vi.waitFor(() => {
+        expect(mockGenerate).toHaveBeenCalled();
+      });
+    });
+
+    it('should call evaluateNow on replies to the bot by default', async () => {
+      const classResult = {
+        classification: 'respond',
+        reasoning: 'bot reply',
+        targetMessageIds: ['msg-default'],
+      };
+      const respondResult = {
+        responses: [{ targetMessageId: 'msg-default', targetUser: 'testuser', response: 'Here!' }],
+      };
+      mockGenerate.mockResolvedValue(mockClassifyResult(classResult));
+      mockStream.mockResolvedValue(mockRespondResult(respondResult));
+
+      accumulateMessage(
+        makeMessage('ch1', 'can you help?', {
+          reference: { messageId: 'bot-message' },
+          channel: {
+            id: 'ch1',
+            name: 'test-channel',
+            topic: null,
+            messages: {
+              fetch: vi.fn().mockResolvedValue({
+                id: 'bot-message',
+                content: 'Earlier bot response',
+                author: { id: 'bot-id', username: 'Volvox.Bot', bot: true },
+              }),
+            },
+          },
+        }),
+        config,
+      );
+
+      await vi.waitFor(() => {
+        expect(mockGenerate).toHaveBeenCalled();
+      });
+    });
+
+    it('should schedule direct bot mentions when the fast path is disabled', () => {
+      const slowMentionConfig = makeConfig({ triage: { directMentionFastPath: false } });
+
+      accumulateMessage(makeMessage('ch1', '<@bot-id> can you help?'), slowMentionConfig);
+
+      expect(mockGenerate).not.toHaveBeenCalled();
+    });
+
+    it('should not override an ignored direct mention when the fast path is disabled', async () => {
+      const slowMentionConfig = makeConfig({ triage: { directMentionFastPath: false } });
+      mockGenerate.mockResolvedValue(
+        mockClassifyResult({
+          classification: 'ignore',
+          reasoning: 'classifier ignored it',
+          targetMessageIds: [],
+        }),
+      );
+
+      accumulateMessage(makeMessage('ch1', '<@bot-id> can you help?'), slowMentionConfig);
+      await evaluateNow('ch1', slowMentionConfig, client, healthMonitor);
+
+      expect(mockStream).not.toHaveBeenCalled();
+    });
+
+    it('should not let stale direct targets bypass cooldown for unrelated responses', async () => {
+      const cooldownConfig = makeConfig({ triage: { responseCooldownMs: 60000 } });
+      channelBuffers.set('ch1', {
+        messages: [
+          {
+            author: 'testuser',
+            content: '<@bot-id> old question',
+            userId: 'u1',
+            messageId: 'msg-old',
+            timestamp: Date.now() - 1000,
+            replyTo: null,
+            channelName: 'test-channel',
+            channelTopic: null,
+          },
+          {
+            author: 'otheruser',
+            content: 'new unrelated question',
+            userId: 'u2',
+            messageId: 'msg-new',
+            timestamp: Date.now(),
+            replyTo: null,
+            channelName: 'test-channel',
+            channelTopic: null,
+          },
+        ],
+        timer: null,
+        lastActivity: Date.now(),
+        evaluating: false,
+        pendingReeval: false,
+        abortController: null,
+        lastResponseAt: Date.now(),
+      });
+      mockGenerate.mockResolvedValue(
+        mockClassifyResult({
+          classification: 'respond',
+          reasoning: 'new target only',
+          targetMessageIds: ['msg-new'],
+        }),
+      );
+
+      await evaluateNow('ch1', cooldownConfig, client, healthMonitor);
+
+      expect(mockStream).not.toHaveBeenCalled();
+    });
+
+    it('should call evaluateNow on nickname mention (<@!bot-id>) by default', async () => {
+      const classResult = {
+        classification: 'respond',
+        reasoning: 'nickname mention',
+        targetMessageIds: ['msg-default'],
+      };
+      const respondResult = {
+        responses: [{ targetMessageId: 'msg-default', targetUser: 'testuser', response: 'Hello!' }],
+      };
+      mockGenerate.mockResolvedValue(mockClassifyResult(classResult));
+      mockStream.mockResolvedValue(mockRespondResult(respondResult));
+
+      accumulateMessage(makeMessage('ch1', '<@!bot-id> what can you do?'), config);
+
+      await vi.waitFor(() => {
+        expect(mockGenerate).toHaveBeenCalled();
+      });
+    });
+
+    it('should treat directMentionFastPath: null as enabled (default-on behavior)', async () => {
+      const nullFastPathConfig = makeConfig({ triage: { directMentionFastPath: null } });
+      mockGlobalConfig = nullFastPathConfig;
+      const classResult = {
+        classification: 'respond',
+        reasoning: 'direct mention',
+        targetMessageIds: ['msg-default'],
+      };
+      const respondResult = {
+        responses: [{ targetMessageId: 'msg-default', targetUser: 'testuser', response: 'Yes!' }],
+      };
+      mockGenerate.mockResolvedValue(mockClassifyResult(classResult));
+      mockStream.mockResolvedValue(mockRespondResult(respondResult));
+
+      accumulateMessage(makeMessage('ch1', '<@bot-id> hello?'), nullFastPathConfig);
+
+      await vi.waitFor(() => {
+        expect(mockGenerate).toHaveBeenCalled();
+      });
+    });
+
+    it('should bypass cooldown for a direct mention when fast path is enabled', async () => {
+      const cooldownConfig = makeConfig({ triage: { responseCooldownMs: 60000 } });
+      // Seed the buffer with a direct bot mention and set a recent lastResponseAt
+      channelBuffers.set('ch1', {
+        messages: [
+          {
+            author: 'testuser',
+            content: '<@bot-id> help me please',
+            userId: 'u1',
+            messageId: 'msg-mention',
+            timestamp: Date.now(),
+            replyTo: null,
+            channelName: 'test-channel',
+            channelTopic: null,
+          },
+        ],
+        timer: null,
+        lastActivity: Date.now(),
+        evaluating: false,
+        pendingReeval: false,
+        abortController: null,
+        lastResponseAt: Date.now(),
+      });
+
+      mockGenerate.mockResolvedValue(
+        mockClassifyResult({
+          classification: 'respond',
+          reasoning: 'direct mention',
+          targetMessageIds: ['msg-mention'],
+        }),
+      );
+      mockStream.mockResolvedValue(
+        mockRespondResult({
+          responses: [
+            { targetMessageId: 'msg-mention', targetUser: 'testuser', response: 'Sure!' },
+          ],
+        }),
+      );
+
+      await evaluateNow('ch1', cooldownConfig, client, healthMonitor);
+
+      // Should respond despite cooldown because this is a direct mention
+      expect(mockStream).toHaveBeenCalled();
+    });
+
+    it('should NOT bypass cooldown for a direct mention when fast path is disabled', async () => {
+      const cooldownConfig = makeConfig({
+        triage: { responseCooldownMs: 60000, directMentionFastPath: false },
+      });
+      channelBuffers.set('ch1', {
+        messages: [
+          {
+            author: 'testuser',
+            content: '<@bot-id> help me',
+            userId: 'u1',
+            messageId: 'msg-mention-off',
+            timestamp: Date.now(),
+            replyTo: null,
+            channelName: 'test-channel',
+            channelTopic: null,
+          },
+        ],
+        timer: null,
+        lastActivity: Date.now(),
+        evaluating: false,
+        pendingReeval: false,
+        abortController: null,
+        lastResponseAt: Date.now(),
+      });
+
+      mockGenerate.mockResolvedValue(
+        mockClassifyResult({
+          classification: 'respond',
+          reasoning: 'would respond',
+          targetMessageIds: ['msg-mention-off'],
+        }),
+      );
+
+      await evaluateNow('ch1', cooldownConfig, client, healthMonitor);
+
+      // Fast path disabled — cooldown applies even to the mention
+      expect(mockStream).not.toHaveBeenCalled();
+    });
+
+    it('should override ignore → respond for nickname mention (<@!bot-id>) when fast path is enabled', async () => {
+      channelBuffers.set('ch1', {
+        messages: [
+          {
+            author: 'testuser',
+            content: '<@!bot-id> are you there?',
+            userId: 'u1',
+            messageId: 'msg-nick',
+            timestamp: Date.now(),
+            replyTo: null,
+            channelName: 'test-channel',
+            channelTopic: null,
+          },
+        ],
+        timer: null,
+        lastActivity: Date.now(),
+        evaluating: false,
+        pendingReeval: false,
+        abortController: null,
+        lastResponseAt: 0,
+      });
+
+      mockGenerate.mockResolvedValue(
+        mockClassifyResult({
+          classification: 'ignore',
+          reasoning: 'classifier missed it',
+          targetMessageIds: [],
+        }),
+      );
+      mockStream.mockResolvedValue(
+        mockRespondResult({
+          responses: [
+            { targetMessageId: 'msg-nick', targetUser: 'testuser', response: 'Yes, I am!' },
+          ],
+        }),
+      );
+
+      await evaluateNow('ch1', config, client, healthMonitor);
+
+      // Should override ignore because of the nickname mention
+      expect(mockStream).toHaveBeenCalled();
+    });
+
     it('should schedule a timer for non-trigger messages', () => {
       accumulateMessage(makeMessage('ch1', 'normal message'), config);
       expect(mockGenerate).not.toHaveBeenCalled();

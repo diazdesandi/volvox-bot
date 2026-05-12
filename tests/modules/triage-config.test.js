@@ -27,6 +27,21 @@ describe('triage-config', () => {
       expect(result.classifyBudget).toBe(0.05);
       expect(result.respondBudget).toBe(0.2);
       expect(result.timeout).toBe(30000);
+      expect(result.memoryTimeoutMs).toBe(2000);
+      expect(result.responseCooldownMs).toBe(0);
+      expect(result.triageDebounceMs).toBe(500);
+    });
+
+    it('should clamp latency tuning fields to configured ranges', () => {
+      const result = resolveTriageConfig({
+        memoryTimeoutMs: 100,
+        responseCooldownMs: 70000,
+        triageDebounceMs: -1,
+      });
+
+      expect(result.memoryTimeoutMs).toBe(500);
+      expect(result.responseCooldownMs).toBe(60000);
+      expect(result.triageDebounceMs).toBe(0);
     });
 
     it('should resolve PR #68 flat format as fallback', () => {
