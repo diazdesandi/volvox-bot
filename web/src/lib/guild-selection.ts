@@ -1,5 +1,15 @@
 export const SELECTED_GUILD_KEY = 'volvox-bot-selected-guild';
 export const GUILD_SELECTED_EVENT = 'volvox-bot:guild-selected';
+export const GUILD_SELECTION_CLEARED_EVENT = 'volvox-bot:guild-selection-cleared';
+
+function dispatchSelectedGuild(guildId: string): void {
+  window.dispatchEvent(
+    new CustomEvent<string>(GUILD_SELECTED_EVENT, {
+      detail: guildId,
+      cancelable: true,
+    }),
+  );
+}
 
 /**
  * Persist and broadcast guild selection changes so dashboard views can react immediately.
@@ -26,10 +36,42 @@ export function broadcastSelectedGuild(guildId: string): void {
     // localStorage may be unavailable in strict browser contexts
   }
 
+  dispatchSelectedGuild(normalizedGuildId);
+}
+
+/**
+ * Clear the persisted guild selection and notify dashboard consumers.
+ */
+export function clearSelectedGuild(): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(SELECTED_GUILD_KEY);
+  } catch {
+    // localStorage may be unavailable in strict browser contexts
+  }
+
+  dispatchSelectedGuild('');
+}
+
+/**
+ * Force-clear the persisted guild selection after the selected guild becomes invalid.
+ *
+ * This intentionally uses a separate, non-cancelable event so unsaved-change guards
+ * for user-initiated guild switches cannot keep other dashboard contexts on a stale guild.
+ */
+export function forceClearSelectedGuild(): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(SELECTED_GUILD_KEY);
+  } catch {
+    // localStorage may be unavailable in strict browser contexts
+  }
+
   window.dispatchEvent(
-    new CustomEvent<string>(GUILD_SELECTED_EVENT, {
-      detail: normalizedGuildId,
-      cancelable: true,
+    new CustomEvent<string>(GUILD_SELECTION_CLEARED_EVENT, {
+      detail: '',
     }),
   );
 }

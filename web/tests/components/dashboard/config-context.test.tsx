@@ -2,6 +2,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { GUILD_SELECTED_EVENT, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
 
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
@@ -11,11 +12,19 @@ const { mockTrackDashboardEvent } = vi.hoisted(() => ({
   mockTrackDashboardEvent: vi.fn(),
 }));
 
+const { mockGuildDirectory } = vi.hoisted(() => ({
+  mockGuildDirectory: vi.fn(),
+}));
+
 vi.mock('@/lib/amplitude', () => ({
   DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT: 'dashboard_config_save_attempted',
   DASHBOARD_CONFIG_SAVE_FAILED_EVENT: 'dashboard_config_save_failed',
   DASHBOARD_CONFIG_SAVED_EVENT: 'dashboard_config_saved',
   trackDashboardEvent: mockTrackDashboardEvent,
+}));
+
+vi.mock('@/components/layout/guild-directory-context', () => ({
+  useGuildDirectory: () => mockGuildDirectory(),
 }));
 
 const mockPush = vi.fn();
@@ -38,6 +47,28 @@ const minimalConfig = {
   permissions: { enabled: false, botOwners: [] },
   memory: { enabled: false },
 };
+
+function makeGuild(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name: `Guild ${id}`,
+    icon: null,
+    owner: true,
+    permissions: '8',
+    features: [],
+    botPresent: true,
+    ...overrides,
+  };
+}
+
+function mockInstalledGuildDirectory(ids: string[]) {
+  mockGuildDirectory.mockReturnValue({
+    error: false,
+    guilds: ids.map((id) => makeGuild(id)),
+    loading: false,
+    refreshGuilds: vi.fn(),
+  });
+}
 
 type FetchMock = ReturnType<typeof vi.fn>;
 
@@ -90,10 +121,19 @@ describe('ConfigProvider', () => {
   beforeEach(() => {
     vi.resetModules();
     localStorage.clear();
-    localStorage.setItem('volvox-bot-selected-guild', 'guild-123');
+    localStorage.setItem(SELECTED_GUILD_KEY, 'guild-123');
     mockPathname.mockReturnValue('/dashboard/settings');
     mockPush.mockClear();
     mockTrackDashboardEvent.mockClear();
+    mockInstalledGuildDirectory([
+      'guild-123',
+      'guild-456',
+      'guild-event',
+      'guild-from-storage',
+      'guild-invalid',
+      'guild-error',
+      'guild-ok',
+    ]);
   });
 
   afterEach(() => {
@@ -115,6 +155,78 @@ describe('ConfigProvider', () => {
     expect(result.current.saving).toBe(false);
   });
 
+  it('does not load config for a stale selected guild where the bot is not installed', async () => {
+    localStorage.setItem(SELECTED_GUILD_KEY, 'missing-bot');
+    mockGuildDirectory.mockReturnValue({
+      error: false,
+      guilds: [makeGuild('missing-bot', { botPresent: false })],
+      loading: false,
+      refreshGuilds: vi.fn(),
+    });
+    const fetchMock = stubConfigFetch();
+
+    const { result } = await renderConfigContext();
+
+    await waitFor(() => {
+      expect(result.current.guildId).toBe('');
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem(SELECTED_GUILD_KEY)).toBeNull();
+    expect(result.current.draftConfig).toBeNull();
+    expect(result.current.error).toBeNull();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('loads config for a manageable selected guild when bot presence is non-authoritative', async () => {
+    localStorage.setItem(SELECTED_GUILD_KEY, 'degraded-guild');
+    mockGuildDirectory.mockReturnValue({
+      error: false,
+      guilds: [
+        makeGuild('degraded-guild', {
+          botPresent: false,
+          botPresenceAuthoritative: false,
+        }),
+      ],
+      loading: false,
+      refreshGuilds: vi.fn(),
+    });
+    const fetchMock = stubConfigFetch();
+
+    const { result } = await renderConfigContext();
+
+    await waitFor(() => {
+      expect(result.current.guildId).toBe('degraded-guild');
+      expect(result.current.draftConfig).not.toBeNull();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/guilds/degraded-guild/config',
+      expect.any(Object),
+    );
+    expect(localStorage.getItem(SELECTED_GUILD_KEY)).toBe('degraded-guild');
+  });
+
+  it('does not load or clear config while the guild directory is unresolved', async () => {
+    mockGuildDirectory.mockReturnValue({
+      error: false,
+      guilds: [],
+      loading: true,
+      refreshGuilds: vi.fn(),
+    });
+    const fetchMock = stubConfigFetch();
+
+    const { result } = await renderConfigContext();
+
+    await waitFor(() => {
+      expect(result.current.guildId).toBe('guild-123');
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(localStorage.getItem(SELECTED_GUILD_KEY)).toBe('guild-123');
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it('updateDraftConfig marks hasChanges', async () => {
     stubConfigFetch();
     const { result } = await renderLoadedConfigContext();
@@ -125,6 +237,124 @@ describe('ConfigProvider', () => {
       }));
     });
     expect(result.current.hasChanges).toBe(true);
+  });
+
+  it('does not refetch or discard draft edits when the guild directory refreshes with the same valid guild', async () => {
+    let directoryGuilds = [makeGuild('guild-123')];
+    mockGuildDirectory.mockImplementation(() => ({
+      error: false,
+      guilds: directoryGuilds,
+      loading: false,
+      refreshGuilds: vi.fn(),
+    }));
+    const fetchMock = stubConfigFetch();
+
+    const { result, rerender } = await renderLoadedConfigContext();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.updateDraftConfig((prev) => ({
+        ...prev,
+        ai: { ...prev.ai, systemPrompt: 'unsaved draft prompt' },
+      }));
+    });
+    expect(result.current.hasChanges).toBe(true);
+
+    directoryGuilds = [makeGuild('guild-123', { name: 'Guild guild-123 refreshed' })];
+    rerender();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(result.current.draftConfig?.ai?.systemPrompt).toBe('unsaved draft prompt');
+    expect(result.current.hasChanges).toBe(true);
+  });
+
+  it.each([
+    { directoryError: false, directoryLoading: true, state: 'loading' },
+    { directoryError: true, directoryLoading: false, state: 'errored' },
+  ])(
+    'clears validated config when guild changes while the guild directory is $state',
+    async ({ directoryError, directoryLoading }) => {
+      let directoryState = {
+        error: false,
+        guilds: [makeGuild('guild-123'), makeGuild('guild-456')],
+        loading: false,
+      };
+      mockGuildDirectory.mockImplementation(() => ({
+        ...directoryState,
+        refreshGuilds: vi.fn(),
+      }));
+      const fetchMock = stubConfigFetch();
+
+      const { result } = await renderLoadedConfigContext();
+      expect(result.current.guildId).toBe('guild-123');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        result.current.updateDraftConfig((prev) => ({
+          ...prev,
+          ai: { ...prev.ai, systemPrompt: 'unsaved draft prompt' },
+        }));
+      });
+      expect(result.current.hasChanges).toBe(true);
+
+      directoryState = {
+        error: directoryError,
+        guilds: [],
+        loading: directoryLoading,
+      };
+      act(() => {
+        window.dispatchEvent(
+          new CustomEvent('volvox-bot:guild-selected', { detail: 'guild-456' }),
+        );
+      });
+
+      await waitFor(() => expect(result.current.guildId).toBe('guild-456'));
+      await waitFor(() => expect(result.current.draftConfig).toBeNull());
+
+      expect(result.current.savedConfig).toBeNull();
+      expect(result.current.hasChanges).toBe(false);
+
+      await act(async () => result.current.executeSave());
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        '/api/guilds/guild-456/config',
+        expect.objectContaining({ method: 'PUT' }),
+      );
+    },
+  );
+
+  it('clears the selected guild when a directory refresh removes its manageability', async () => {
+    let directoryGuilds = [makeGuild('guild-123')];
+    mockGuildDirectory.mockImplementation(() => ({
+      error: false,
+      guilds: directoryGuilds,
+      loading: false,
+      refreshGuilds: vi.fn(),
+    }));
+    const fetchMock = stubConfigFetch();
+
+    const { result, rerender } = await renderLoadedConfigContext();
+    expect(result.current.guildId).toBe('guild-123');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const cancelableSwitchGuard = (event: Event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    window.addEventListener(GUILD_SELECTED_EVENT, cancelableSwitchGuard, true);
+
+    try {
+      directoryGuilds = [makeGuild('guild-123', { botPresent: false })];
+      rerender();
+
+      await waitFor(() => expect(result.current.guildId).toBe(''));
+      expect(localStorage.getItem(SELECTED_GUILD_KEY)).toBeNull();
+      expect(result.current.draftConfig).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      window.removeEventListener(GUILD_SELECTED_EVENT, cancelableSwitchGuard, true);
+    }
   });
 
   it('discardChanges resets draft to saved', async () => {

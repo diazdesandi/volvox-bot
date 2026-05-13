@@ -45,14 +45,16 @@ vi.mock('@/lib/discord', () => ({
 
 // next/image mock
 vi.mock('next/image', () => ({
-  default: ({ alt, ...props }: any) => <img alt={alt} {...props} />,
+  default: ({ alt, fill: _fill, ...props }: any) => <img alt={alt} {...props} />,
 }));
 
 import { Footer } from '@/components/landing/Footer';
 
+const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
+
 describe('Footer', () => {
   beforeEach(() => {
-    mockGetBotInviteUrl.mockReturnValue('https://discord.com/invite/bot');
+    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
   });
 
   it('should render the main CTA heading', () => {
@@ -63,13 +65,16 @@ describe('Footer', () => {
   it('should render the invite link when URL is available', () => {
     render(<Footer />);
     const link = screen.getByRole('link', { name: /Initialize Bot/i });
-    expect(link).toHaveAttribute('href', 'https://discord.com/invite/bot');
+    expect(link).toHaveAttribute('href', inviteUrl);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
   it('should render locked state when no invite URL', () => {
     mockGetBotInviteUrl.mockReturnValue(null);
     render(<Footer />);
     expect(screen.getByText('[Locked]')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Initialize Bot/i })).not.toBeInTheDocument();
   });
 
   it('should render footer navigation links', () => {

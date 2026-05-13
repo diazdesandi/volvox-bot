@@ -16,7 +16,7 @@ describe('triage-config-fields', () => {
     });
 
     describe('responseCooldownMs', () => {
-      it('has default of 0 (changed from 10000)', () => {
+      it('has default of 0', () => {
         expect(TRIAGE_NUMERIC_FIELDS.responseCooldownMs.default).toBe(0);
       });
 
@@ -26,6 +26,12 @@ describe('triage-config-fields', () => {
 
       it('has max of 60000', () => {
         expect(TRIAGE_NUMERIC_FIELDS.responseCooldownMs.max).toBe(60000);
+      });
+
+      it('default is within [min, max] range', () => {
+        const { min, max, default: def } = TRIAGE_NUMERIC_FIELDS.responseCooldownMs;
+        expect(def).toBeGreaterThanOrEqual(min);
+        expect(def).toBeLessThanOrEqual(max);
       });
     });
 
@@ -76,6 +82,10 @@ describe('triage-config-fields', () => {
       for (const [key, field] of Object.entries(TRIAGE_NUMERIC_FIELDS)) {
         expect(field.min, `${key}.min <= max`).toBeLessThanOrEqual(field.max);
       }
+    });
+
+    it('responseCooldownMs keeps the runtime default at 0', () => {
+      expect(TRIAGE_NUMERIC_FIELDS.responseCooldownMs.default).toBe(0);
     });
   });
 });

@@ -146,16 +146,91 @@ describe('bot-api-proxy branch coverage', () => {
     expect(mockGetMutualGuilds).not.toHaveBeenCalled();
   });
 
-  it('requires Discord membership confirmation for viewer bot access entries without present', async () => {
+  it('requires Discord membership and bot presence confirmation for viewer bot access entries without present', async () => {
     mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
     mockFetchBotGuildAccess.mockResolvedValue([{ id: 'guild-1', access: 'viewer' }]);
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockGetMutualGuilds.mockResolvedValue([
+      { id: 'guild-1', owner: false, permissions: '8', botPresent: true },
+    ]);
 
     const response = await authorizeGuildAdmin(createRequest(), 'guild-1', '[test]');
 
     expect(response).toBeNull();
     expect(mockGetMutualGuilds).toHaveBeenCalledWith('token', expect.any(AbortSignal));
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('denies oauth fallback access when authoritative bot presence says the bot is absent', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockFetchBotGuildAccess.mockResolvedValue(null);
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: 'guild-1',
+        owner: false,
+        permissions: '8',
+        botPresent: false,
+        botPresenceAuthoritative: true,
+      },
+    ]);
+
+    const response = await authorizeGuildAdmin(createRequest(), 'guild-1', '[test]');
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toEqual({ error: 'Forbidden' });
+  });
+
+  it('allows admin oauth fallback access when bot presence is non-authoritative', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockFetchBotGuildAccess.mockResolvedValue(null);
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: 'guild-1',
+        owner: false,
+        permissions: '8',
+        botPresent: false,
+        botPresenceAuthoritative: false,
+      },
+    ]);
+
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+  });
+
+  it('allows moderator oauth fallback access when bot presence is non-authoritative', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockFetchBotGuildAccess.mockResolvedValue(null);
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: 'guild-1',
+        owner: false,
+        permissions: '32',
+        botPresent: false,
+        botPresenceAuthoritative: false,
+      },
+    ]);
+
+    await expect(authorizeGuildModerator(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
+    await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it('denies non-authoritative oauth fallback access without Discord management permissions', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
+    mockFetchBotGuildAccess.mockResolvedValue(null);
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: 'guild-1',
+        owner: false,
+        permissions: '0',
+        botPresent: false,
+        botPresenceAuthoritative: false,
+      },
+    ]);
+
+    const response = await authorizeGuildModerator(createRequest(), 'guild-1', '[test]');
+
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toEqual({ error: 'Forbidden' });
   });
 
   it('denies explicit viewer bot access absence even when Discord permissions are admin', async () => {
@@ -191,13 +266,15 @@ describe('bot-api-proxy branch coverage', () => {
     mockGetToken.mockResolvedValue({ accessToken: 'token' });
     mockFetchBotGuildAccess.mockResolvedValue(null);
     mockGetMutualGuilds.mockResolvedValue([
-      { id: 'guild-1', owner: true, permissions: '0' },
-      { id: 'guild-2', owner: false, permissions: '8' },
+      { id: 'guild-1', owner: true, permissions: '0', botPresent: true },
+      { id: 'guild-2', owner: false, permissions: '8', botPresent: true },
     ]);
 
     await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
 
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-2', owner: false, permissions: '8' }]);
+    mockGetMutualGuilds.mockResolvedValue([
+      { id: 'guild-2', owner: false, permissions: '8', botPresent: true },
+    ]);
 
     await expect(authorizeGuildAdmin(createRequest(), 'guild-2', '[test]')).resolves.toBeNull();
   });
@@ -219,7 +296,9 @@ describe('bot-api-proxy branch coverage', () => {
   it('falls back to oauth-derived access without a second direct access fetch', async () => {
     mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
     mockFetchBotGuildAccess.mockResolvedValue(null);
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockGetMutualGuilds.mockResolvedValue([
+      { id: 'guild-1', owner: false, permissions: '8', botPresent: true },
+    ]);
 
     await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
     expect(mockFetchBotGuildAccess).toHaveBeenCalledTimes(1);
@@ -229,26 +308,46 @@ describe('bot-api-proxy branch coverage', () => {
   it('falls back to discord permissions when userId cannot be derived from token', async () => {
     // token has no id or sub → getUserIdFromToken returns '' → skip bot API
     mockGetToken.mockResolvedValue({ accessToken: 'token' });
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockGetMutualGuilds.mockResolvedValue([
+      { id: 'guild-1', owner: false, permissions: '8', botPresent: true },
+    ]);
 
-    // With administrator permission (8), fallback should grant admin access
+    // With administrator permission (8) and confirmed bot presence, fallback should grant admin access
     await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('falls back to discord permissions when bot api base url is missing', async () => {
+  it('allows non-authoritative fallback admin access when the bot api base url is missing', async () => {
     mockGetBotApiBaseUrl.mockReturnValue(null);
     mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockFetchBotGuildAccess.mockResolvedValue(null);
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: 'guild-1',
+        owner: false,
+        permissions: '8',
+        botPresent: false,
+        botPresenceAuthoritative: false,
+      },
+    ]);
 
     await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('falls back to discord permissions when bot api secret is missing', async () => {
+  it('allows non-authoritative fallback admin access when the bot api secret is missing', async () => {
     delete process.env.BOT_API_SECRET;
     mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockFetchBotGuildAccess.mockResolvedValue(null);
+    mockGetMutualGuilds.mockResolvedValue([
+      {
+        id: 'guild-1',
+        owner: false,
+        permissions: '8',
+        botPresent: false,
+        botPresenceAuthoritative: false,
+      },
+    ]);
 
     await expect(authorizeGuildAdmin(createRequest(), 'guild-1', '[test]')).resolves.toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
@@ -271,7 +370,9 @@ describe('bot-api-proxy branch coverage', () => {
 
   it('falls back to discord permissions when bot api returns non-array response', async () => {
     mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockGetMutualGuilds.mockResolvedValue([
+      { id: 'guild-1', owner: false, permissions: '8', botPresent: true },
+    ]);
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({ error: 'not-an-array' }),
@@ -283,7 +384,9 @@ describe('bot-api-proxy branch coverage', () => {
 
   it('falls back to discord permissions when bot api entry is not found in the response array', async () => {
     mockGetToken.mockResolvedValue({ accessToken: 'token', id: 'user-1' });
-    mockGetMutualGuilds.mockResolvedValue([{ id: 'guild-1', owner: false, permissions: '8' }]);
+    mockGetMutualGuilds.mockResolvedValue([
+      { id: 'guild-1', owner: false, permissions: '8', botPresent: true },
+    ]);
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       // entry for a different guild id

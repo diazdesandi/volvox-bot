@@ -22,6 +22,8 @@ import type {
   ConfigFeatureId,
   ConfigSearchItem,
 } from '@/components/dashboard/config-workspace/types';
+import { useGuildDirectory } from '@/components/layout/guild-directory-context';
+import { isGuildManageable } from '@/hooks/use-guild-role';
 import {
   DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT,
   DASHBOARD_CONFIG_SAVE_FAILED_EVENT,
@@ -29,7 +31,12 @@ import {
   trackDashboardEvent,
 } from '@/lib/amplitude';
 import { computePatches, deepEqual } from '@/lib/config-utils';
-import { GUILD_SELECTED_EVENT, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
+import {
+  forceClearSelectedGuild,
+  GUILD_SELECTED_EVENT,
+  GUILD_SELECTION_CLEARED_EVENT,
+  SELECTED_GUILD_KEY,
+} from '@/lib/guild-selection';
 import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
 import type { GuildConfig } from './config-editor-utils';
 import { generateId, isGuildConfig } from './config-editor-utils';
@@ -124,6 +131,11 @@ function getConfigSaveFailureReason(
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const {
+    error: guildDirectoryError,
+    guilds,
+    loading: guildDirectoryLoading,
+  } = useGuildDirectory();
 
   const [guildId, setGuildId] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -136,12 +148,36 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [savedConfig, setSavedConfig] = useState<GuildConfig | null>(null);
   const [draftConfig, setDraftConfig] = useState<GuildConfig | null>(null);
+  const [loadableGuildId, setLoadableGuildId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [focusFeatureId, setFocusFeatureId] = useState<ConfigFeatureId | null>(null);
   const [selectedSearchItemId, setSelectedSearchItemId] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<ConfigFeatureId | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
+
+  const installedManageableGuildIds = useMemo(
+    () =>
+      new Set(
+        guilds
+          .filter(
+            (guild) =>
+              (guild.botPresent || guild.botPresenceAuthoritative === false) &&
+              isGuildManageable(guild),
+          )
+          .map((guild) => guild.id),
+      ),
+    [guilds],
+  );
+
+  const clearConfigState = useCallback(() => {
+    abortRef.current?.abort();
+    setLoading(false);
+    setError(null);
+    setSavedConfig(null);
+    setDraftConfig(null);
+    setPrevSavedConfig(null);
+  }, []);
 
   // Derive active category from URL
   const activeCategoryId = useMemo(() => parseCategoryFromPathname(pathname), [pathname]);
@@ -174,6 +210,9 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       const detail = (e as CustomEvent<string>).detail;
       setGuildId(detail);
     }
+    function onGuildSelectionCleared() {
+      setGuildId('');
+    }
     function onStorage(e: StorageEvent) {
       if (e.key === SELECTED_GUILD_KEY) {
         setGuildId(e.newValue ?? '');
@@ -181,9 +220,11 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
 
     window.addEventListener(GUILD_SELECTED_EVENT, onGuildSelected);
+    window.addEventListener(GUILD_SELECTION_CLEARED_EVENT, onGuildSelectionCleared);
     window.addEventListener('storage', onStorage);
     return () => {
       window.removeEventListener(GUILD_SELECTED_EVENT, onGuildSelected);
+      window.removeEventListener(GUILD_SELECTION_CLEARED_EVENT, onGuildSelectionCleared);
       window.removeEventListener('storage', onStorage);
     };
   }, []);
@@ -239,11 +280,49 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Validate selected guilds against directory changes without refetching saved config.
+  useEffect(() => {
+    if (!guildId) {
+      if (loadableGuildId) {
+        clearConfigState();
+      }
+      setLoadableGuildId('');
+      return;
+    }
+    if (guildDirectoryLoading || guildDirectoryError) {
+      if (guildId !== loadableGuildId) {
+        clearConfigState();
+        setLoadableGuildId('');
+      }
+      return;
+    }
+    if (!installedManageableGuildIds.has(guildId)) {
+      clearConfigState();
+      setLoadableGuildId('');
+      setGuildId('');
+      forceClearSelectedGuild();
+      return;
+    }
+    setLoadableGuildId(guildId);
+  }, [
+    clearConfigState,
+    guildDirectoryError,
+    guildDirectoryLoading,
+    guildId,
+    installedManageableGuildIds,
+    loadableGuildId,
+  ]);
+
+  // Fetch saved config only when the validated guild selection changes.
   useEffect(() => {
     setPrevSavedConfig(null);
-    fetchConfig(guildId);
+    if (!loadableGuildId) {
+      clearConfigState();
+      return;
+    }
+    fetchConfig(loadableGuildId);
     return () => abortRef.current?.abort();
-  }, [guildId, fetchConfig]);
+  }, [clearConfigState, fetchConfig, loadableGuildId]);
 
   // ── Reset focus state on route change ──────────────────────────
   const prevPathnameRef = useRef(pathname);
@@ -414,7 +493,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   // ── Keyboard shortcut: Ctrl/Cmd+S → open diff preview ─────────
   const openDiffModal = useCallback(() => {
-    if (!guildId || !savedConfig || !draftConfig) return;
+    if (!guildId || guildId !== loadableGuildId || !savedConfig || !draftConfig) return;
     if (hasValidationErrors) {
       toast.error('Cannot save', {
         description: 'Fix validation errors before saving.',
@@ -426,7 +505,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
       return;
     }
     setShowDiffModal(true);
-  }, [guildId, savedConfig, draftConfig, hasValidationErrors, hasChanges]);
+  }, [guildId, loadableGuildId, savedConfig, draftConfig, hasValidationErrors, hasChanges]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -500,7 +579,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
    * state.
    */
   const executeSave = useCallback(async () => {
-    if (!guildId || !savedConfig || !draftConfig) return;
+    if (!guildId || guildId !== loadableGuildId || !savedConfig || !draftConfig) return;
 
     if (hasValidationErrors) {
       toast.error('Cannot save', {
@@ -574,6 +653,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
     changedCategoryCount,
     changedSections,
     guildId,
+    loadableGuildId,
     savedConfig,
     draftConfig,
     hasValidationErrors,

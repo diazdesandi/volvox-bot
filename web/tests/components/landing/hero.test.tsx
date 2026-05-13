@@ -1,15 +1,14 @@
-import { act, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockUseInView, mockUseReducedMotion } = vi.hoisted(() => ({
-  mockUseInView: vi.fn(),
-  mockUseReducedMotion: vi.fn(),
+const { mockGetBotInviteUrl } = vi.hoisted(() => ({
+  mockGetBotInviteUrl: vi.fn(),
 }));
 
 vi.mock('framer-motion', async () => {
   const React = await import('react');
   const createComponent = (tag: string) =>
-    React.forwardRef(({ animate: _animate, initial: _initial, transition: _transition, whileHover: _whileHover, ...props }: any, ref: any) =>
+    React.forwardRef(({ animate: _animate, initial: _initial, transition: _transition, whileHover: _whileHover, whileInView: _whileInView, viewport: _viewport, ...props }: any, ref: any) =>
       React.createElement(tag, { ...props, ref }, props.children)
     );
 
@@ -24,56 +23,62 @@ vi.mock('framer-motion', async () => {
       span: createComponent('span'),
       section: createComponent('section'),
     },
-    useInView: (...args: unknown[]) => mockUseInView(...args),
+    useInView: () => true,
     useScroll: () => ({ scrollY: 0, scrollYProgress: 0 }),
     useSpring: (value: unknown) => value,
     useTransform: (_value: unknown, _input: unknown, output: unknown[]) => output[0],
-    useReducedMotion: () => mockUseReducedMotion(),
+    useReducedMotion: () => false,
   };
 });
 
+vi.mock('gsap', () => ({
+  gsap: {
+    registerPlugin: vi.fn(),
+    timeline: vi.fn(() => ({ fromTo: vi.fn().mockReturnThis() })),
+    to: vi.fn(),
+  },
+  default: {
+    registerPlugin: vi.fn(),
+    timeline: vi.fn(() => ({ fromTo: vi.fn().mockReturnThis() })),
+    to: vi.fn(),
+  },
+}));
+vi.mock('gsap/ScrollTrigger', () => ({ ScrollTrigger: {} }));
+vi.mock('@gsap/react', () => ({ useGSAP: vi.fn() }));
+
+vi.mock('@/lib/discord', () => ({
+  getBotInviteUrl: () => mockGetBotInviteUrl(),
+}));
+
 import { Hero } from '@/components/landing/Hero';
 
-describe.skip('Hero', () => {
+const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
+
+describe('Hero', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    mockUseInView.mockReturnValue(true);
-    mockUseReducedMotion.mockReturnValue(false);
+    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.clearAllMocks();
-  });
-
-  it('should use 40ms typing speed and 150ms start delay', () => {
-    render(<Hero />);
-    expect(screen.getByText(/Building the future of Discord communities/i)).toBeInTheDocument();
-    expect(document.querySelector('.terminal-cursor')).not.toBeNull();
-  });
-
-  it('should reveal headline and CTAs after typewriter completes', () => {
+  it('renders the VOLVOX hero brand', () => {
     render(<Hero />);
 
-    act(() => {
-      vi.advanceTimersByTime(800); // 150ms delay + 10 chars * 40ms + buffer
-    });
-
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      /volvox-bot\s*AI-powered Discord\./i,
-    );
-    expect(screen.getByRole('link', { name: /Open Dashboard/i })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('VOLVOX');
+    expect(screen.getByText('BOT')).toBeInTheDocument();
   });
 
-  it('should render the chat console with channel context', () => {
+  it('renders a direct invite link when URL is configured', () => {
     render(<Hero />);
-    expect(screen.getByText('volvox-bot')).toBeInTheDocument();
-    expect(screen.getByText('#general')).toBeInTheDocument();
+
+    const link = screen.getByRole('link', { name: /Add to Server/i });
+    expect(link).toHaveAttribute('href', inviteUrl);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('should still render correctly when reduced motion is enabled', () => {
-    mockUseReducedMotion.mockReturnValue(true);
+  it('hides the invite CTA when no invite URL is configured', () => {
+    mockGetBotInviteUrl.mockReturnValue(null);
     render(<Hero />);
-    expect(screen.getByText(/Building the future of Discord communities/i)).toBeInTheDocument();
+
+    expect(screen.queryByRole('link', { name: /Add to Server/i })).not.toBeInTheDocument();
   });
 });

@@ -13,6 +13,7 @@ interface InviteButtonProps {
 export function InviteButton({ size = 'sm', className }: InviteButtonProps) {
   const url = getBotInviteUrl();
   if (!url) return null;
+
   return (
     <Button variant="discord" size={size} className={className} asChild>
       <a href={url} target="_blank" rel="noopener noreferrer">

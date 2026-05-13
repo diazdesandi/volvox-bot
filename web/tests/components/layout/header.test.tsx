@@ -24,6 +24,7 @@ const mockRefreshConversations = vi.fn();
 const mockRefreshAuditLog = vi.fn();
 const mockRefreshTempRoles = vi.fn();
 const mockRefreshHealth = vi.fn();
+const mockRefreshGuilds = vi.fn();
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
@@ -47,6 +48,15 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
     <a href={href} {...props}>{children}</a>
   ),
+}));
+
+vi.mock('@/components/layout/guild-directory-context', () => ({
+  useGuildDirectory: () => ({
+    error: false,
+    guilds: [],
+    loading: false,
+    refreshGuilds: mockRefreshGuilds,
+  }),
 }));
 
 vi.mock('@/components/layout/mobile-sidebar', () => ({
@@ -182,9 +192,24 @@ describe('Header', () => {
   it('renders dashboard branding and the session user', () => {
     render(<Header />);
 
+    expect(screen.getByRole('link', { name: 'Volvox.Bot dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
+    expect(screen.getByRole('link', { name: 'Volvox.Bot dashboard' })).toHaveClass(
+      'hover:text-primary',
+    );
     expect(screen.getAllByText(/Volvox/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText('TestUser').length).toBeGreaterThan(0);
     expect(screen.getByText('Mobile menu')).toBeInTheDocument();
+  });
+
+  it('hides the mobile sidebar trigger on welcome routes', () => {
+    mockUsePathname.mockReturnValue('/dashboard/welcome');
+
+    render(<Header />);
+
+    expect(screen.queryByText('Mobile menu')).not.toBeInTheDocument();
   });
 
   it('renders loading and unauthenticated session states', () => {

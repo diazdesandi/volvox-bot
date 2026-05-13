@@ -32,13 +32,17 @@ vi.mock("@/components/dashboard/analytics-dashboard", () => ({
   AnalyticsDashboard: () => <div>Analytics dashboard component</div>,
 }));
 
+vi.mock("@/components/dashboard/dashboard-home", () => ({
+  DashboardHome: () => <div>Dashboard home component</div>,
+}));
+
 import DashboardPage from "@/app/dashboard/page";
 import DashboardLayout from "@/app/dashboard/layout";
 
 describe("DashboardPage", () => {
-  it("renders analytics dashboard component", () => {
+  it("renders the dashboard home component", () => {
     render(<DashboardPage />);
-    expect(screen.getByText("Analytics dashboard component")).toBeInTheDocument();
+    expect(screen.getByText("Dashboard home component")).toBeInTheDocument();
   });
 });
 

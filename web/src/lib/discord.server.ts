@@ -90,6 +90,10 @@ function getGuildIconUrl(guildId: string, iconHash: string | null, size = 128): 
   return `${DISCORD_CDN}/icons/${guildId}/${iconHash}.${ext}?size=${size}`;
 }
 
+function getDiscordGuildMemberCount(guild: DiscordGuild): number | null {
+  return typeof guild.approximate_member_count === 'number' ? guild.approximate_member_count : null;
+}
+
 function getDiscordGuildAccess(guild: DiscordGuild): NonNullable<MutualGuild['access']> {
   if (guild.owner) return 'owner';
 
@@ -120,13 +124,31 @@ function getDiscordGuildAccess(guild: DiscordGuild): NonNullable<MutualGuild['ac
  *
  * @returns A `MutualGuild` object derived from `guild` where `icon` is the CDN URL computed from the guild's `icon` hash, `iconHash` preserves the original hash, and `botPresent` is `false`.
  */
-function mapDiscordGuildToMutualGuild(guild: DiscordGuild): MutualGuild {
+function mapDiscordGuildToMutualGuild(
+  guild: DiscordGuild,
+  botPresenceAuthoritative = true,
+): MutualGuild {
   const iconHash = guild.icon;
   return {
     ...guild,
     icon: getGuildIconUrl(guild.id, iconHash),
     iconHash,
+    memberCount: getDiscordGuildMemberCount(guild),
     botPresent: false as const,
+    botPresenceAuthoritative,
+  };
+}
+
+function mapUserAndBotGuildToMutualGuild(guild: DiscordGuild, botGuild: BotGuild): MutualGuild {
+  const iconHash = botGuild.iconHash ?? guild.icon;
+  return {
+    ...guild,
+    name: botGuild.name,
+    icon: botGuild.icon ?? getGuildIconUrl(guild.id, iconHash),
+    iconHash,
+    memberCount: botGuild.memberCount ?? getDiscordGuildMemberCount(guild),
+    botPresent: true as const,
+    config: botGuild.config,
   };
 }
 
@@ -149,6 +171,7 @@ function mapBotGuildToMutualGuild(guild: BotGuild, access: BotGuildAccessLevel):
     owner: false,
     permissions: '0',
     features: [],
+    memberCount: guild.memberCount ?? null,
     botPresent: true as const,
     access,
     config: guild.config,
@@ -264,6 +287,7 @@ async function fetchAllUserGuildPages(
 
     const url = new URL(`${DISCORD_API_BASE}/users/@me/guilds`);
     url.searchParams.set('limit', String(GUILDS_PER_PAGE));
+    url.searchParams.set('with_counts', 'true');
     if (after) {
       url.searchParams.set('after', after);
     }
@@ -687,44 +711,40 @@ export async function getMutualGuilds(
   const botResult = await botResultPromise;
 
   // If the bot API was unavailable, return all user guilds unfiltered so
-  // the UI can still be useful. If the API was available but the bot is
-  // genuinely in zero guilds, return an empty list.
+  // the UI can still be useful.
   if (!botResult.available) {
-    return userGuilds.map(mapDiscordGuildToMutualGuild);
+    return userGuilds.map((guild) => ({
+      ...mapDiscordGuildToMutualGuild(guild, false),
+      access: getDiscordGuildAccess(guild),
+    }));
   }
 
   const botGuildsById = new Map(botResult.guilds.map((guild) => [guild.id, guild]));
-  const mutualGuilds = userGuilds.flatMap((guild) => {
+  const guildsWithPresence = userGuilds.map((guild) => {
     const botGuild = botGuildsById.get(guild.id);
-    if (!botGuild) return [];
-
-    const iconHash = botGuild.iconHash ?? guild.icon;
-    return [
-      {
-        ...guild,
-        name: botGuild.name,
-        icon: botGuild.icon ?? getGuildIconUrl(guild.id, iconHash),
-        iconHash,
-        botPresent: true as const,
-        config: botGuild.config,
-      },
-    ];
+    return botGuild
+      ? mapUserAndBotGuildToMutualGuild(guild, botGuild)
+      : mapDiscordGuildToMutualGuild(guild);
   });
+  const botPresentGuilds = guildsWithPresence.filter((guild) => guild.botPresent);
 
   const userId = options.userId;
-  if (!userId || mutualGuilds.length === 0) {
-    return mutualGuilds;
+  if (!userId || botPresentGuilds.length === 0) {
+    return guildsWithPresence.map((guild) => ({
+      ...guild,
+      access: getDiscordGuildAccess(guild),
+    }));
   }
 
   const accessEntries = await withBotGuildAccessLookupTimeout((accessSignal) =>
     fetchBotGuildAccess(
       userId,
-      mutualGuilds.map((guild) => guild.id),
+      botPresentGuilds.map((guild) => guild.id),
       accessSignal,
     ),
   );
   if (!accessEntries) {
-    return mutualGuilds.map((guild) => ({
+    return guildsWithPresence.map((guild) => ({
       ...guild,
       access: getDiscordGuildAccess(guild),
     }));
@@ -734,8 +754,10 @@ export async function getMutualGuilds(
     accessEntries.filter(canExposeBotGuildAccess).map((entry) => [entry.id, entry.access]),
   );
 
-  return mutualGuilds.map((guild) => ({
+  return guildsWithPresence.map((guild) => ({
     ...guild,
-    access: botAccessById.get(guild.id) ?? getDiscordGuildAccess(guild),
+    access: guild.botPresent
+      ? (botAccessById.get(guild.id) ?? getDiscordGuildAccess(guild))
+      : getDiscordGuildAccess(guild),
   }));
 }

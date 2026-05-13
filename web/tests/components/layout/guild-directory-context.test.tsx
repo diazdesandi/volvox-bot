@@ -137,6 +137,37 @@ describe('GuildDirectoryProvider', () => {
     errorSpy.mockRestore();
   });
 
+  it('preserves bot presence authority from guild API response', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: '1', name: 'Fallback Guild', botPresent: false, botPresenceAuthoritative: false },
+      ],
+    } as Response);
+
+    function PresenceConsumer() {
+      const { guilds } = useGuildDirectory();
+      const g = guilds[0];
+      if (!g) return <div data-testid="status">none</div>;
+      return (
+        <div data-testid="status">
+          {g.botPresenceAuthoritative === false ? 'presence-degraded' : 'presence-authoritative'}
+        </div>
+      );
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <PresenceConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('presence-degraded');
+    });
+  });
+
   it('parses iconHash and config from guild API response', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
@@ -332,6 +363,49 @@ describe('GuildDirectoryProvider', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('status')).toHaveTextContent('no-hub-config');
+    });
+  });
+
+  it('normalizes invalid member counts to null', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [
+        { id: '1', name: 'Direct', botPresent: true, memberCount: 42 },
+        { id: '2', name: 'Zero', botPresent: true, memberCount: 0 },
+        { id: '3', name: 'Approx', botPresent: true, approximate_member_count: 7 },
+        {
+          id: '4',
+          name: 'Fallback',
+          botPresent: true,
+          memberCount: -1,
+          approximate_member_count: 9,
+        },
+        { id: '5', name: 'Negative', botPresent: true, memberCount: -10 },
+        { id: '6', name: 'NaN', botPresent: true, memberCount: Number.NaN },
+        { id: '7', name: 'Infinity', botPresent: true, approximate_member_count: Infinity },
+      ],
+    } as Response);
+
+    function MemberCountConsumer() {
+      const { guilds } = useGuildDirectory();
+      return (
+        <div data-testid="counts">
+          {guilds
+            .map((guild) => (guild.memberCount === null ? 'null' : String(guild.memberCount)))
+            .join(',')}
+        </div>
+      );
+    }
+
+    render(
+      <GuildDirectoryProvider>
+        <MemberCountConsumer />
+      </GuildDirectoryProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('counts')).toHaveTextContent('42,0,7,9,null,null,null');
     });
   });
 });

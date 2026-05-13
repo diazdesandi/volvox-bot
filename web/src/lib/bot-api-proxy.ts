@@ -70,10 +70,17 @@ function getUserIdFromToken(token: AuthToken): string {
   return '';
 }
 
+function allowsPermissionFallbackAccess(guild: {
+  botPresent?: boolean;
+  botPresenceAuthoritative?: boolean;
+}): boolean {
+  return guild.botPresenceAuthoritative === false || guild.botPresent === true;
+}
+
 /**
  * Determines the caller's access level for a specific Discord guild.
  *
- * Attempts to resolve the user's guild access and whether the guild is present for the user. If a bot-managed access record exists for the user and guild, that value is used. If the user is not a member of the guild, returns `{ access: 'viewer', present: false }`. Otherwise returns a resolved access level and `present: true`; when upstream queries fail or bot configuration/user id is unavailable, returns a fallback access derived from the guild membership.
+ * Attempts to resolve the user's guild access and whether the guild is present for the user. If a bot-managed access record exists for the user and guild, that value is used. If the user is not a member of the guild, returns `{ access: 'viewer', present: false }`. Otherwise returns a resolved access level and `present: true`; when upstream queries fail or bot configuration/user id is unavailable, returns a fallback access derived from guild membership when bot presence is confirmed or temporarily non-authoritative.
  *
  * @param token - Authentication token containing `accessToken` and optional `id`/`sub` used to identify the user and call Discord APIs
  * @param guildId - The Discord guild ID to resolve access for
@@ -102,6 +109,10 @@ async function resolveGuildAccess(
 
   if (!targetGuild) {
     return { access: 'viewer', present: false };
+  }
+
+  if (!allowsPermissionFallbackAccess(targetGuild)) {
+    return { access: 'viewer', present: true };
   }
 
   const fallbackAccess = getFallbackGuildAccess(targetGuild);

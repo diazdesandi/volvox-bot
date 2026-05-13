@@ -38,6 +38,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAnalytics } from '@/contexts/analytics-context';
 import { useGuildSelection } from '@/hooks/use-guild-selection';
 import { getDashboardPageTitle } from '@/lib/page-titles';
+import { WELCOME_ROUTE } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import { useAuditLogStore } from '@/stores/audit-log-store';
 import { useConversationsStore } from '@/stores/conversations-store';
@@ -46,6 +47,7 @@ import { useMembersStore } from '@/stores/members-store';
 import { useModerationStore } from '@/stores/moderation-store';
 import { useTempRolesStore } from '@/stores/temp-roles-store';
 import { useTicketsStore } from '@/stores/tickets-store';
+import { useGuildDirectory } from './guild-directory-context';
 import { MobileSidebar } from './mobile-sidebar';
 
 // ─── Shared compact button classes ──────────────────────────────────────────
@@ -59,6 +61,20 @@ const COMPACT_BTN_OVERLAY =
   'before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/[0.12] before:to-transparent before:pointer-events-none before:opacity-60';
 
 const COMPACT_BTN_DISABLED = 'opacity-50 cursor-not-allowed active:scale-100';
+
+const DASHBOARD_LINK_CLASS_NAME =
+  'group/brand flex min-w-0 shrink-0 items-center gap-2 rounded-xl pr-1 transition-colors ' +
+  'hover:text-primary focus-visible:outline-none focus-visible:ring-2 ' +
+  'focus-visible:ring-primary/50 md:gap-3.5';
+
+const DASHBOARD_BRAND_ICON_FRAME_CLASS_NAME =
+  'relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br ' +
+  'from-primary/80 to-secondary/80 p-[1px] shadow-lg shadow-primary/5 transition-all ' +
+  'group-hover/brand:scale-105 group-active/brand:scale-95 md:h-9 md:w-9 md:rounded-2xl';
+
+const DASHBOARD_BRAND_ICON_INNER_CLASS_NAME =
+  'flex h-full w-full items-center justify-center rounded-[11px] md:rounded-[15px] ' +
+  'bg-background/20 backdrop-blur-sm overflow-hidden';
 
 /**
  * Renders the top navigation header for the Volvox.Bot Dashboard, including branding, a theme toggle, and a session-aware user menu.
@@ -104,6 +120,7 @@ export function Header() {
   const isTempRolesDashboard = pathname === '/dashboard/temp-roles';
   const isPerformanceDashboard = pathname === '/dashboard/performance';
   const isLogsDashboard = pathname === '/dashboard/logs';
+  const isWelcome = pathname === WELCOME_ROUTE || pathname.startsWith(`${WELCOME_ROUTE}/`);
 
   // Global Guild State for Refresh Actions
   const guildId = useGuildSelection();
@@ -192,6 +209,8 @@ export function Header() {
     window.dispatchEvent(new CustomEvent('refresh-performance'));
   }, []);
 
+  const { refreshGuilds, loading: guildsLoading } = useGuildDirectory();
+
   useEffect(() => {
     const handleStart = () => setPerformanceLoading(true);
     const handleEnd = () => setPerformanceLoading(false);
@@ -225,13 +244,17 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-background/20 transition-all duration-300 shadow-[0_2px_5px_-2px_rgba(0,0,0,0.2)]">
       <div className="mx-auto flex h-12 md:h-14 w-full items-center gap-2 md:gap-4 px-2 md:px-4">
-        <MobileSidebar />
-        <div className="flex min-w-0 shrink-0 items-center gap-2 md:gap-3.5">
+        {!isWelcome && <MobileSidebar />}
+        <Link
+          href="/dashboard"
+          aria-label="Volvox.Bot dashboard"
+          className={DASHBOARD_LINK_CLASS_NAME}
+        >
           <div
-            className="group relative flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-xl md:rounded-2xl bg-gradient-to-br from-primary/80 to-secondary/80 p-[1px] shadow-lg shadow-primary/5 transition-all hover:scale-105 active:scale-95"
+            className={DASHBOARD_BRAND_ICON_FRAME_CLASS_NAME}
             style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
           >
-            <div className="flex h-full w-full items-center justify-center rounded-[11px] md:rounded-[15px] bg-background/20 backdrop-blur-sm overflow-hidden">
+            <div className={DASHBOARD_BRAND_ICON_INNER_CLASS_NAME}>
               <Image
                 src="/icon-192.png"
                 alt="Volvox.Bot Logo"
@@ -270,7 +293,7 @@ export function Header() {
               </span>
             </div>
           </div>
-        </div>
+        </Link>
 
         {/* Dynamic Search Bar for Settings */}
         {activeCategoryId && (
@@ -604,6 +627,30 @@ export function Header() {
                 )}
               />
               <span>Refresh Health</span>
+            </button>
+          </div>
+        )}
+
+        {isWelcome && (
+          <div className="hidden md:flex items-center gap-2">
+            <div className="h-6 w-[1px] bg-border/40 mx-1" />
+            <button
+              type="button"
+              onClick={() => refreshGuilds()}
+              disabled={guildsLoading}
+              className={cn(
+                `${COMPACT_BTN_BASE} bg-transparent `,
+                COMPACT_BTN_OVERLAY,
+                guildsLoading && COMPACT_BTN_DISABLED,
+              )}
+            >
+              <RefreshCw
+                className={cn(
+                  'h-3 w-3 md:h-3.5 md:w-3.5 opacity-60',
+                  guildsLoading && 'animate-spin',
+                )}
+              />
+              <span>Refresh Servers</span>
             </button>
           </div>
         )}

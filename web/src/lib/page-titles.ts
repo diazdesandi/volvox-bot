@@ -26,6 +26,11 @@ const dashboardTitleMatchers: DashboardTitleMatcher[] = [
   },
   {
     matches: (pathname) =>
+      pathname === '/dashboard/welcome' || pathname.startsWith('/dashboard/welcome/'),
+    title: 'Server Picker',
+  },
+  {
+    matches: (pathname) =>
       pathname === '/dashboard/moderation' || pathname.startsWith('/dashboard/moderation/'),
     title: 'Moderation',
   },

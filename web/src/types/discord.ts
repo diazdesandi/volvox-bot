@@ -6,6 +6,8 @@ export interface DiscordGuild {
   owner: boolean;
   permissions: string;
   features: string[];
+  approximate_member_count?: number | null;
+  approximate_presence_count?: number | null;
 }
 
 export interface GuildCommunityConfig {
@@ -19,11 +21,14 @@ export interface BotGuild {
   name: string;
   icon: string | null;
   iconHash?: string | null;
+  memberCount?: number | null;
   config?: GuildCommunityConfig;
 }
 
 export interface MutualGuild extends DiscordGuild {
   botPresent: boolean;
+  botPresenceAuthoritative?: boolean;
+  memberCount?: number | null;
   access?: 'owner' | 'admin' | 'moderator' | 'viewer';
   config?: GuildCommunityConfig;
 }

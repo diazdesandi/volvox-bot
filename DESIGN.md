@@ -228,6 +228,8 @@ Source: `web/src/components/layout` and `web/src/components/dashboard`.
 - Main content: scrollable, max width `1440px`, padded `px-4 md:px-8 lg:px-10`.
 - Footer sits inside the main scroll region.
 
+Welcome/setup routes intentionally use a standalone frame before a server is installed. Keep that frame separate from the dashboard sidebar/header, use the product mark in the top bar, and connect the setup header and server list in one quiet bordered surface. Subtle page texture and one-time entrance motion are acceptable here; avoid animated backgrounds, hero copy, or dashboard chrome that implies an active server context.
+
 ### Sidebar
 
 The sidebar is grouped into operational sections:

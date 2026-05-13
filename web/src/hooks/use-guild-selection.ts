@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { GUILD_SELECTED_EVENT, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
+import {
+  GUILD_SELECTED_EVENT,
+  GUILD_SELECTION_CLEARED_EVENT,
+  SELECTED_GUILD_KEY,
+} from '@/lib/guild-selection';
 
 interface UseGuildSelectionOptions {
   onGuildChange?: () => void;
@@ -27,36 +31,38 @@ export function useGuildSelection(options?: UseGuildSelectionOptions): string | 
       // localStorage may be unavailable
     }
 
-    const handleGuildSelect = (event: Event) => {
-      if (event.defaultPrevented) return;
-      const selected = (event as CustomEvent<string>).detail;
-      if (selected) {
-        setGuildId((currentGuildId) => {
-          if (currentGuildId === selected) {
-            return currentGuildId;
-          }
-          onGuildChangeRef.current?.();
-          return selected;
-        });
-      }
-    };
-
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key !== SELECTED_GUILD_KEY || !event.newValue) return;
+    const applyGuildSelection = (nextGuildId: string | null) => {
       setGuildId((currentGuildId) => {
-        if (currentGuildId === event.newValue) {
+        if (currentGuildId === nextGuildId) {
           return currentGuildId;
         }
         onGuildChangeRef.current?.();
-        return event.newValue;
+        return nextGuildId;
       });
     };
 
+    const handleGuildSelect = (event: Event) => {
+      if (event.defaultPrevented) return;
+      const selected = (event as CustomEvent<string>).detail;
+      applyGuildSelection(selected || null);
+    };
+
+    const handleGuildSelectionCleared = () => {
+      applyGuildSelection(null);
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== SELECTED_GUILD_KEY && event.key !== null) return;
+      applyGuildSelection(event.newValue || null);
+    };
+
     window.addEventListener(GUILD_SELECTED_EVENT, handleGuildSelect as EventListener);
+    window.addEventListener(GUILD_SELECTION_CLEARED_EVENT, handleGuildSelectionCleared);
     window.addEventListener('storage', handleStorage);
 
     return () => {
       window.removeEventListener(GUILD_SELECTED_EVENT, handleGuildSelect as EventListener);
+      window.removeEventListener(GUILD_SELECTION_CLEARED_EVENT, handleGuildSelectionCleared);
       window.removeEventListener('storage', handleStorage);
     };
   }, []);

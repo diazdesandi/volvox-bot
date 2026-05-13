@@ -47,6 +47,8 @@ describe("GET /api/guilds/[guildId]/analytics", () => {
         id: "guild-1",
         permissions: String(0x8),
         owner: false,
+        botPresent: true,
+        botPresenceAuthoritative: true,
       },
     ]);
   });
@@ -110,6 +112,8 @@ describe("GET /api/guilds/[guildId]/analytics", () => {
         id: "guild-1",
         permissions: "0",
         owner: true,
+        botPresent: true,
+        botPresenceAuthoritative: true,
       },
     ]);
 

@@ -27,21 +27,6 @@ describe('triage-config', () => {
       expect(result.classifyBudget).toBe(0.05);
       expect(result.respondBudget).toBe(0.2);
       expect(result.timeout).toBe(30000);
-      expect(result.memoryTimeoutMs).toBe(2000);
-      expect(result.responseCooldownMs).toBe(0);
-      expect(result.triageDebounceMs).toBe(500);
-    });
-
-    it('should clamp latency tuning fields to configured ranges', () => {
-      const result = resolveTriageConfig({
-        memoryTimeoutMs: 100,
-        responseCooldownMs: 70000,
-        triageDebounceMs: -1,
-      });
-
-      expect(result.memoryTimeoutMs).toBe(500);
-      expect(result.responseCooldownMs).toBe(60000);
-      expect(result.triageDebounceMs).toBe(0);
     });
 
     it('should resolve PR #68 flat format as fallback', () => {
@@ -339,6 +324,58 @@ describe('triage-config', () => {
 
     it('should return false for webhook messages regardless of type', () => {
       expect(isMessageTypeEligible({ type: 19, webhookId: '12345' })).toBe(false);
+    });
+  });
+
+  describe('resolveTriageConfig latency field defaults', () => {
+    it('should apply responseCooldownMs default of 0', () => {
+      const result = resolveTriageConfig({});
+      expect(result.responseCooldownMs).toBe(0);
+    });
+
+    it('should apply memoryTimeoutMs default of 2000', () => {
+      const result = resolveTriageConfig({});
+      expect(result.memoryTimeoutMs).toBe(2000);
+    });
+
+    it('should apply triageDebounceMs default of 500', () => {
+      const result = resolveTriageConfig({});
+      expect(result.triageDebounceMs).toBe(500);
+    });
+
+    it('should clamp responseCooldownMs above max (60000) to 60000', () => {
+      const result = resolveTriageConfig({ responseCooldownMs: 70000 });
+      expect(result.responseCooldownMs).toBe(60000);
+    });
+
+    it('should clamp responseCooldownMs below min (0) to 0', () => {
+      const result = resolveTriageConfig({ responseCooldownMs: -1 });
+      expect(result.responseCooldownMs).toBe(0);
+    });
+
+    it('should clamp memoryTimeoutMs below min (500) to 500', () => {
+      const result = resolveTriageConfig({ memoryTimeoutMs: 100 });
+      expect(result.memoryTimeoutMs).toBe(500);
+    });
+
+    it('should clamp triageDebounceMs below min (0) to 0', () => {
+      const result = resolveTriageConfig({ triageDebounceMs: -1 });
+      expect(result.triageDebounceMs).toBe(0);
+    });
+
+    it('should accept responseCooldownMs at exact boundaries', () => {
+      expect(resolveTriageConfig({ responseCooldownMs: 0 }).responseCooldownMs).toBe(0);
+      expect(resolveTriageConfig({ responseCooldownMs: 60000 }).responseCooldownMs).toBe(60000);
+    });
+
+    it('should use provided responseCooldownMs when in valid range', () => {
+      const result = resolveTriageConfig({ responseCooldownMs: 5000 });
+      expect(result.responseCooldownMs).toBe(5000);
+    });
+
+    it('responseCooldownMs keeps the runtime default at 0', () => {
+      const result = resolveTriageConfig({});
+      expect(result.responseCooldownMs).toBe(0);
     });
   });
 });

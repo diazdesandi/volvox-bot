@@ -2,17 +2,29 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockUseInView, mockUseReducedMotion, mockGetBotInviteUrl } = vi.hoisted(() => ({
+const { mockGetBotInviteUrl, mockUseInView, mockUseReducedMotion } = vi.hoisted(() => ({
+  mockGetBotInviteUrl: vi.fn(),
   mockUseInView: vi.fn(),
   mockUseReducedMotion: vi.fn(),
-  mockGetBotInviteUrl: vi.fn(),
 }));
 
 vi.mock('framer-motion', async () => {
   const React = await import('react');
   const createComponent = (tag: string) =>
-    React.forwardRef(({ animate: _animate, initial: _initial, transition: _transition, whileHover: _whileHover, ...props }: any, ref: any) =>
-      React.createElement(tag, { ...props, ref }, props.children)
+    React.forwardRef(
+      (
+        {
+          animate: _animate,
+          initial: _initial,
+          layout: _layout,
+          transition: _transition,
+          viewport: _viewport,
+          whileHover: _whileHover,
+          whileInView: _whileInView,
+          ...props
+        }: any,
+        ref: any,
+      ) => React.createElement(tag, { ...props, ref }, props.children),
     );
 
   return {
@@ -40,11 +52,13 @@ vi.mock('@/lib/discord', () => ({
 
 import { Pricing } from '@/components/landing/Pricing';
 
+const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
+
 describe('Pricing', () => {
   beforeEach(() => {
     mockUseInView.mockReturnValue(true);
     mockUseReducedMotion.mockReturnValue(false);
-    mockGetBotInviteUrl.mockReturnValue('https://discord.com/invite/bot');
+    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
   });
 
   it('should render 2 tiers with monthly pricing by default', () => {
@@ -69,20 +83,28 @@ describe('Pricing', () => {
     expect(screen.getByText('SYSTEM ACCESS TIERS')).toBeInTheDocument();
   });
 
-  it('should link tiers to bot invite URL', () => {
+  it('should link both tier actions to the direct bot invite URL', () => {
     render(<Pricing />);
     const links = screen.getAllByRole('link', { name: /INITIALIZE|DEPLOY/i });
     expect(links).toHaveLength(2);
+
     for (const link of links) {
-      expect(link).toHaveAttribute('href', 'https://discord.com/invite/bot');
+      expect(link).toHaveAttribute('href', inviteUrl);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     }
   });
 
-  it('should render CTA text without links when no invite URL', () => {
+  it('should disable both tier actions when no invite URL is configured', () => {
     mockGetBotInviteUrl.mockReturnValue(null);
     render(<Pricing />);
-    expect(screen.getByText('INITIALIZE STANDARD')).toBeInTheDocument();
-    expect(screen.getByText('DEPLOY OVERCLOCKED')).toBeInTheDocument();
+
     expect(screen.queryAllByRole('link', { name: /INITIALIZE|DEPLOY/i })).toHaveLength(0);
+    const buttons = screen.getAllByRole('button', { name: /INITIALIZE|DEPLOY/i });
+    expect(buttons).toHaveLength(2);
+
+    for (const button of buttons) {
+      expect(button).toBeDisabled();
+    }
   });
 });

@@ -145,75 +145,6 @@ describe('configValidation', () => {
       expect(validateSingleValue('aiAutoMod.dmNotifications.ban', false)).toEqual([]);
     });
 
-    it('should validate triage latency controls and direct mention fast path', () => {
-      expect(validateSingleValue('triage.memoryTimeoutMs', 2000)).toEqual([]);
-      expect(validateSingleValue('triage.responseCooldownMs', 0)).toEqual([]);
-      expect(validateSingleValue('triage.triageDebounceMs', 500)).toEqual([]);
-      expect(validateSingleValue('triage.directMentionFastPath', true)).toEqual([]);
-      expect(validateSingleValue('triage.memoryTimeoutMs', 499)).toEqual(
-        expect.arrayContaining([expect.stringContaining('>= 500')]),
-      );
-      expect(validateSingleValue('triage.responseCooldownMs', 60001)).toEqual(
-        expect.arrayContaining([expect.stringContaining('<= 60000')]),
-      );
-      expect(validateSingleValue('triage.triageDebounceMs', 2001)).toEqual(
-        expect.arrayContaining([expect.stringContaining('<= 2000')]),
-      );
-      expect(validateSingleValue('triage.directMentionFastPath', 'yes')).toEqual(
-        expect.arrayContaining([expect.stringContaining('expected boolean')]),
-      );
-    });
-
-    it('should accept null for new nullable triage latency fields', () => {
-      expect(validateSingleValue('triage.memoryTimeoutMs', null)).toEqual([]);
-      expect(validateSingleValue('triage.responseCooldownMs', null)).toEqual([]);
-      expect(validateSingleValue('triage.triageDebounceMs', null)).toEqual([]);
-      expect(validateSingleValue('triage.directMentionFastPath', null)).toEqual([]);
-    });
-
-    it('should accept false for directMentionFastPath', () => {
-      expect(validateSingleValue('triage.directMentionFastPath', false)).toEqual([]);
-    });
-
-    it('should accept exact boundary values for triage latency fields', () => {
-      // responseCooldownMs: min=0, max=60000
-      expect(validateSingleValue('triage.responseCooldownMs', 0)).toEqual([]);
-      expect(validateSingleValue('triage.responseCooldownMs', 60000)).toEqual([]);
-      // memoryTimeoutMs: min=500, max=30000
-      expect(validateSingleValue('triage.memoryTimeoutMs', 500)).toEqual([]);
-      expect(validateSingleValue('triage.memoryTimeoutMs', 30000)).toEqual([]);
-      // triageDebounceMs: min=0, max=2000
-      expect(validateSingleValue('triage.triageDebounceMs', 0)).toEqual([]);
-      expect(validateSingleValue('triage.triageDebounceMs', 2000)).toEqual([]);
-    });
-
-    it('should reject below-min for memoryTimeoutMs (min is 500, not 0)', () => {
-      expect(validateSingleValue('triage.memoryTimeoutMs', 0)).toEqual(
-        expect.arrayContaining([expect.stringContaining('>= 500')]),
-      );
-      expect(validateSingleValue('triage.memoryTimeoutMs', 499)).toEqual(
-        expect.arrayContaining([expect.stringContaining('>= 500')]),
-      );
-    });
-
-    it('should reject above-max for triage latency fields', () => {
-      expect(validateSingleValue('triage.memoryTimeoutMs', 30001)).toEqual(
-        expect.arrayContaining([expect.stringContaining('<= 30000')]),
-      );
-      expect(validateSingleValue('triage.responseCooldownMs', -1)).toEqual(
-        expect.arrayContaining([expect.stringContaining('>= 0')]),
-      );
-    });
-
-    it('should reject non-boolean and non-null values for directMentionFastPath', () => {
-      expect(validateSingleValue('triage.directMentionFastPath', 1)).toEqual(
-        expect.arrayContaining([expect.stringContaining('expected boolean')]),
-      );
-      expect(validateSingleValue('triage.directMentionFastPath', 0)).toEqual(
-        expect.arrayContaining([expect.stringContaining('expected boolean')]),
-      );
-    });
-
     it('should reject invalid aiAutoMod model, threshold, and action values', () => {
       expect(validateSingleValue('aiAutoMod.model', 'MiniMax-M2.7')).toEqual(
         expect.arrayContaining([expect.stringContaining('must be one of')]),
@@ -1007,6 +938,65 @@ describe('configValidation', () => {
       expect(validateSingleValue('aiAutoMod.dmNotifications', 'all')).toEqual(
         expect.arrayContaining([expect.any(String)]),
       );
+    });
+  });
+
+  describe('triage schema — latency fields', () => {
+    it('should accept responseCooldownMs at minimum boundary (0)', () => {
+      expect(validateSingleValue('triage.responseCooldownMs', 0)).toEqual([]);
+    });
+
+    it('should reject responseCooldownMs above maximum boundary (60000)', () => {
+      expect(validateSingleValue('triage.responseCooldownMs', 60001)).toEqual(
+        expect.arrayContaining([expect.stringContaining('<= 60000')]),
+      );
+      expect(validateSingleValue('triage.responseCooldownMs', 120000)).toEqual(
+        expect.arrayContaining([expect.stringContaining('<= 60000')]),
+      );
+    });
+
+    it('should accept null for nullable triage.responseCooldownMs', () => {
+      expect(validateSingleValue('triage.responseCooldownMs', null)).toEqual([]);
+    });
+
+    it('should reject negative responseCooldownMs (below min: 0)', () => {
+      expect(validateSingleValue('triage.responseCooldownMs', -1)).toEqual(
+        expect.arrayContaining([expect.stringContaining('>= 0')]),
+      );
+    });
+
+    it('should reject non-numeric responseCooldownMs', () => {
+      expect(validateSingleValue('triage.responseCooldownMs', 'fast')).toEqual(
+        expect.arrayContaining([expect.stringContaining('expected finite number')]),
+      );
+    });
+
+    it('should accept triageDebounceMs in the triage schema', () => {
+      const errors = validateSingleValue('triage', {
+        enabled: true,
+        triageDebounceMs: 500,
+      });
+      expect(errors).toEqual([]);
+    });
+
+    it('should accept memoryTimeoutMs in the triage schema', () => {
+      const errors = validateSingleValue('triage', {
+        enabled: true,
+        memoryTimeoutMs: 2000,
+      });
+      expect(errors).toEqual([]);
+    });
+
+    it('should accept directMentionFastPath in the triage schema', () => {
+      const errors = validateSingleValue('triage', {
+        enabled: true,
+        directMentionFastPath: true,
+      });
+      expect(errors).toEqual([]);
+    });
+
+    it('should accept a valid triage object that only uses responseCooldownMs', () => {
+      expect(validateSingleValue('triage.responseCooldownMs', 10000)).toEqual([]);
     });
   });
 });

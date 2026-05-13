@@ -41,6 +41,16 @@ function parseGuildConfig(value: unknown): GuildCommunityConfig | undefined {
   return Object.keys(config).length > 0 ? config : undefined;
 }
 
+function normalizeMemberCount(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+function parseMemberCount(value: Record<string, unknown>): number | null {
+  return (
+    normalizeMemberCount(value.memberCount) ?? normalizeMemberCount(value.approximate_member_count)
+  );
+}
+
 function parseMutualGuild(value: unknown): ParsedMutualGuild | null {
   if (!isRecord(value)) {
     return null;
@@ -55,8 +65,13 @@ function parseMutualGuild(value: unknown): ParsedMutualGuild | null {
     id,
     name,
     botPresent,
+    botPresenceAuthoritative:
+      typeof value.botPresenceAuthoritative === 'boolean'
+        ? value.botPresenceAuthoritative
+        : undefined,
     icon: typeof value.icon === 'string' || value.icon === null ? value.icon : null,
     iconHash: typeof value.iconHash === 'string' || value.iconHash === null ? value.iconHash : null,
+    memberCount: parseMemberCount(value),
     owner: typeof value.owner === 'boolean' ? value.owner : false,
     permissions: typeof value.permissions === 'string' ? value.permissions : '0',
     features: Array.isArray(value.features)

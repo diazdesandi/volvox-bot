@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
-import { AnalyticsDashboard } from '@/components/dashboard/analytics-dashboard';
-import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { DashboardHome } from '@/components/dashboard/dashboard-home';
 import { createPageMetadata } from '@/lib/page-titles';
 
 export const metadata: Metadata = createPageMetadata(
@@ -9,12 +8,5 @@ export const metadata: Metadata = createPageMetadata(
 );
 
 export default function DashboardPage() {
-  return (
-    <ErrorBoundary
-      title="Analytics failed to load"
-      description="There was a problem loading the dashboard analytics. Select a different server or try again."
-    >
-      <AnalyticsDashboard />
-    </ErrorBoundary>
-  );
+  return <DashboardHome />;
 }

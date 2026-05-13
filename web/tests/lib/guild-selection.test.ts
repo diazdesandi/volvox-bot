@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   broadcastSelectedGuild,
+  clearSelectedGuild,
+  forceClearSelectedGuild,
   GUILD_SELECTED_EVENT,
+  GUILD_SELECTION_CLEARED_EVENT,
   SELECTED_GUILD_KEY,
 } from "@/lib/guild-selection";
 
@@ -20,6 +23,7 @@ describe("guild-selection", () => {
     expect(dispatchSpy).toHaveBeenCalledTimes(1);
     const event = dispatchSpy.mock.calls[0][0] as CustomEvent<string>;
     expect(event.type).toBe(GUILD_SELECTED_EVENT);
+    expect(event.cancelable).toBe(true);
     expect(event.detail).toBe("guild-123");
   });
 
@@ -55,5 +59,33 @@ describe("guild-selection", () => {
     expect(dispatchSpy).toHaveBeenCalledTimes(1);
     const event = dispatchSpy.mock.calls[0][0] as CustomEvent<string>;
     expect(event.detail).toBe("guild-999");
+  });
+
+  it("clears the persisted guild and dispatches an empty selection", () => {
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    localStorage.setItem(SELECTED_GUILD_KEY, "guild-123");
+
+    clearSelectedGuild();
+
+    expect(localStorage.getItem(SELECTED_GUILD_KEY)).toBeNull();
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    const event = dispatchSpy.mock.calls[0][0] as CustomEvent<string>;
+    expect(event.type).toBe(GUILD_SELECTED_EVENT);
+    expect(event.cancelable).toBe(true);
+    expect(event.detail).toBe("");
+  });
+
+  it("force-clears the persisted guild with a non-cancelable invalidation event", () => {
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    localStorage.setItem(SELECTED_GUILD_KEY, "guild-123");
+
+    forceClearSelectedGuild();
+
+    expect(localStorage.getItem(SELECTED_GUILD_KEY)).toBeNull();
+    expect(dispatchSpy).toHaveBeenCalledTimes(1);
+    const event = dispatchSpy.mock.calls[0][0] as CustomEvent<string>;
+    expect(event.type).toBe(GUILD_SELECTION_CLEARED_EVENT);
+    expect(event.cancelable).toBe(false);
+    expect(event.detail).toBe("");
   });
 });

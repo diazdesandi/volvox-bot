@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getBotInviteUrl, getGuildIconUrl } from "@/lib/discord";
+import {
+  getBotInviteAuthorizationParams,
+  getBotInviteUrl,
+  getGuildIconUrl,
+} from "@/lib/discord";
 import {
   fetchUserGuilds,
   fetchBotGuilds,
@@ -129,6 +133,53 @@ describe("getBotInviteUrl", () => {
     const scope = new URL(inviteUrl!).searchParams.get("scope");
     expect(scope).toContain("bot");
     expect(scope).toContain("applications.commands");
+  });
+
+  it("builds reusable combined OAuth authorization params for dashboard invite flows", () => {
+    const params = getBotInviteAuthorizationParams({
+      disableGuildSelect: true,
+      guildId: "guild-123",
+    });
+
+    expect(params).toEqual({
+      disable_guild_select: "true",
+      guild_id: "guild-123",
+      permissions: "1099511704598",
+      scope: "bot applications.commands identify guilds",
+    });
+  });
+
+  it("returns null when user OAuth scopes are provided without a redirect URI", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl({ scopes: ["bot", "applications.commands", "identify"] });
+
+    expect(inviteUrl).toBeNull();
+  });
+
+  it("supports a combined OAuth URL with redirect URI, state, guild targeting, and swappable scopes", () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
+
+    const inviteUrl = getBotInviteUrl({
+      disableGuildSelect: true,
+      guildId: "guild-123",
+      redirectUri: "https://volvox.bot/api/auth/callback/discord",
+      scopes: ["bot", "applications.commands", "identify", "guilds"],
+      state: "csrf-token",
+    });
+
+    expect(inviteUrl).not.toBeNull();
+    const url = new URL(inviteUrl!);
+    expect(url.searchParams.get("client_id")).toBe("test-client-id");
+    expect(url.searchParams.get("permissions")).toBe("1099511704598");
+    expect(url.searchParams.get("scope")).toBe("bot applications.commands identify guilds");
+    expect(url.searchParams.get("response_type")).toBe("code");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://volvox.bot/api/auth/callback/discord",
+    );
+    expect(url.searchParams.get("state")).toBe("csrf-token");
+    expect(url.searchParams.get("guild_id")).toBe("guild-123");
+    expect(url.searchParams.get("disable_guild_select")).toBe("true");
   });
 
   it("encodes the exact permission value 1099511704598 (regression guard for permission mask)", () => {
@@ -456,8 +507,11 @@ describe("fetchUserGuilds", () => {
 
     const guilds = await fetchUserGuilds("test-token");
     expect(guilds).toEqual(mockGuilds);
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining("/users/@me/guilds"),
+    const [url, init] = fetchSpy.mock.calls[0];
+    const requestUrl = new URL(url.toString());
+    expect(requestUrl.pathname).toBe("/api/v10/users/@me/guilds");
+    expect(requestUrl.searchParams.get("with_counts")).toBe("true");
+    expect(init).toEqual(
       expect.objectContaining({
         headers: {
           Authorization: "Bearer test-token",
@@ -816,11 +870,11 @@ describe("getMutualGuilds", () => {
     }
   });
 
-  it("returns only guilds where bot is present", async () => {
+  it("returns user guilds with per-server bot presence", async () => {
     const userGuilds = [
-      { id: "1", name: "Server 1", icon: "user-icon-hash", owner: true, permissions: "8", features: [] },
-      { id: "2", name: "Server 2", icon: null, owner: false, permissions: "0", features: [] },
-      { id: "3", name: "Server 3", icon: null, owner: false, permissions: "0", features: [] },
+      { id: "1", name: "Server 1", icon: "user-icon-hash", owner: true, permissions: "8", features: [], approximate_member_count: 120 },
+      { id: "2", name: "Server 2", icon: null, owner: false, permissions: "32", features: [], approximate_member_count: 42 },
+      { id: "3", name: "Server 3", icon: null, owner: false, permissions: "0", features: [], approximate_member_count: null },
     ];
     const botGuilds = [
       {
@@ -828,6 +882,7 @@ describe("getMutualGuilds", () => {
         name: "Server 1",
         icon: "https://cdn.example.com/server-1.webp",
         iconHash: "bot-icon-hash",
+        memberCount: 121,
         config: { communityHubs: { enabled: true } },
       },
       { id: "3", name: "Server 3", icon: null },
@@ -849,12 +904,18 @@ describe("getMutualGuilds", () => {
 
     const mutualGuilds = await getMutualGuilds("test-token");
 
-    expect(mutualGuilds).toHaveLength(2);
+    expect(mutualGuilds).toHaveLength(3);
     expect(mutualGuilds[0].id).toBe("1");
-    expect(mutualGuilds[1].id).toBe("3");
+    expect(mutualGuilds[1].id).toBe("2");
+    expect(mutualGuilds[2].id).toBe("3");
     expect(mutualGuilds[0].botPresent).toBe(true);
+    expect(mutualGuilds[1].botPresent).toBe(false);
+    expect(mutualGuilds[2].botPresent).toBe(true);
     expect(mutualGuilds[0].icon).toBe("https://cdn.example.com/server-1.webp");
     expect(mutualGuilds[0].iconHash).toBe("bot-icon-hash");
+    expect(mutualGuilds[0].memberCount).toBe(121);
+    expect(mutualGuilds[1].memberCount).toBe(42);
+    expect(mutualGuilds[2].memberCount).toBeNull();
     expect(mutualGuilds[0].config).toEqual({ communityHubs: { enabled: true } });
   });
 
@@ -901,8 +962,9 @@ describe("getMutualGuilds", () => {
 
     expect(accessGuildIds).toEqual(["1", "3"]);
     expect(mutualGuilds).toEqual([
-      expect.objectContaining({ id: "1", access: "admin" }),
-      expect.objectContaining({ id: "3", access: "moderator" }),
+      expect.objectContaining({ id: "1", access: "admin", botPresent: true }),
+      expect.objectContaining({ id: "2", access: "viewer", botPresent: false }),
+      expect.objectContaining({ id: "3", access: "moderator", botPresent: true }),
     ]);
   });
 
@@ -1001,7 +1063,11 @@ describe("getMutualGuilds", () => {
 
     expect(mutualGuilds).toHaveLength(2);
     expect(mutualGuilds[0].botPresent).toBe(false);
+    expect(mutualGuilds[0].botPresenceAuthoritative).toBe(false);
+    expect(mutualGuilds[0].access).toBe("owner");
     expect(mutualGuilds[1].botPresent).toBe(false);
+    expect(mutualGuilds[1].botPresenceAuthoritative).toBe(false);
+    expect(mutualGuilds[1].access).toBe("viewer");
   });
 
   it("returns all user guilds when no BOT_API_URL is set", async () => {
@@ -1021,6 +1087,8 @@ describe("getMutualGuilds", () => {
 
     expect(mutualGuilds).toHaveLength(1);
     expect(mutualGuilds[0].botPresent).toBe(false);
+    expect(mutualGuilds[0].botPresenceAuthoritative).toBe(false);
+    expect(mutualGuilds[0].access).toBe("owner");
   });
 
   it("falls back to bot guild access when Discord user guilds fail with transient 408", async () => {

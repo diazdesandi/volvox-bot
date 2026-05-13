@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Mock next/image
@@ -7,6 +7,10 @@ vi.mock("next/image", () => ({
   default: ({ alt, ...props }: { alt: string; [key: string]: unknown }) => (
     <img alt={alt} {...props} />
   ),
+}));
+
+const { mockSignIn } = vi.hoisted(() => ({
+  mockSignIn: vi.fn(),
 }));
 
 const mockBroadcastSelectedGuild = vi.fn();
@@ -20,6 +24,10 @@ vi.mock("@/lib/guild-selection", async () => {
       mockBroadcastSelectedGuild(...args),
   };
 });
+
+vi.mock("next-auth/react", () => ({
+  signIn: (...args: unknown[]) => mockSignIn(...args),
+}));
 
 import { ServerSelector } from '@/components/layout/server-selector';
 import { GuildDirectoryProvider } from '@/components/layout/guild-directory-context';
@@ -51,6 +59,7 @@ describe('ServerSelector', () => {
   beforeEach(() => {
     localStorage.clear();
     mockBroadcastSelectedGuild.mockReset();
+    mockSignIn.mockReset();
     fetchSpy = vi.spyOn(global, "fetch");
     HTMLElement.prototype.animate = vi.fn(
       () =>
@@ -97,7 +106,8 @@ describe('ServerSelector', () => {
     });
   });
 
-  it('shows the invite button when no mutual servers and a client id exists', async () => {
+  it('starts the combined invite flow when no mutual servers and a client id exists', async () => {
+    const user = userEvent.setup();
     process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "discord-client-id";
     fetchSpy.mockResolvedValue({
       ok: true,
@@ -106,12 +116,17 @@ describe('ServerSelector', () => {
 
     renderServerSelector();
 
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: /Invite Volvox\.Bot/i })).toHaveAttribute(
-        "href",
-        expect.stringContaining("client_id=discord-client-id"),
-      );
-    });
+    const inviteButton = await screen.findByRole('button', { name: /Invite Volvox\.Bot/i });
+    await user.click(inviteButton);
+
+    expect(mockSignIn).toHaveBeenCalledWith(
+      'discord',
+      { callbackUrl: '/dashboard/welcome' },
+      {
+        permissions: '1099511704598',
+        scope: 'bot applications.commands identify guilds',
+      },
+    );
   });
 
   it('renders guild name when guilds are returned', async () => {
@@ -134,6 +149,209 @@ describe('ServerSelector', () => {
     await waitFor(() => {
       expect(screen.getByText("Test Server")).toBeInTheDocument();
     });
+  });
+
+  it('shows an invite action in the workspace dropdown for adding another server', async () => {
+    const user = userEvent.setup();
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "discord-client-id";
+    const guilds = [
+      {
+        id: "1",
+        name: "Installed Server",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: true,
+      },
+    ];
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    await user.click(await screen.findByRole("button", { name: /Installed Server/i }));
+    const inviteItem = await screen.findByRole("menuitem", {
+      name: /Add Volvox\.Bot to another server/i,
+    });
+    expect(inviteItem).toHaveClass('text-discord');
+
+    await user.click(inviteItem);
+
+    expect(mockSignIn).toHaveBeenCalledWith(
+      'discord',
+      { callbackUrl: '/dashboard/welcome' },
+      {
+        permissions: '1099511704598',
+        scope: 'bot applications.commands identify guilds',
+      },
+    );
+  });
+
+  it('sorts installed manageable workspaces alphabetically', async () => {
+    const user = userEvent.setup();
+    const guilds = [
+      {
+        id: "zeta",
+        name: "Zeta Server",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: true,
+      },
+      {
+        id: "alpha",
+        name: "alpha Server",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: true,
+      },
+      {
+        id: "beta",
+        name: "Beta Server",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: true,
+      },
+    ];
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /alpha server/i })).toBeInTheDocument();
+    });
+
+    expect(mockBroadcastSelectedGuild).toHaveBeenCalledWith("alpha");
+
+    await user.click(screen.getByRole("button", { name: /alpha server/i }));
+
+    const menuItems = await screen.findAllByRole("menuitem");
+    const menuItemNames = menuItems
+      .filter((menuItem) =>
+        ["alpha Server", "Beta Server", "Zeta Server"].some((name) =>
+          menuItem.textContent?.includes(name),
+        ),
+      )
+      .map((menuItem) => within(menuItem).getByText(/server$/i).textContent);
+
+    expect(menuItemNames).toEqual(["alpha Server", "Beta Server", "Zeta Server"]);
+  });
+
+  it('does not show manageable guilds where the bot is not installed', async () => {
+    const user = userEvent.setup();
+    const guilds = [
+      {
+        id: "installed-1",
+        name: "Installed Server",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: true,
+      },
+      {
+        id: "missing-bot-1",
+        name: "Needs Install",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: false,
+      },
+    ];
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    await waitFor(() => {
+      expect(screen.getByText("Installed Server")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Installed Server/i }));
+
+    expect(await screen.findByRole("menuitem", { name: "Installed Server" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: "Needs Install" })).not.toBeInTheDocument();
+    expect(mockBroadcastSelectedGuild).toHaveBeenCalledWith("installed-1");
+    expect(mockBroadcastSelectedGuild).not.toHaveBeenCalledWith("missing-bot-1");
+  });
+
+  it('keeps manageable guilds selectable when bot presence is non-authoritative', async () => {
+    const user = userEvent.setup();
+    const guilds = [
+      {
+        id: "degraded-1",
+        name: "Degraded Presence Server",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: false,
+        botPresenceAuthoritative: false,
+      },
+    ];
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    await waitFor(() => {
+      expect(screen.getByText("Degraded Presence Server")).toBeInTheDocument();
+    });
+
+    expect(mockBroadcastSelectedGuild).toHaveBeenCalledWith("degraded-1");
+
+    await user.click(screen.getByRole("button", { name: /Degraded Presence Server/i }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: "Degraded Presence Server" }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the invite empty state when every returned guild is missing the bot', async () => {
+    process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "discord-client-id";
+    const guilds = [
+      {
+        id: "missing-bot-1",
+        name: "Needs Install",
+        icon: null,
+        owner: true,
+        permissions: "8",
+        features: [],
+        botPresent: false,
+      },
+    ];
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(guilds),
+    } as Response);
+
+    renderServerSelector();
+
+    const inviteButton = await screen.findByRole('button', { name: /Invite Volvox\.Bot/i });
+    expect(inviteButton).toBeInTheDocument();
+    expect(screen.queryByText("Needs Install")).not.toBeInTheDocument();
+    expect(mockBroadcastSelectedGuild).not.toHaveBeenCalled();
   });
 
   it('uses renderable guild icon urls directly', async () => {

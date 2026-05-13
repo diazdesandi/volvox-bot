@@ -13,9 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/material-dropdown-menu';
+import { useBotInvite } from '@/hooks/use-bot-invite';
 import { isGuildManageable } from '@/hooks/use-guild-role';
-import { getBotInviteUrl } from '@/lib/discord';
 import { broadcastSelectedGuild, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
+import { sortGuildsByName } from '@/lib/guild-sort';
 import { cn } from '@/lib/utils';
 import type { MutualGuild } from '@/types/discord';
 import { useGuildDirectory } from './guild-directory-context';
@@ -31,6 +32,10 @@ function formatServerCount(count: number, label: string): string {
 
 function hasCommunityHubsEnabled(guild: MutualGuild): boolean {
   return guild.config?.communityHubs?.enabled === true;
+}
+
+function isBotInstalledOrPresenceDegraded(guild: MutualGuild): boolean {
+  return guild.botPresent || guild.botPresenceAuthoritative === false;
 }
 
 /** Compact guild icon + name row used in both sections of the dropdown. */
@@ -56,13 +61,18 @@ function GuildRow({ guild }: { readonly guild: MutualGuild }) {
 export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
   const [selectedGuild, setSelectedGuild] = useState<MutualGuild | null>(null);
   const { error, guilds, loading, refreshGuilds } = useGuildDirectory();
+  const { inviteBot, isInviteConfigured } = useBotInvite();
 
-  // Split guilds into manageable (mod/admin/owner) and enabled member-only community hubs.
-  const { manageable, memberOnly } = useMemo(() => {
-    const manageableGuilds = guilds.filter(isGuildManageable);
+  // The selector normally only includes workspaces the bot can actually serve.
+  // When bot presence is degraded, fall back to permission-based options so
+  // admins do not lose access while the bot API is unavailable.
+  const { installedGuilds, manageable, memberOnly } = useMemo(() => {
+    const botInstalledGuilds = sortGuildsByName(guilds.filter(isBotInstalledOrPresenceDegraded));
+    const manageableGuilds = botInstalledGuilds.filter(isGuildManageable);
     return {
+      installedGuilds: botInstalledGuilds,
       manageable: manageableGuilds,
-      memberOnly: guilds.filter(
+      memberOnly: botInstalledGuilds.filter(
         (guild) => !isGuildManageable(guild) && hasCommunityHubsEnabled(guild),
       ),
     };
@@ -141,20 +151,17 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
     );
   }
 
-  if (guilds.length === 0) {
-    const inviteUrl = getBotInviteUrl();
+  if (installedGuilds.length === 0) {
     return (
       <div className="dashboard-chip flex flex-col items-start gap-2 rounded-xl px-3 py-3 text-sm text-muted-foreground">
         <Bot className="h-5 w-5" />
         <span className="font-medium text-foreground">No shared servers yet</span>
         <span className="text-xs">Volvox.Bot isn&apos;t in any of your Discord servers yet.</span>
-        {inviteUrl ? (
-          <a href={inviteUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="discord" size="sm" className="gap-1">
-              <Bot className="h-3 w-3" />
-              Invite Volvox.Bot
-            </Button>
-          </a>
+        {isInviteConfigured ? (
+          <Button variant="discord" size="sm" className="gap-1" onClick={() => inviteBot()}>
+            <Bot className="h-3 w-3" />
+            Invite Volvox.Bot
+          </Button>
         ) : (
           <span className="text-xs">
             Ask a server admin to add the bot, or check that{' '}
@@ -306,6 +313,23 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
                 Administrative clearance required.
               </span>
             </div>
+          )}
+
+          {isInviteConfigured && (
+            <>
+              <DropdownMenuSeparator className="mx-3 my-2 bg-border/50 opacity-100" />
+              <DropdownMenuItem
+                delayDuration={0}
+                onSelect={() => {
+                  inviteBot();
+                  onSelect?.();
+                }}
+                className="mx-1.5 rounded-[18px] border border-discord/30 bg-discord/5 text-discord ring-1 ring-discord/10 transition-all hover:border-discord/45 hover:bg-discord/10 hover:ring-discord/20 data-[highlighted]:border-discord/45 data-[highlighted]:bg-discord/10 data-[highlighted]:ring-discord/20 active:scale-[0.98]"
+              >
+                <Bot className="h-4 w-4 shrink-0" />
+                <span className="truncate text-sm">Add Volvox.Bot to another server</span>
+              </DropdownMenuItem>
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
