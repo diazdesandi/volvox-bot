@@ -92,8 +92,8 @@ importers:
   web:
     dependencies:
       '@amplitude/analytics-browser':
-        specifier: ^2.42.1
-        version: 2.42.1
+        specifier: ^2.42.2
+        version: 2.42.2
       '@gsap/react':
         specifier: ^2.1.2
         version: 2.1.2(gsap@3.15.0)(react@19.2.6)
@@ -265,8 +265,8 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
-  '@amplitude/analytics-browser@2.42.1':
-    resolution: {integrity: sha512-lanSeX3DeOAx0aF3H0BOtanUEjibAZFwp9Gmv/Tqycr8YdlY3yTmjH2Rl1HsRVopWQ7s3fbu2S15z9MMwvuFWg==}
+  '@amplitude/analytics-browser@2.42.2':
+    resolution: {integrity: sha512-smMBDxBuB4jdto+WVH1kbN9Tzxc3ZrgjavgG+wzV2sPFYf6B6yzGZ/Qa3aqFtB6JC+u02S7QhLV7LGSDDro2AA==}
 
   '@amplitude/analytics-connector@1.6.4':
     resolution: {integrity: sha512-SpIv0IQMNIq6SH3UqFGiaZyGSc7PBZwRdq7lvP0pBxW8i4Ny+8zwI0pV+VMfMHQwWY3wdIbWw5WQphNjpdq1/Q==}
@@ -5628,7 +5628,7 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@amplitude/analytics-browser@2.42.1':
+  '@amplitude/analytics-browser@2.42.2':
     dependencies:
       '@amplitude/analytics-core': 2.48.1
       '@amplitude/plugin-autocapture-browser': 1.27.1
