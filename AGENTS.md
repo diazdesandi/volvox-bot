@@ -153,6 +153,7 @@ Docs updates are part of done criteria, not optional cleanup.
 - Update `README.md` when the public/product overview, user-facing setup, or feature summaries change.
 - Update `CONTRIBUTING.md` when contribution workflow or review expectations change.
 - Update Mintlify docs (`docs/**/*.mdx`) and `docs/docs.json` when user-facing feature/config/security/help docs, dashboard docs, public behavior, or docs navigation changes.
+- Treat `docs/changelog.mdx` as automation-owned. Do not manually add or rewrite changelog entries unless explicitly asked to repair generated output; keep `<Update>` labels unique and newest-first.
 - Update `.github/workflows/maintain-docs.md` when the automated doc-maintenance scope or rules change.
 - Update the `Issue Conventions` section above and the templates in `.github/ISSUE_TEMPLATE/` when title grammar, label taxonomy, or body structure changes.
 - Do not bury agent-only rules in `README.md`; keep them here.

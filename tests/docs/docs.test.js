@@ -51,6 +51,10 @@ function getLines(content, predicate) {
   return content.split('\n').filter(predicate);
 }
 
+function getChangelogUpdateLabels(content) {
+  return [...content.matchAll(/<Update label="(\d{4}-\d{2}-\d{2})"/g)].map((match) => match[1]);
+}
+
 function getFirstBraceExpansionNames(line) {
   const openingBrace = line.indexOf('{');
   const closingBrace = line.indexOf('}', openingBrace + 1);
@@ -73,6 +77,39 @@ function getSupportHelpGroup(config) {
   expect(helpGroup).toBeDefined();
   return helpGroup;
 }
+
+// ---------------------------------------------------------------------------
+// docs/changelog.mdx
+// ---------------------------------------------------------------------------
+
+describe('docs/changelog.mdx', () => {
+  const mdxPath = join(docsRoot, 'changelog.mdx');
+  let content;
+
+  beforeAll(() => {
+    content = readText(mdxPath);
+  });
+
+  it('file exists', () => {
+    expect(existsSync(mdxPath)).toBe(true);
+  });
+
+  it('keeps update labels unique', () => {
+    const updateLabels = getChangelogUpdateLabels(content);
+
+    expect(updateLabels.length).toBeGreaterThan(0);
+    expect(new Set(updateLabels).size).toBe(updateLabels.length);
+  });
+
+  it('keeps update labels in descending order', () => {
+    const updateLabels = getChangelogUpdateLabels(content);
+    const sortedLabels = [...updateLabels].sort((previousLabel, nextLabel) =>
+      nextLabel.localeCompare(previousLabel),
+    );
+
+    expect(updateLabels).toEqual(sortedLabels);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // docs/docs.json
