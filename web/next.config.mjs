@@ -40,6 +40,12 @@ if (process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY) {
   connectSrc.push(getAmplitudeConnectSrcOrigin());
 }
 
+const shouldUploadSentrySourcemaps = process.env.SENTRY_UPLOAD_SOURCEMAPS === "true";
+const hasSentryUploadConfig = Boolean(
+  process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT,
+);
+const enableSentrySourcemapUploads = shouldUploadSentrySourcemaps && hasSentryUploadConfig;
+
 const securityHeaders = [
   {
     key: "X-Frame-Options",
@@ -107,9 +113,12 @@ const nextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  org: enableSentrySourcemapUploads ? process.env.SENTRY_ORG : undefined,
+  project: enableSentrySourcemapUploads ? process.env.SENTRY_PROJECT : undefined,
+  authToken: enableSentrySourcemapUploads ? process.env.SENTRY_AUTH_TOKEN : undefined,
   silent: !process.env.CI,
-  widenClientFileUpload: Boolean(process.env.SENTRY_AUTH_TOKEN),
+  // Keep Railway/CI builds deterministic: source-map uploads require an explicit opt-in and complete upload config.
+  sourcemaps: { disable: !enableSentrySourcemapUploads },
+  release: { create: enableSentrySourcemapUploads },
+  widenClientFileUpload: enableSentrySourcemapUploads,
 });
