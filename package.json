@@ -36,7 +36,7 @@
     "@ai-sdk/anthropic": "^3.0.77",
     "@amplitude/analytics-node": "^1.5.57",
     "@sentry/node": "^10.53.1",
-    "ai": "^6.0.180",
+    "ai": "^6.0.182",
     "discord.js": "^14.26.4",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
