@@ -50,7 +50,7 @@ export function isInstalledAccessibleWorkspace(guild: MutualGuild): boolean {
   return guild.botPresent && (isGuildManageable(guild) || hasCommunityHubAccess(guild));
 }
 
-export function hasInstalledManageableWorkspace(guilds: readonly MutualGuild[]): boolean {
+export function hasInstalledAccessibleWorkspace(guilds: readonly MutualGuild[]): boolean {
   return guilds.some(isInstalledAccessibleWorkspace);
 }
 
@@ -65,7 +65,7 @@ export function shouldOpenDashboardWelcome({
     !loading &&
     !error &&
     hasAuthoritativeBotPresence(guilds) &&
-    !hasInstalledManageableWorkspace(guilds)
+    !hasInstalledAccessibleWorkspace(guilds)
   );
 }
 

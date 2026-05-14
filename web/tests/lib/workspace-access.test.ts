@@ -4,7 +4,7 @@ import {
   getWorkspaceSelectorGroups,
   hasAuthoritativeBotPresence,
   hasBotPresenceAccess,
-  hasInstalledManageableWorkspace,
+  hasInstalledAccessibleWorkspace,
   isDashboardWelcomeRoute,
   isInstalledManageableWorkspace,
   isSelectableManageableWorkspace,
@@ -98,8 +98,21 @@ describe('workspace-access', () => {
     expect(isInstalledManageableWorkspace(degradedAdmin)).toBe(false);
     expect(isSelectableManageableWorkspace(degradedAdmin)).toBe(true);
     expect(hasBotPresenceAccess(degradedAdmin)).toBe(true);
-    expect(hasInstalledManageableWorkspace([missingAdmin, degradedAdmin])).toBe(false);
-    expect(hasInstalledManageableWorkspace([installedAdmin])).toBe(true);
+    expect(hasInstalledAccessibleWorkspace([missingAdmin, degradedAdmin])).toBe(false);
+    expect(hasInstalledAccessibleWorkspace([installedAdmin])).toBe(true);
+  });
+
+  it('detects installed accessible workspaces through community hub access', () => {
+    const viewerHub = makeGuild({
+      access: 'viewer',
+      botPresent: true,
+      config: { communityHubs: { enabled: true } },
+      id: 'viewer-hub',
+    });
+    const viewerNoHub = makeGuild({ access: 'viewer', botPresent: true, id: 'viewer-no-hub' });
+
+    expect(hasInstalledAccessibleWorkspace([viewerHub])).toBe(true);
+    expect(hasInstalledAccessibleWorkspace([viewerNoHub])).toBe(false);
   });
 
   it('groups selector workspaces by bot access, manageability, and community hub access', () => {
