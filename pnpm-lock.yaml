@@ -92,8 +92,8 @@ importers:
   web:
     dependencies:
       '@amplitude/analytics-browser':
-        specifier: ^2.42.2
-        version: 2.42.2
+        specifier: ^2.42.3
+        version: 2.42.3
       '@gsap/react':
         specifier: ^2.1.2
         version: 2.1.2(gsap@3.15.0)(react@19.2.6)
@@ -265,8 +265,8 @@ packages:
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
 
-  '@amplitude/analytics-browser@2.42.2':
-    resolution: {integrity: sha512-smMBDxBuB4jdto+WVH1kbN9Tzxc3ZrgjavgG+wzV2sPFYf6B6yzGZ/Qa3aqFtB6JC+u02S7QhLV7LGSDDro2AA==}
+  '@amplitude/analytics-browser@2.42.3':
+    resolution: {integrity: sha512-zej80Yb7G56xjNeURhyFDXgluIroIdcCQVg6bcTQebJOp2HkjleUL7YMa/891sdmKuqJ8TrZgJoCE7wMz2fqcg==}
 
   '@amplitude/analytics-connector@1.6.4':
     resolution: {integrity: sha512-SpIv0IQMNIq6SH3UqFGiaZyGSc7PBZwRdq7lvP0pBxW8i4Ny+8zwI0pV+VMfMHQwWY3wdIbWw5WQphNjpdq1/Q==}
@@ -292,8 +292,8 @@ packages:
   '@amplitude/plugin-network-capture-browser@1.10.0':
     resolution: {integrity: sha512-wDTxpeDCst+pKyfRnVH1RYV93ctQtfuAQuCaUHqSO/TYcHnidGFWLl/UVbMvJ6EkrPoDXOCCTk5gTSPVMKSp0w==}
 
-  '@amplitude/plugin-page-url-enrichment-browser@0.7.9':
-    resolution: {integrity: sha512-3hMP05h8+wbEwrJQm/1Di4XkGskGEeSTI7lnMYwAwsSXIQkmP0bM8G8MAWYwoA1cGAh5Z3cUxp2xGJ/7IacvlA==}
+  '@amplitude/plugin-page-url-enrichment-browser@0.7.10':
+    resolution: {integrity: sha512-ILehefdpqUk1iK4G8kTlRxmf7OogiG2Y4lRph2cvsw25a9zVUpPXeZ5H4us9uEWrsUI0Y7w6FJlt3MMBJRMiBA==}
 
   '@amplitude/plugin-page-view-tracking-browser@2.11.0':
     resolution: {integrity: sha512-ZI/1kTQID0yXileGjvseMoFZ9zUbLG5r+MsznmT0Br+x91LdCrPHXdpU7lq53UAwIhgREXk9S/o/AwUZfFSgzg==}
@@ -5583,14 +5583,14 @@ snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
 
-  '@amplitude/analytics-browser@2.42.2':
+  '@amplitude/analytics-browser@2.42.3':
     dependencies:
       '@amplitude/analytics-core': 2.48.1
       '@amplitude/plugin-autocapture-browser': 1.27.1
       '@amplitude/plugin-custom-enrichment-browser': 0.1.8
       '@amplitude/plugin-event-property-attribution-browser': 0.2.0
       '@amplitude/plugin-network-capture-browser': 1.10.0
-      '@amplitude/plugin-page-url-enrichment-browser': 0.7.9
+      '@amplitude/plugin-page-url-enrichment-browser': 0.7.10
       '@amplitude/plugin-page-view-tracking-browser': 2.11.0
       '@amplitude/plugin-web-vitals-browser': 1.1.32
       tslib: 2.8.1
@@ -5638,9 +5638,9 @@ snapshots:
       '@amplitude/analytics-core': 2.48.0
       tslib: 2.8.1
 
-  '@amplitude/plugin-page-url-enrichment-browser@0.7.9':
+  '@amplitude/plugin-page-url-enrichment-browser@0.7.10':
     dependencies:
-      '@amplitude/analytics-core': 2.48.0
+      '@amplitude/analytics-core': 2.48.1
       tslib: 2.8.1
 
   '@amplitude/plugin-page-view-tracking-browser@2.11.0':
