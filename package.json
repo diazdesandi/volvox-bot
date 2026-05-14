@@ -33,7 +33,7 @@
     "providers:check": "node scripts/sync-web-provider-catalog.js --check"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.76",
+    "@ai-sdk/anthropic": "^3.0.77",
     "@amplitude/analytics-node": "^1.5.57",
     "@sentry/node": "^10.53.1",
     "ai": "^6.0.180",
