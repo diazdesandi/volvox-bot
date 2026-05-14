@@ -19,7 +19,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 <Update label="2026-05-11" description="May 2026" tags={["Features", "Improvements"]}>
 ## New features
 
-**Triage performance controls** — AI Automation now exposes triage latency controls in the dashboard. `responseCooldownMs` defaults to `0` ms and remains clamped with `triageDebounceMs` and `memoryTimeoutMs`; fast direct replies are enabled by default and can be toggled from Operational Modes. See [Moderation](/features/moderation).
+**Triage performance controls** — AI Automation now exposes triage latency controls in the dashboard. `responseCooldownMs` defaults to `0` ms and remains clamped with `triageDebounceMs` and `memoryTimeoutMs`; fast direct replies are enabled by default and you can toggle them from Operational Modes. See [Moderation](/features/moderation).
 
 ## Improvements
 
@@ -65,7 +65,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 ## Improvements
 
-**More reliable welcome publishing** — Welcome publish routes now rate-limit requests and validate channels per server, so misconfigured publishes fail fast with a useful error. The dashboard also surfaces persistence warnings when Discord delivery succeeds but state can't be saved, so you know to retry.
+**More reliable welcome publishing** — Welcome publish routes now rate-limit requests and validate channels per server, so misconfigured publishes fail fast with a useful error. The dashboard also surfaces persistence warnings when Discord delivery succeeds but the bot can't save state, so you know to retry.
 
 **Friendlier timezone inputs** — Challenge schedule timezones now accept UTC/GMT offsets like `GMT+3` or `UTC-05`, in addition to IANA names like `America/New_York`. Offsets normalize to their canonical IANA equivalent (for example, `GMT+3` → `Etc/GMT-3`) when you save.
 
@@ -107,7 +107,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Stronger phishing and link filtering** — The link filter now catches malicious URLs hidden inside markdown links (`[click here](https://...)`), angle-bracket links (`<https://...>`), and links wedged against punctuation. It also detects phishing keywords in URL query strings (for example, `?gift=nitro` on a `.xyz` domain). See [moderation](/features/moderation) for the full set of safeguards.
 
-**Better reliability monitoring** — Volvox.Bot now tracks dashboard errors and performance issues in the background, so problems surface and get fixed faster. It scrubs sensitive data — Discord IDs, message content, tokens, query params, headers, and request bodies — before anything leaves your browser. Your server's data stays private by default.
+**Better reliability monitoring** — Volvox.Bot now tracks dashboard errors and performance issues in the background, so the team finds and fixes problems faster. It scrubs sensitive data — Discord IDs, message content, tokens, query params, headers, and request bodies — before anything leaves your browser. Your server's data stays private by default.
 
 ## Fixes
 
@@ -221,7 +221,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Landing page redesign** — The landing page now sports a new visual style, with interactive feature previews in a bento-box grid, animated stats, and a redesigned pricing section.
 
-**Dashboard polish** — Tables now have row hover highlighting, KPI counters animate, and heatmap tooltips are visible. Member rows are clickable, XP progress bars are corrected, and a live commands-served counter is in place. Inputs and dropdowns now use thin scrollbars for a cleaner look.
+**Dashboard polish** — Tables now have row hover highlighting, KPI counters animate, and heatmap tooltips are visible. Member rows are clickable, XP progress bars now display correctly, and the dashboard shows a live commands-served counter. Inputs and dropdowns now use thin scrollbars for a cleaner look.
 
 **Identity resolution** — Conversation replays now show real Discord profile icons. Volvox.Bot resolves mentions to actual usernames, and audit logs display rich user identity (display name + username).
 
@@ -231,7 +231,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **OpenGraph previews** — Sharing Volvox.Bot links now shows rich previews on social media, Discord, and Slack. A sitemap and robots.txt are now in place for better search engine discoverability.
 
-**Branding update** — Visible branding is now consistent as "Volvox.Bot" across the product.
+**Branding update** — Visible branding now uses "Volvox.Bot" consistently across the product.
 
 ## Fixes
 
