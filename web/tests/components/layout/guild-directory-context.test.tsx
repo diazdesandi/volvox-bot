@@ -384,6 +384,7 @@ describe('GuildDirectoryProvider', () => {
         { id: '5', name: 'Negative', botPresent: true, memberCount: -10 },
         { id: '6', name: 'NaN', botPresent: true, memberCount: Number.NaN },
         { id: '7', name: 'Infinity', botPresent: true, approximate_member_count: Infinity },
+        { id: '8', name: 'Decimal', botPresent: true, memberCount: 1.5 },
       ],
     } as Response);
 
@@ -405,7 +406,7 @@ describe('GuildDirectoryProvider', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('counts')).toHaveTextContent('42,0,7,9,null,null,null');
+      expect(screen.getByTestId('counts')).toHaveTextContent('42,0,7,9,null,null,null,null');
     });
   });
 });

@@ -350,6 +350,32 @@ describe('WelcomeServerPicker', () => {
     expect(window.localStorage.getItem('volvox-bot-selected-guild')).toBe('guild-add');
   });
 
+  it('treats degraded bot presence as sufficient for direct management', async () => {
+    render(
+      <WelcomeServerPicker
+        error={false}
+        guilds={[
+          makeGuild({
+            access: 'moderator',
+            botPresent: false,
+            botPresenceAuthoritative: false,
+            id: 'guild-degraded',
+            name: 'Degraded HQ',
+            permissions: '32',
+          }),
+        ]}
+        loading={false}
+        onRefresh={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Server summary')).toHaveTextContent(
+      '1 server found, 1 installed, 0 need bot',
+    );
+    expect(screen.getByRole('button', { name: /manage degraded hq/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add bot to degraded hq/i })).not.toBeInTheDocument();
+  });
+
   it('treats degraded bot presence as sufficient for callback guild selection', async () => {
     render(
       <WelcomeServerPicker

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { isDashboardWelcomeRoute } from '@/lib/workspace-access';
 
 export const APP_TITLE = 'Volvox.Bot - AI Powered Discord Bot';
 
@@ -25,8 +26,7 @@ const dashboardTitleMatchers: DashboardTitleMatcher[] = [
     title: 'Overview',
   },
   {
-    matches: (pathname) =>
-      pathname === '/dashboard/welcome' || pathname.startsWith('/dashboard/welcome/'),
+    matches: isDashboardWelcomeRoute,
     title: 'Server Picker',
   },
   {
