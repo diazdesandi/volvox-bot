@@ -65,8 +65,8 @@ export async function execute(interaction) {
 
     if (warnings.length === 0) {
       const msg = activeOnly
-        ? `No active warnings found for **${user.tag}**.`
-        : `No warnings found for **${user.tag}**.`;
+        ? `No active warnings found for **${user.globalName ?? user.username}**.`
+        : `No warnings found for **${user.globalName ?? user.username}**.`;
       return await safeEditReply(interaction, msg);
     }
 
@@ -91,7 +91,7 @@ export async function execute(interaction) {
 
     const embed = new EmbedBuilder()
       .setColor(stats.points > 5 ? 0xed4245 : stats.points > 2 ? 0xfee75c : 0x57f287)
-      .setTitle(`Warnings — ${user.tag}`)
+      .setTitle(`Warnings — ${user.globalName ?? user.username}`)
       .setDescription(lines.join('\n\n'))
       .addFields(
         { name: 'Active Warnings', value: `${stats.count}`, inline: true },
@@ -99,15 +99,15 @@ export async function execute(interaction) {
       )
       .setThumbnail(user.displayAvatarURL())
       .setFooter({
-        text: `Page ${page} · Showing ${warnings.length} warning(s)${activeOnly ? ' (active only)' : ''} · Use /warnings page:${page + 1} for more`,
+        text: `Page ${page} · Showing ${warnings.length} warning(s)${activeOnly ? ' (active only)' : ''}${warnings.length === perPage ? ` · Use /warnings page:${page + 1} for more` : ''}`,
       })
       .setTimestamp();
 
     info('Warnings viewed', {
       guildId: interaction.guild.id,
       channelId: interaction.channelId,
-      target: user.tag,
-      moderator: interaction.user.tag,
+      target: user.globalName ?? user.username,
+      moderator: interaction.user.globalName ?? interaction.user.username,
       count: warnings.length,
     });
 

@@ -28,6 +28,9 @@ export async function execute(interaction) {
       if (!target) return { earlyReturn: '\u274C User is not in this server.' };
       return { target, targetId: target.id, targetTag: target.user.tag };
     },
+    extractOptions: (inter) => ({
+      reason: inter.options.getString('reason'),
+    }),
     actionFn: async (target, reason) => {
       await target.kick(reason || undefined);
     },

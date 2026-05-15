@@ -23,8 +23,14 @@ vi.mock('../../../src/api/middleware/oauthJwt.js', () => ({
   stopJwtCleanup: vi.fn(),
 }));
 
+vi.mock('../../../src/utils/cache.js', () => ({
+  cacheGetOrSet: vi.fn((_key, factory) => factory()),
+  TTL: { MOD_STATS: 300 },
+}));
+
 import { createApp } from '../../../src/api/server.js';
 import { getPool } from '../../../src/db.js';
+import { cacheGetOrSet, TTL } from '../../../src/utils/cache.js';
 
 function authed(req) {
   return req.set('x-api-secret', 'warnings-secret');
@@ -73,7 +79,8 @@ describe('warnings routes', () => {
         return { rows: [{ total: 12 }] };
       }
 
-      expect(sql).toContain('SELECT * FROM warnings');
+      expect(sql).toContain('FROM warnings');
+      expect(sql).not.toContain('SELECT * FROM warnings');
       expect(sql).toContain(
         'WHERE guild_id = $1 AND user_id = $2 AND active = $3 AND severity = $4',
       );
@@ -117,7 +124,7 @@ describe('warnings routes', () => {
   it('returns a user warning summary with severity buckets', async () => {
     mockGetWarnings.mockResolvedValueOnce([{ id: 1, reason: 'spam' }]);
     mockGetActiveWarningStats.mockResolvedValueOnce({ count: 2, points: 5 });
-    mockPool.query.mockResolvedValueOnce({
+    mockPool.query.mockResolvedValueOnce({ rows: [{ total: 1 }] }).mockResolvedValueOnce({
       rows: [
         { severity: 'low', count: 1 },
         { severity: 'high', count: 1 },
@@ -132,6 +139,10 @@ describe('warnings routes', () => {
       activeCount: 2,
       activePoints: 5,
       bySeverity: { low: 1, high: 1 },
+      total: 1,
+      page: 1,
+      limit: 25,
+      pages: 1,
       warnings: [{ id: 1, reason: 'spam' }],
     });
   });
@@ -162,6 +173,11 @@ describe('warnings routes', () => {
     const res = await authed(request(app).get('/api/v1/warnings/stats?guildId=guild-1'));
 
     expect(res.status).toBe(200);
+    expect(cacheGetOrSet).toHaveBeenCalledWith(
+      'warnings:stats:guild-1',
+      expect.any(Function),
+      TTL.MOD_STATS,
+    );
     expect(res.body).toEqual({
       totalWarnings: 9,
       activeWarnings: 4,

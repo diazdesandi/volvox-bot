@@ -313,8 +313,11 @@ export async function sendDmNotification(member, action, reason, guildName, opti
 
   try {
     await member.send({ embeds: [embed] });
-  } catch {
-    // User has DMs disabled — silently continue
+  } catch (err) {
+    // 50007 = Cannot send messages to this user (DMs disabled or bot blocked)
+    if (err.code !== 50007) {
+      logError('Failed to send DM notification', { error: err.message, userId: member.id });
+    }
   }
 }
 
@@ -386,19 +389,6 @@ export async function sendModLogEmbed(client, config, caseData) {
   }
 }
 
-/**
- * Evaluate configured escalation thresholds for a guild target and apply the first matching escalation.
- *
- * If a threshold is met, performs the configured action (e.g., timeout or ban), creates a moderation case, and posts the mod-log for the escalation.
- *
- * @param {import('discord.js').Client} client - Discord client instance.
- * @param {string} guildId - ID of the guild where escalation is evaluated.
- * @param {string} targetId - ID of the target user being evaluated.
- * @param {string} moderatorId - ID used as the moderator for the escalation case (typically the bot).
- * @param {string} moderatorTag - Tag to record for the moderator in the created case.
- * @param {Object} config - Bot configuration containing moderation.escalation settings and thresholds.
- * @returns {Object|null} The created escalation case object when an escalation is applied, `null` if no thresholds triggered or on failure.
- */
 /**
  * Count active warnings for a user within a threshold window.
  * Falls back to mod_cases if the warnings table doesn't exist yet.
@@ -472,6 +462,19 @@ async function executeEscalationAction(
   return escalationCase;
 }
 
+/**
+ * Evaluate configured escalation thresholds for a guild target and apply the first matching escalation.
+ *
+ * If a threshold is met, performs the configured action (e.g., timeout or ban), creates a moderation case, and posts the mod-log for the escalation.
+ *
+ * @param {import('discord.js').Client} client - Discord client instance.
+ * @param {string} guildId - ID of the guild where escalation is evaluated.
+ * @param {string} targetId - ID of the target user being evaluated.
+ * @param {string} moderatorId - ID used as the moderator for the escalation case (typically the bot).
+ * @param {string} moderatorTag - Tag to record for the moderator in the created case.
+ * @param {Object} config - Bot configuration containing moderation.escalation settings and thresholds.
+ * @returns {Object|null} The created escalation case object when an escalation is applied, `null` if no thresholds triggered or on failure.
+ */
 export async function checkEscalation(
   client,
   guildId,

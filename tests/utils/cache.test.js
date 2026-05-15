@@ -536,6 +536,7 @@ describe('cache.js — cacheClear with Redis', () => {
       'guild:stats:*',
       'mod:stats:*',
       'bot:stats:*',
+      'warnings:stats:*',
       'member:enrichment:*',
     ];
     expect(redisMock.scan).toHaveBeenCalledTimes(expectedPrefixes.length);

@@ -254,6 +254,7 @@ export async function cacheClear() {
         'guild:stats:*',
         'mod:stats:*',
         'bot:stats:*',
+        'warnings:stats:*',
         'member:enrichment:*',
       ];
       for (const pattern of prefixes) {

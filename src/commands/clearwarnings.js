@@ -36,20 +36,23 @@ export async function execute(interaction) {
     const count = await clearWarnings(interaction.guild.id, user.id, interaction.user.id, reason);
 
     if (count === 0) {
-      return await safeEditReply(interaction, `No active warnings found for **${user.tag}**.`);
+      return await safeEditReply(
+        interaction,
+        `No active warnings found for **${user.globalName ?? user.username}**.`,
+      );
     }
 
     info('Warnings cleared via command', {
       guildId: interaction.guild.id,
       channelId: interaction.channelId,
-      target: user.tag,
-      moderator: interaction.user.tag,
+      target: user.globalName ?? user.username,
+      moderator: interaction.user.globalName ?? interaction.user.username,
       count,
     });
 
     await safeEditReply(
       interaction,
-      `✅ Cleared **${count}** active warning(s) for **${user.tag}**.`,
+      `✅ Cleared **${count}** active warning(s) for **${user.globalName ?? user.username}**.`,
     );
   } catch (err) {
     logError('Command error', { error: err.message, command: 'clearwarnings' });

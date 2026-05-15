@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { getPool } from '../../db.js';
 import { info, error as logError } from '../../logger.js';
 import { getActiveWarningStats, getWarnings } from '../../modules/warningEngine.js';
+import { cacheGetOrSet, TTL } from '../../utils/cache.js';
 import { adaptGuildIdFromQuery } from '../middleware/adaptGuildId.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { parseLimit, parsePage } from '../utils/pagination.js';
@@ -115,7 +116,7 @@ router.get('/', async (req, res) => {
 
     const [warningsResult, countResult] = await Promise.all([
       pool.query(
-        `SELECT * FROM warnings
+        `SELECT id, guild_id, user_id, moderator_id, moderator_tag, reason, severity, points, expires_at, case_id, active, created_at, removal_reason, removed_at, updated_at FROM warnings
          WHERE ${where}
          ORDER BY created_at DESC
          LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
@@ -166,6 +167,17 @@ router.get('/', async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 25
+ *           maximum: 100
  *     responses:
  *       "200":
  *         description: User warning summary with history
@@ -180,11 +192,20 @@ router.get('/user/:userId', async (req, res) => {
     return res.status(400).json({ error: 'guildId is required' });
   }
 
+  const page = parsePage(req.query.page);
+  const limit = parseLimit(req.query.limit);
+  const offset = (page - 1) * limit;
+
   try {
     const pool = getPool();
 
-    const [warnings, activeStats, bySeverityResult] = await Promise.all([
-      getWarnings(guildId, userId),
+    const [warnings, countResult, activeStats, bySeverityResult] = await Promise.all([
+      getWarnings(guildId, userId, { limit, offset }),
+      pool.query(
+        `SELECT COUNT(*)::integer AS total FROM warnings
+         WHERE guild_id = $1 AND user_id = $2`,
+        [guildId, userId],
+      ),
       getActiveWarningStats(guildId, userId),
       pool.query(
         `SELECT severity, COUNT(*)::integer AS count
@@ -194,6 +215,9 @@ router.get('/user/:userId', async (req, res) => {
         [guildId, userId],
       ),
     ]);
+
+    const total = countResult.rows[0]?.total ?? 0;
+    const pages = Math.ceil(total / limit);
 
     const bySeverity = {};
     for (const row of bySeverityResult.rows) {
@@ -207,6 +231,10 @@ router.get('/user/:userId', async (req, res) => {
       activeCount: activeStats.count,
       activePoints: activeStats.points,
       bySeverity,
+      total,
+      page,
+      limit,
+      pages,
       warnings,
     });
   } catch (err) {
@@ -246,43 +274,55 @@ router.get('/stats', async (req, res) => {
   }
 
   try {
-    const pool = getPool();
+    const cacheKey = `warnings:stats:${guildId}`;
 
-    const [totalResult, activeResult, bySeverityResult, topUsersResult] = await Promise.all([
-      pool.query('SELECT COUNT(*)::integer AS total FROM warnings WHERE guild_id = $1', [guildId]),
-      pool.query(
-        'SELECT COUNT(*)::integer AS total FROM warnings WHERE guild_id = $1 AND active = TRUE',
-        [guildId],
-      ),
-      pool.query(
-        `SELECT severity, COUNT(*)::integer AS count
-         FROM warnings
-         WHERE guild_id = $1 AND active = TRUE
-         GROUP BY severity`,
-        [guildId],
-      ),
-      pool.query(
-        `SELECT user_id, COUNT(*)::integer AS count, SUM(points)::integer AS points
-         FROM warnings
-         WHERE guild_id = $1 AND active = TRUE
-         GROUP BY user_id
-         ORDER BY points DESC
-         LIMIT 10`,
-        [guildId],
-      ),
-    ]);
+    const statsData = await cacheGetOrSet(
+      cacheKey,
+      async () => {
+        const pool = getPool();
 
-    const bySeverity = {};
-    for (const row of bySeverityResult.rows) {
-      bySeverity[row.severity] = row.count;
-    }
+        const [totalResult, activeResult, bySeverityResult, topUsersResult] = await Promise.all([
+          pool.query('SELECT COUNT(*)::integer AS total FROM warnings WHERE guild_id = $1', [
+            guildId,
+          ]),
+          pool.query(
+            'SELECT COUNT(*)::integer AS total FROM warnings WHERE guild_id = $1 AND active = TRUE',
+            [guildId],
+          ),
+          pool.query(
+            `SELECT severity, COUNT(*)::integer AS count
+             FROM warnings
+             WHERE guild_id = $1 AND active = TRUE
+             GROUP BY severity`,
+            [guildId],
+          ),
+          pool.query(
+            `SELECT user_id, COUNT(*)::integer AS count, SUM(points)::integer AS points
+             FROM warnings
+             WHERE guild_id = $1 AND active = TRUE
+             GROUP BY user_id
+             ORDER BY points DESC
+             LIMIT 10`,
+            [guildId],
+          ),
+        ]);
 
-    return res.json({
-      totalWarnings: totalResult.rows[0]?.total ?? 0,
-      activeWarnings: activeResult.rows[0]?.total ?? 0,
-      bySeverity,
-      topUsers: topUsersResult.rows,
-    });
+        const bySeverity = {};
+        for (const row of bySeverityResult.rows) {
+          bySeverity[row.severity] = row.count;
+        }
+
+        return {
+          totalWarnings: totalResult.rows[0]?.total ?? 0,
+          activeWarnings: activeResult.rows[0]?.total ?? 0,
+          bySeverity,
+          topUsers: topUsersResult.rows,
+        };
+      },
+      TTL.MOD_STATS,
+    );
+
+    return res.json(statsData);
   } catch (err) {
     logError('Failed to fetch warning stats', { error: err.message, guildId });
     return res.status(500).json({ error: 'Failed to fetch warning stats' });

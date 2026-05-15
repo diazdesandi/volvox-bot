@@ -327,9 +327,11 @@ export async function clearWarnings(guildId, userId, clearedBy, reason) {
  * @returns {number} Number of warnings deactivated; returns 0 if none were expired or if processing failed.
  */
 export async function processExpiredWarnings() {
-  const pool = getPool();
+  if (expiryPollInFlight) return 0;
+  expiryPollInFlight = true;
 
   try {
+    const pool = getPool();
     const { rowCount } = await pool.query(
       `UPDATE warnings
        SET active = FALSE, removed_at = NOW(), removal_reason = 'Expired', updated_at = NOW()
@@ -344,6 +346,8 @@ export async function processExpiredWarnings() {
   } catch (err) {
     logError('Failed to process expired warnings', { error: err.message });
     return 0;
+  } finally {
+    expiryPollInFlight = false;
   }
 }
 
@@ -357,22 +361,9 @@ export function startWarningExpiryScheduler() {
   if (expiryInterval) return;
 
   // Immediate check on startup
-  processExpiredWarnings().catch((err) => {
-    logError('Initial warning expiry poll failed', { error: err.message });
-  });
+  processExpiredWarnings();
 
-  expiryInterval = setInterval(() => {
-    if (expiryPollInFlight) return;
-    expiryPollInFlight = true;
-
-    processExpiredWarnings()
-      .catch((err) => {
-        logError('Warning expiry poll failed', { error: err.message });
-      })
-      .finally(() => {
-        expiryPollInFlight = false;
-      });
-  }, 60_000);
+  expiryInterval = setInterval(processExpiredWarnings, 60_000);
 
   info('Warning expiry scheduler started');
 }

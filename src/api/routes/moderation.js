@@ -140,7 +140,7 @@ router.use(adaptGuildIdFromQuery, requireGuildModerator);
  *       "500":
  *         $ref: "#/components/responses/ServerError"
  */
-router.get('/cases', moderationRateLimit, async (req, res) => {
+router.get('/cases', async (req, res) => {
   const { guildId, targetId, action } = req.query;
 
   if (!guildId) {
@@ -312,7 +312,7 @@ router.get('/cases', moderationRateLimit, async (req, res) => {
  *       "500":
  *         $ref: "#/components/responses/ServerError"
  */
-router.get('/cases/:caseNumber', moderationRateLimit, async (req, res) => {
+router.get('/cases/:caseNumber', async (req, res) => {
   const caseNumber = parseInt(req.params.caseNumber, 10);
   if (Number.isNaN(caseNumber)) {
     return res.status(400).json({ error: 'Invalid case number' });
@@ -433,7 +433,7 @@ router.get('/cases/:caseNumber', moderationRateLimit, async (req, res) => {
  *       "500":
  *         $ref: "#/components/responses/ServerError"
  */
-router.get('/stats', moderationRateLimit, async (req, res) => {
+router.get('/stats', async (req, res) => {
   const { guildId } = req.query;
 
   if (!guildId) {
@@ -606,16 +606,12 @@ router.get('/stats', moderationRateLimit, async (req, res) => {
  *       "500":
  *         $ref: "#/components/responses/ServerError"
  */
-router.get('/user/:userId/history', moderationRateLimit, async (req, res) => {
+router.get('/user/:userId/history', async (req, res) => {
   const { userId } = req.params;
   const { guildId } = req.query;
 
   if (!guildId) {
     return res.status(400).json({ error: 'guildId is required' });
-  }
-
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
   }
 
   const page = parsePage(req.query.page);

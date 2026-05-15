@@ -267,16 +267,6 @@ export async function isQuietMode(guildId, channelId) {
   return record !== null;
 }
 
-/**
- * Handle a potential quiet mode command in a bot mention message.
- *
- * Call only when the bot is mentioned. Returns `true` if the message was a
- * quiet mode command (caller should stop further processing).
- *
- * @param {import('discord.js').Message} message - Discord message
- * @param {Object} config - Per-guild merged config
- * @returns {Promise<boolean>} Whether this was a quiet mode command
- */
 /** Handle the quiet mode status check subcommand. */
 async function handleStatusSubcommand(message, guildId, channelId) {
   const record = await getQuiet(guildId, channelId);
@@ -335,6 +325,16 @@ async function handleActivateSubcommand(
   });
 }
 
+/**
+ * Handle a potential quiet mode command in a bot mention message.
+ *
+ * Call only when the bot is mentioned. Returns `true` if the message was a
+ * quiet mode command (caller should stop further processing).
+ *
+ * @param {import('discord.js').Message} message - Discord message
+ * @param {Object} config - Per-guild merged config
+ * @returns {Promise<boolean>} Whether this was a quiet mode command
+ */
 export async function handleQuietCommand(message, config) {
   if (!config?.quietMode?.enabled) return false;
 
@@ -348,30 +348,37 @@ export async function handleQuietCommand(message, config) {
 
   const firstWord = cleanContent.split(/\s+/)[0] ?? '';
 
-  if (STATUS_KEYWORDS.has(firstWord)) {
-    await handleStatusSubcommand(message, guild.id, channel.id);
-    return true;
+  if (
+    !STATUS_KEYWORDS.has(firstWord) &&
+    !UNQUIET_KEYWORDS.has(firstWord) &&
+    !QUIET_KEYWORDS.has(firstWord)
+  ) {
+    return false;
   }
 
-  if (UNQUIET_KEYWORDS.has(firstWord)) {
-    await handleUnquietSubcommand(message, member, config, guild.id, channel.id, author.id);
-    return true;
-  }
-
-  if (QUIET_KEYWORDS.has(firstWord)) {
-    await handleActivateSubcommand(
-      message,
-      member,
-      config,
-      guild.id,
-      channel.id,
-      author.id,
-      cleanContent,
+  try {
+    if (STATUS_KEYWORDS.has(firstWord)) {
+      await handleStatusSubcommand(message, guild.id, channel.id);
+    } else if (UNQUIET_KEYWORDS.has(firstWord)) {
+      await handleUnquietSubcommand(message, member, config, guild.id, channel.id, author.id);
+    } else {
+      await handleActivateSubcommand(
+        message,
+        member,
+        config,
+        guild.id,
+        channel.id,
+        author.id,
+        cleanContent,
+      );
+    }
+  } catch (err) {
+    logError('Quiet mode command error', { error: err.message, guildId: guild?.id });
+    await safeReply(message, '❌ An error occurred while processing the quiet mode command.').catch(
+      () => {},
     );
-    return true;
   }
-
-  return false;
+  return true;
 }
 
 /**
