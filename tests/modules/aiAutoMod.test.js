@@ -39,6 +39,13 @@ const { mockGenerate, mockGetPool, mockPool } = vi.hoisted(() => ({
 
 vi.mock('../../src/db.js', () => ({
   getPool: (...args) => mockGetPool(...args),
+  getPoolSafe: (...args) => {
+    try {
+      return mockGetPool(...args);
+    } catch {
+      return null;
+    }
+  },
 }));
 
 vi.mock('../../src/utils/aiClient.js', () => ({

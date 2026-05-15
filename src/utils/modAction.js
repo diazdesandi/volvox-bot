@@ -5,7 +5,7 @@
  * case creation, mod log, success reply, and error handling.
  */
 
-import { getPool } from '../db.js';
+import { getPoolSafe } from '../db.js';
 import { debug, info, error as logError, warn } from '../logger.js';
 import { logAuditEvent } from '../modules/auditLogger.js';
 import { getConfig } from '../modules/config.js';
@@ -18,6 +18,25 @@ import {
   shouldSendDm,
 } from '../modules/moderation.js';
 import { safeEditReply } from './safeSend.js';
+
+/**
+ * Resolve the target for ban/tempban commands.
+ * Fetches the guild member when possible (for hierarchy checks) but falls
+ * back gracefully when the user is not in the guild.
+ *
+ * @param {import('discord.js').ChatInputCommandInteraction} inter
+ * @returns {Promise<{target: import('discord.js').GuildMember|null, targetId: string, targetTag: string}>}
+ */
+export async function getBanTarget(inter) {
+  const user = inter.options.getUser('user');
+  let member = null;
+  try {
+    member = await inter.guild.members.fetch(user.id);
+  } catch {
+    // User not in guild — skip hierarchy check
+  }
+  return { target: member, targetId: user.id, targetTag: user.tag };
+}
 
 /**
  * Extract and validate command options, filtering private keys.
@@ -192,14 +211,7 @@ export async function executeModAction(interaction, opts) {
     });
 
     // Audit log
-    let pool;
-    try {
-      pool = getPool();
-    } catch {
-      pool = null;
-    }
-
-    logAuditEvent(pool, {
+    logAuditEvent(getPoolSafe(), {
       guildId: interaction.guild.id,
       userId: interaction.user.id,
       userTag: interaction.user.tag,

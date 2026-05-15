@@ -36,6 +36,24 @@ export function mergeRoleIds(roleIds, roleId) {
 }
 
 /**
+ * Extract the merged admin and moderator role ID arrays from a guild config.
+ * Centralizes the mergeRoleIds calls that were duplicated across modExempt.js
+ * and moderation.js.
+ *
+ * @param {Object} config - Bot configuration containing permissions role settings.
+ * @returns {{ adminRoleIds: string[], moderatorRoleIds: string[] }}
+ */
+export function getConfiguredRoleIds(config) {
+  return {
+    adminRoleIds: mergeRoleIds(config.permissions?.adminRoleIds, config.permissions?.adminRoleId),
+    moderatorRoleIds: mergeRoleIds(
+      config.permissions?.moderatorRoleIds,
+      config.permissions?.moderatorRoleId,
+    ),
+  };
+}
+
+/**
  * Retrieve the configured bot owner user IDs.
  *
  * Reads the BOT_OWNER_IDS environment variable (comma-separated) and returns the parsed IDs.

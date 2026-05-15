@@ -9,10 +9,10 @@ import { getPool } from '../db.js';
 import { info, error as logError, warn as logWarn } from '../logger.js';
 import { fetchChannelCached } from '../utils/discordCache.js';
 import { parseDuration } from '../utils/duration.js';
-import { mergeRoleIds } from '../utils/permissions.js';
+import { getConfiguredRoleIds } from '../utils/permissions.js';
 import { safeSend } from '../utils/safeSend.js';
 import { getConfig } from './config.js';
-import { calculateExpiry, getSeverityPoints } from './warningEngine.js';
+import { createWarning } from './warningEngine.js';
 import { fireEvent } from './webhookNotifier.js';
 
 /**
@@ -75,6 +75,61 @@ let schedulerInterval = null;
 let schedulerPollInFlight = false;
 
 /**
+ * Insert a mod case row inside an existing transaction.
+ * Acquires a per-guild advisory lock to serialise case-number generation.
+ *
+ * @param {import('pg').PoolClient} client - Active transaction client
+ * @param {string} guildId
+ * @param {Object} data
+ * @returns {Promise<Object>} Created case row
+ */
+async function insertModCase(client, guildId, data) {
+  await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [guildId]);
+
+  const { rows } = await client.query(
+    `INSERT INTO mod_cases
+      (
+        guild_id,
+        case_number,
+        action,
+        target_id,
+        target_tag,
+        moderator_id,
+        moderator_tag,
+        reason,
+        duration,
+        expires_at
+      )
+    VALUES (
+      $1,
+      COALESCE((SELECT MAX(case_number) FROM mod_cases WHERE guild_id = $1), 0) + 1,
+      $2,
+      $3,
+      $4,
+      $5,
+      $6,
+      $7,
+      $8,
+      $9
+    )
+    RETURNING *`,
+    [
+      guildId,
+      data.action,
+      data.targetId,
+      data.targetTag,
+      data.moderatorId,
+      data.moderatorTag,
+      data.reason || null,
+      data.duration || null,
+      data.expiresAt || null,
+    ],
+  );
+
+  return rows[0];
+}
+
+/**
  * Create a moderation case in the database.
  * Uses a per-guild advisory lock to atomically assign sequential case numbers.
  * @param {string} guildId - Discord guild ID
@@ -96,52 +151,10 @@ export async function createCase(guildId, data) {
   try {
     await client.query('BEGIN');
 
-    // Serialize case-number generation per guild to prevent race conditions.
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [guildId]);
-
-    const { rows } = await client.query(
-      `INSERT INTO mod_cases
-        (
-          guild_id,
-          case_number,
-          action,
-          target_id,
-          target_tag,
-          moderator_id,
-          moderator_tag,
-          reason,
-          duration,
-          expires_at
-        )
-      VALUES (
-        $1,
-        COALESCE((SELECT MAX(case_number) FROM mod_cases WHERE guild_id = $1), 0) + 1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9
-      )
-      RETURNING *`,
-      [
-        guildId,
-        data.action,
-        data.targetId,
-        data.targetTag,
-        data.moderatorId,
-        data.moderatorTag,
-        data.reason || null,
-        data.duration || null,
-        data.expiresAt || null,
-      ],
-    );
+    const createdCase = await insertModCase(client, guildId, data);
 
     await client.query('COMMIT');
 
-    const createdCase = rows[0];
     info('Moderation case created', {
       guildId,
       caseNumber: createdCase.case_number,
@@ -193,79 +206,34 @@ export async function createCase(guildId, data) {
 export async function createWarnCaseWithWarning(guildId, caseData, warningData, config) {
   const pool = getPool();
   const client = await pool.connect();
-  const severity = warningData.severity || 'low';
-  const points = getSeverityPoints(config, severity);
-  const expiresAt = calculateExpiry(config);
 
   try {
     await client.query('BEGIN');
 
-    // Serialize case-number generation per guild to prevent race conditions.
-    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [guildId]);
+    const createdCase = await insertModCase(client, guildId, {
+      action: 'warn',
+      targetId: caseData.targetId,
+      targetTag: caseData.targetTag,
+      moderatorId: caseData.moderatorId,
+      moderatorTag: caseData.moderatorTag,
+      reason: caseData.reason,
+    });
 
-    const { rows: caseRows } = await client.query(
-      `INSERT INTO mod_cases
-        (
-          guild_id,
-          case_number,
-          action,
-          target_id,
-          target_tag,
-          moderator_id,
-          moderator_tag,
-          reason,
-          duration,
-          expires_at
-        )
-      VALUES (
-        $1,
-        COALESCE((SELECT MAX(case_number) FROM mod_cases WHERE guild_id = $1), 0) + 1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9
-      )
-      RETURNING *`,
-      [
-        guildId,
-        'warn',
-        caseData.targetId,
-        caseData.targetTag,
-        caseData.moderatorId,
-        caseData.moderatorTag,
-        caseData.reason || null,
-        null,
-        null,
-      ],
-    );
-
-    const createdCase = caseRows[0];
-
-    const { rows: warningRows } = await client.query(
-      `INSERT INTO warnings
-        (guild_id, user_id, moderator_id, moderator_tag, reason, severity, points, expires_at, case_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING *`,
-      [
-        guildId,
-        warningData.userId,
-        warningData.moderatorId,
-        warningData.moderatorTag,
-        warningData.reason || null,
-        severity,
-        points,
-        expiresAt,
-        createdCase.id,
-      ],
+    const warning = await createWarning(
+      guildId,
+      {
+        userId: warningData.userId,
+        moderatorId: warningData.moderatorId,
+        moderatorTag: warningData.moderatorTag,
+        reason: warningData.reason,
+        severity: warningData.severity,
+        caseId: createdCase.id,
+      },
+      config,
+      { client },
     );
 
     await client.query('COMMIT');
-
-    const warning = warningRows[0];
 
     info('Moderation case created', {
       guildId,
@@ -273,15 +241,6 @@ export async function createWarnCaseWithWarning(guildId, caseData, warningData, 
       action: 'warn',
       target: caseData.targetTag,
       moderator: caseData.moderatorTag,
-    });
-
-    info('Warning created', {
-      guildId,
-      warningId: warning.id,
-      userId: warningData.userId,
-      severity,
-      points,
-      expiresAt: expiresAt?.toISOString() || null,
     });
 
     fireEvent('moderation.action', guildId, {
@@ -750,16 +709,9 @@ export function isProtectedTarget(target, guild) {
     return true;
   }
 
-  // Resolve admin/moderator role ID arrays — mergeRoleIds handles the case where
+  // Resolve admin/moderator role ID arrays — getConfiguredRoleIds handles the case where
   // defaults inject adminRoleIds:[] alongside a legacy adminRoleId guild override
-  const adminRoleIds = mergeRoleIds(
-    config.permissions?.adminRoleIds,
-    config.permissions?.adminRoleId,
-  );
-  const moderatorRoleIds = mergeRoleIds(
-    config.permissions?.moderatorRoleIds,
-    config.permissions?.moderatorRoleId,
-  );
+  const { adminRoleIds, moderatorRoleIds } = getConfiguredRoleIds(config);
 
   const protectedRoleIds = [
     ...(protectRoles.includeAdmins ? adminRoleIds : []),

@@ -8,6 +8,7 @@
 import { Router } from 'express';
 import { getPool } from '../../db.js';
 import { info, error as logError } from '../../logger.js';
+import { getActiveWarningStats, getWarnings } from '../../modules/warningEngine.js';
 import { adaptGuildIdFromQuery } from '../middleware/adaptGuildId.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { parseLimit, parsePage } from '../utils/pagination.js';
@@ -182,22 +183,9 @@ router.get('/user/:userId', async (req, res) => {
   try {
     const pool = getPool();
 
-    const [warningsResult, statsResult, bySeverityResult] = await Promise.all([
-      pool.query(
-        `SELECT * FROM warnings
-         WHERE guild_id = $1 AND user_id = $2
-         ORDER BY created_at DESC
-         LIMIT 50`,
-        [guildId, userId],
-      ),
-      pool.query(
-        `SELECT
-           COUNT(*)::integer AS active_count,
-           COALESCE(SUM(points), 0)::integer AS active_points
-         FROM warnings
-         WHERE guild_id = $1 AND user_id = $2 AND active = TRUE`,
-        [guildId, userId],
-      ),
+    const [warnings, activeStats, bySeverityResult] = await Promise.all([
+      getWarnings(guildId, userId),
+      getActiveWarningStats(guildId, userId),
       pool.query(
         `SELECT severity, COUNT(*)::integer AS count
          FROM warnings
@@ -216,10 +204,10 @@ router.get('/user/:userId', async (req, res) => {
 
     return res.json({
       userId,
-      activeCount: statsResult.rows[0]?.active_count ?? 0,
-      activePoints: statsResult.rows[0]?.active_points ?? 0,
+      activeCount: activeStats.count,
+      activePoints: activeStats.points,
       bySeverity,
-      warnings: warningsResult.rows,
+      warnings,
     });
   } catch (err) {
     logError('Failed to fetch user warnings', { error: err.message, guildId, userId });

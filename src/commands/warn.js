@@ -49,7 +49,6 @@ export async function execute(interaction) {
     },
     extractOptions: (inter) => ({
       reason: inter.options.getString('reason'),
-      _severity: inter.options.getString('severity') || 'low',
     }),
     afterCase: async (caseData, inter, config) => {
       const severity = inter.options.getString('severity') || 'low';

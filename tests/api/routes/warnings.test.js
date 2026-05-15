@@ -11,6 +11,13 @@ vi.mock('../../../src/db.js', () => ({
   getPool: vi.fn(),
 }));
 
+const mockGetWarnings = vi.fn();
+const mockGetActiveWarningStats = vi.fn();
+vi.mock('../../../src/modules/warningEngine.js', () => ({
+  getWarnings: (...args) => mockGetWarnings(...args),
+  getActiveWarningStats: (...args) => mockGetActiveWarningStats(...args),
+}));
+
 vi.mock('../../../src/api/middleware/oauthJwt.js', () => ({
   handleOAuthJwt: vi.fn().mockResolvedValue(false),
   stopJwtCleanup: vi.fn(),
@@ -108,15 +115,14 @@ describe('warnings routes', () => {
   });
 
   it('returns a user warning summary with severity buckets', async () => {
-    mockPool.query
-      .mockResolvedValueOnce({ rows: [{ id: 1, reason: 'spam' }] })
-      .mockResolvedValueOnce({ rows: [{ active_count: 2, active_points: 5 }] })
-      .mockResolvedValueOnce({
-        rows: [
-          { severity: 'low', count: 1 },
-          { severity: 'high', count: 1 },
-        ],
-      });
+    mockGetWarnings.mockResolvedValueOnce([{ id: 1, reason: 'spam' }]);
+    mockGetActiveWarningStats.mockResolvedValueOnce({ count: 2, points: 5 });
+    mockPool.query.mockResolvedValueOnce({
+      rows: [
+        { severity: 'low', count: 1 },
+        { severity: 'high', count: 1 },
+      ],
+    });
 
     const res = await authed(request(app).get('/api/v1/warnings/user/user-1?guildId=guild-1'));
 

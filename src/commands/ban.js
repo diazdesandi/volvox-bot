@@ -4,7 +4,7 @@
  */
 
 import { SlashCommandBuilder } from 'discord.js';
-import { executeModAction } from '../utils/modAction.js';
+import { executeModAction, getBanTarget } from '../utils/modAction.js';
 
 export const data = new SlashCommandBuilder()
   .setName('ban')
@@ -31,16 +31,7 @@ export const adminOnly = true;
 export async function execute(interaction) {
   await executeModAction(interaction, {
     action: 'ban',
-    getTarget: async (inter) => {
-      const user = inter.options.getUser('user');
-      let member = null;
-      try {
-        member = await inter.guild.members.fetch(user.id);
-      } catch {
-        // User not in guild — skip hierarchy check
-      }
-      return { target: member, targetId: user.id, targetTag: user.tag };
-    },
+    getTarget: getBanTarget,
     extractOptions: (inter) => ({
       reason: inter.options.getString('reason'),
     }),

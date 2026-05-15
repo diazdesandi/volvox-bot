@@ -7,7 +7,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock('../../src/db.js', () => ({ getPool: vi.fn() }));
+vi.mock('../../src/db.js', () => ({
+  getPool: vi.fn(),
+  getPoolSafe: vi.fn().mockReturnValue(null),
+}));
 vi.mock('../../src/logger.js', () => ({
   info: vi.fn(),
   warn: vi.fn(),

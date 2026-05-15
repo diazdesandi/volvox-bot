@@ -6,7 +6,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { scheduleAction } from '../modules/moderation.js';
 import { formatDuration, parseDuration } from '../utils/duration.js';
-import { executeModAction } from '../utils/modAction.js';
+import { executeModAction, getBanTarget } from '../utils/modAction.js';
 
 export const data = new SlashCommandBuilder()
   .setName('tempban')
@@ -37,16 +37,7 @@ export async function execute(interaction) {
   await executeModAction(interaction, {
     action: 'tempban',
     dmAction: 'ban',
-    getTarget: async (inter) => {
-      const user = inter.options.getUser('user');
-      let member = null;
-      try {
-        member = await inter.guild.members.fetch(user.id);
-      } catch {
-        // User not in guild — skip hierarchy check
-      }
-      return { target: member, targetId: user.id, targetTag: user.tag };
-    },
+    getTarget: getBanTarget,
     extractOptions: (inter) => {
       const durationStr = inter.options.getString('duration');
       const durationMs = parseDuration(durationStr);
@@ -57,7 +48,6 @@ export async function execute(interaction) {
         reason: inter.options.getString('reason'),
         duration: formatDuration(durationMs),
         expiresAt: new Date(Date.now() + durationMs),
-        _durationMs: durationMs,
       };
     },
     actionFn: async (_target, reason, inter) => {

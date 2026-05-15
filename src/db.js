@@ -361,6 +361,20 @@ export function getPool() {
 }
 
 /**
+ * Safe variant of getPool that returns null instead of throwing when the
+ * pool has not been initialised yet.  Useful for fire-and-forget audit
+ * logging where a missing pool should not crash the caller.
+ * @returns {pg.Pool|null}
+ */
+export function getPoolSafe() {
+  try {
+    return getPool();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Gracefully close the database pool
  */
 export async function closeDb() {

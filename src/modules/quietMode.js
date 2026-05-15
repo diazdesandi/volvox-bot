@@ -12,6 +12,7 @@
 
 import { info, error as logError } from '../logger.js';
 import { getRedis } from '../redis.js';
+import { parseDuration } from '../utils/duration.js';
 import { isAdmin, isModerator } from '../utils/permissions.js';
 import { safeReply } from '../utils/safeSend.js';
 
@@ -198,14 +199,18 @@ export function parseDurationFromContent(
   // Helper to clamp to valid range
   const clamp = (seconds) => Math.min(Math.max(seconds, MIN_DURATION_SECONDS), maxSeconds);
 
-  // "30m" / "2h" / "1d" (no space between number and single-char unit)
-  const shortMatch = text.match(/\b(\d+)\s*([smhd])\b/);
+  // "30m" / "2h" / "1d" / "2w" — delegate raw parsing to the shared parseDuration helper
+  const shortMatch = text.match(/\b(\d+)\s*([smhdw])\b/);
   if (shortMatch) {
-    const value = parseInt(shortMatch[1], 10);
-    const unit = UNIT_MAP[shortMatch[2]];
-    if (unit && value > 0) {
-      return clamp(value * unit);
+    const ms = parseDuration(shortMatch[0].trim());
+    if (ms != null) {
+      return clamp(ms / 1000);
     }
+    // parseDuration returns null for values exceeding its 1-year cap — fall back
+    // to manual multiply-then-clamp to preserve the old "clamp to max" behavior.
+    const UNIT_SECS = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
+    const raw = parseInt(shortMatch[1], 10) * UNIT_SECS[shortMatch[2].toLowerCase()];
+    if (Number.isFinite(raw) && raw > 0) return clamp(raw);
   }
 
   // "30 minutes" / "for 1 hour" / "2 hrs"

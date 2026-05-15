@@ -63,16 +63,18 @@ export function calculateExpiry(config) {
  * @param {string} [data.severity='low'] - Severity level (`low`, `medium`, or `high`).
  * @param {number} [data.caseId] - Linked mod_cases.id.
  * @param {Object} [config] - Bot configuration used to determine points and expiry.
+ * @param {Object} [options] - Additional options.
+ * @param {import('pg').PoolClient} [options.client] - Active transaction client to participate in an existing transaction.
  * @returns {Object} The created warning row.
  */
-export async function createWarning(guildId, data, config) {
-  const pool = getPool();
+export async function createWarning(guildId, data, config, { client } = {}) {
+  const queryFn = client || getPool();
   const severity = data.severity || 'low';
   const points = getSeverityPoints(config, severity);
   const expiresAt = calculateExpiry(config);
 
   try {
-    const { rows } = await pool.query(
+    const { rows } = await queryFn.query(
       `INSERT INTO warnings
         (guild_id, user_id, moderator_id, moderator_tag, reason, severity, points, expires_at, case_id)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)

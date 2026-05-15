@@ -5,7 +5,7 @@
  */
 
 import { PermissionFlagsBits } from 'discord.js';
-import { mergeRoleIds } from './permissions.js';
+import { getConfiguredRoleIds } from './permissions.js';
 
 /**
  * Check whether a message author has mod/admin permissions and should be
@@ -32,19 +32,17 @@ export function isExempt(message, config) {
   if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
 
   // Array role IDs — new schema (permissions.adminRoleIds / moderatorRoleIds)
-  // Use mergeRoleIds to handle configs that have both the new empty-array default
+  // Use getConfiguredRoleIds to handle configs that have both the new empty-array default
   // AND the old singular field set from a legacy guild override.
-  const adminRoleIds = mergeRoleIds(
-    config.permissions?.adminRoleIds,
-    config.permissions?.adminRoleId,
-  );
+  const { adminRoleIds, moderatorRoleIds } = getConfiguredRoleIds(config);
   if (adminRoleIds.some((id) => member.roles.cache.has(id))) return true;
-
-  const moderatorRoleIds = mergeRoleIds(
-    config.permissions?.moderatorRoleIds,
-    config.permissions?.moderatorRoleId,
-  );
   if (moderatorRoleIds.some((id) => member.roles.cache.has(id))) return true;
+
+  // Custom protection roles — protectRoles.roleIds entries are shielded from
+  // slash commands via isProtectedTarget, but they should also be exempt from
+  // automated moderation (AI auto-mod, rate limiting, link filters).
+  const protectedRoleIds = config.moderation?.protectRoles?.roleIds || [];
+  if (protectedRoleIds.some((id) => member.roles.cache.has(id))) return true;
 
   // Legacy / test-facing array of role IDs or names (permissions.modRoles)
   const modRoles = config.permissions?.modRoles ?? [];

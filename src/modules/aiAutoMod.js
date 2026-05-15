@@ -5,7 +5,7 @@
  */
 
 import { EmbedBuilder } from 'discord.js';
-import { getPool } from '../db.js';
+import { getPoolSafe } from '../db.js';
 import { info, error as logError, warn } from '../logger.js';
 import { generate } from '../utils/aiClient.js';
 import { fetchChannelCached } from '../utils/discordCache.js';
@@ -522,14 +522,6 @@ async function sendCaseModLogEmbed(client, guildConfig, caseData, action) {
   );
 }
 
-function getAuditPool() {
-  try {
-    return getPool();
-  } catch {
-    return null;
-  }
-}
-
 const MEMBER_TARGET_ACTIONS = new Set(['warn', 'timeout', 'kick', 'ban']);
 
 function getAuditTarget(message, action) {
@@ -558,7 +550,7 @@ function logAiAutoModAuditEvent(message, result, autoModConfig, options = {}) {
 
   const { targetType, targetId, targetTag } = getAuditTarget(message, action);
 
-  logAuditEvent(getAuditPool(), {
+  logAuditEvent(getPoolSafe(), {
     guildId,
     userId: botId,
     userTag: botTag,
