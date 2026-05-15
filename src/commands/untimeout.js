@@ -34,6 +34,6 @@ export async function execute(interaction) {
       await target.timeout(null, reason || undefined);
     },
     formatReply: (tag, c) =>
-      `\u2705 **${tag}** has had their timeout removed. (Case #${c.case_number})`,
+      `\u2705 **${tag}** has been removed from timeout. (Case #${c.case_number})`,
   });
 }

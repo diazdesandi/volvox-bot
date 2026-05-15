@@ -35,18 +35,23 @@ export const ACTION_COLORS = {
 };
 
 /**
- * Past-tense label for DM notifications by action type.
+ * Past-participle labels used in DM notifications and moderator success replies.
+ * Values must work after "has been" / "You have been" (e.g. "has been warned").
  * @type {Record<string, string>}
  */
-const ACTION_PAST_TENSE = {
+export const ACTION_PAST_TENSE = {
   warn: 'warned',
   kick: 'kicked',
   timeout: 'timed out',
-  untimeout: 'had their timeout removed',
+  untimeout: 'removed from timeout',
   ban: 'banned',
   tempban: 'temporarily banned',
   unban: 'unbanned',
   softban: 'soft-banned',
+  purge: 'purged',
+  lock: 'locked',
+  unlock: 'unlocked',
+  slowmode: 'put in slowmode',
 };
 
 /**

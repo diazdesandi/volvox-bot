@@ -10,6 +10,7 @@ import { debug, info, error as logError, warn } from '../logger.js';
 import { logAuditEvent } from '../modules/auditLogger.js';
 import { getConfig } from '../modules/config.js';
 import {
+  ACTION_PAST_TENSE,
   checkHierarchy,
   createCase,
   isProtectedTarget,
@@ -237,9 +238,10 @@ export async function executeModAction(interaction, opts) {
     // Log and reply
     info(`User ${action}`, { target: targetTag, moderator: interaction.user.tag });
 
+    const pastTense = ACTION_PAST_TENSE[action] ?? `${action}ed`;
     const reply = formatReply
       ? formatReply(targetTag, caseData)
-      : `\u2705 **${targetTag}** has been ${action}ed. (Case #${caseData.case_number})`;
+      : `\u2705 **${targetTag}** has been ${pastTense}. (Case #${caseData.case_number})`;
     await safeEditReply(interaction, reply);
   } catch (err) {
     logError('Command error', { error: err.message, command: action });

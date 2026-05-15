@@ -32,7 +32,7 @@ export const adminOnly = true;
  * @param {import('discord.js').ChatInputCommandInteraction} interaction
  */
 export async function execute(interaction) {
-  const config = getConfig();
+  const config = getConfig(interaction.guildId);
   if (!hasPermission(interaction.member, 'modlog', config)) {
     const permLevel = config.permissions?.allowedCommands?.modlog || 'administrator';
     return await safeReply(interaction, {

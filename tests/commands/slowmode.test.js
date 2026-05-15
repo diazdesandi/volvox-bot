@@ -28,6 +28,20 @@ vi.mock('../../src/modules/config.js', () => ({
   getConfig: vi.fn().mockReturnValue({ moderation: { logging: { channels: { default: '123' } } } }),
 }));
 vi.mock('../../src/modules/moderation.js', () => ({
+  ACTION_PAST_TENSE: {
+    warn: 'warned',
+    kick: 'kicked',
+    timeout: 'timed out',
+    untimeout: 'removed from timeout',
+    ban: 'banned',
+    tempban: 'temporarily banned',
+    unban: 'unbanned',
+    softban: 'soft-banned',
+    purge: 'purged',
+    lock: 'locked',
+    unlock: 'unlocked',
+    slowmode: 'put in slowmode',
+  },
   createCase: vi.fn().mockResolvedValue({ case_number: 12, action: 'slowmode', id: 12 }),
   sendModLogEmbed: vi.fn().mockResolvedValue(null),
 }));

@@ -9,6 +9,20 @@ vi.mock('../../src/modules/auditLogger.js', () => ({
 }));
 
 vi.mock('../../src/modules/moderation.js', () => ({
+  ACTION_PAST_TENSE: {
+    warn: 'warned',
+    kick: 'kicked',
+    timeout: 'timed out',
+    untimeout: 'removed from timeout',
+    ban: 'banned',
+    tempban: 'temporarily banned',
+    unban: 'unbanned',
+    softban: 'soft-banned',
+    purge: 'purged',
+    lock: 'locked',
+    unlock: 'unlocked',
+    slowmode: 'put in slowmode',
+  },
   createCase: vi.fn().mockResolvedValue({ case_number: 1, action: 'test', id: 1 }),
   sendDmNotification: vi.fn().mockResolvedValue(undefined),
   sendModLogEmbed: vi.fn().mockResolvedValue({ id: 'msg1' }),

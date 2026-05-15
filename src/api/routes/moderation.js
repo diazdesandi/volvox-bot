@@ -54,7 +54,7 @@ router.use(adaptGuildIdFromQuery, requireGuildModerator);
  *         name: action
  *         schema:
  *           type: string
- *           enum: [warn, kick, ban, mute, unmute, unban]
+ *           enum: [warn, kick, timeout, untimeout, ban, tempban, unban, softban, purge, lock, unlock, slowmode]
  *         description: Filter by action type
  *       - in: query
  *         name: page
