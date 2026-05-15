@@ -52,6 +52,16 @@ AI auto-moderation settings are in **Config → Moderation & Safety → Content 
 | Response actions | Select any combination of flag, delete, warn, timeout, kick, or ban per category. Leave a category empty to skip category-specific responses. `warn` creates a warning record, sends the warning DM (when enabled), and applies your escalation rules. |
 | User DM notifications | Select whether AI auto-moderation warnings, timeouts, kicks, and bans send a direct message to the affected member. If you haven't set AI-specific DM preferences, Content Safety follows your existing moderation DM notification settings. |
 
+### Protected roles
+
+Use **Config → Moderation & Safety → Moderation → Protect Roles** to mark roles whose members should never be moderated. Members with any selected role are exempt from:
+
+- Manual moderation commands and dashboard actions (warn, timeout, kick, ban, tempban).
+- AI auto-moderation responses from Content Safety.
+- Spam rate limiting and link/invite filters.
+
+Use this for staff, partnered creators, or other accounts that should bypass every automated and manual moderation path. Removing the role restores normal moderation immediately on the next message.
+
 ### How the bot sends AI auto-mod DMs
 
 When the bot queues multiple destructive actions for the same message (for example, warn → kick → ban), each destructive step sends its own DM right before that action runs:
