@@ -14,10 +14,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/material-dropdown-menu';
 import { useBotInvite } from '@/hooks/use-bot-invite';
-import { isGuildManageable } from '@/hooks/use-guild-role';
 import { broadcastSelectedGuild, SELECTED_GUILD_KEY } from '@/lib/guild-selection';
 import { sortGuildsByName } from '@/lib/guild-sort';
 import { cn } from '@/lib/utils';
+import { getWorkspaceSelectorGroups } from '@/lib/workspace-access';
 import type { MutualGuild } from '@/types/discord';
 import { useGuildDirectory } from './guild-directory-context';
 
@@ -28,14 +28,6 @@ interface ServerSelectorProps {
 
 function formatServerCount(count: number, label: string): string {
   return `${count} ${label}${count === 1 ? '' : 's'}`;
-}
-
-function hasCommunityHubsEnabled(guild: MutualGuild): boolean {
-  return guild.config?.communityHubs?.enabled === true;
-}
-
-function isBotInstalledOrPresenceDegraded(guild: MutualGuild): boolean {
-  return guild.botPresent || guild.botPresenceAuthoritative === false;
 }
 
 /** Compact guild icon + name row used in both sections of the dropdown. */
@@ -67,14 +59,12 @@ export function ServerSelector({ className, onSelect }: ServerSelectorProps) {
   // When bot presence is degraded, fall back to permission-based options so
   // admins do not lose access while the bot API is unavailable.
   const { installedGuilds, manageable, memberOnly } = useMemo(() => {
-    const botInstalledGuilds = sortGuildsByName(guilds.filter(isBotInstalledOrPresenceDegraded));
-    const manageableGuilds = botInstalledGuilds.filter(isGuildManageable);
+    const groups = getWorkspaceSelectorGroups(guilds);
+
     return {
-      installedGuilds: botInstalledGuilds,
-      manageable: manageableGuilds,
-      memberOnly: botInstalledGuilds.filter(
-        (guild) => !isGuildManageable(guild) && hasCommunityHubsEnabled(guild),
-      ),
+      installedGuilds: sortGuildsByName(groups.installedGuilds),
+      manageable: sortGuildsByName(groups.manageableGuilds),
+      memberOnly: sortGuildsByName(groups.memberOnlyGuilds),
     };
   }, [guilds]);
 

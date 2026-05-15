@@ -38,8 +38,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAnalytics } from '@/contexts/analytics-context';
 import { useGuildSelection } from '@/hooks/use-guild-selection';
 import { getDashboardPageTitle } from '@/lib/page-titles';
-import { WELCOME_ROUTE } from '@/lib/routes';
 import { cn } from '@/lib/utils';
+import { isDashboardWelcomeRoute } from '@/lib/workspace-access';
 import { useAuditLogStore } from '@/stores/audit-log-store';
 import { useConversationsStore } from '@/stores/conversations-store';
 import { useHealthStore } from '@/stores/health-store';
@@ -120,7 +120,7 @@ export function Header() {
   const isTempRolesDashboard = pathname === '/dashboard/temp-roles';
   const isPerformanceDashboard = pathname === '/dashboard/performance';
   const isLogsDashboard = pathname === '/dashboard/logs';
-  const isWelcome = pathname === WELCOME_ROUTE || pathname.startsWith(`${WELCOME_ROUTE}/`);
+  const isWelcome = isDashboardWelcomeRoute(pathname);
 
   // Global Guild State for Refresh Actions
   const guildId = useGuildSelection();

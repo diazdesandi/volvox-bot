@@ -14,10 +14,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useBotInvite } from '@/hooks/use-bot-invite';
-import { getGuildDashboardRole, isGuildManageable } from '@/hooks/use-guild-role';
+import { getGuildDashboardRole } from '@/hooks/use-guild-role';
 import { broadcastSelectedGuild } from '@/lib/guild-selection';
 import { sortGuildsByName } from '@/lib/guild-sort';
 import { cn } from '@/lib/utils';
+import {
+  getWelcomeWorkspaceGroups,
+  hasBotPresenceAccess,
+  isSelectableManageableWorkspace,
+} from '@/lib/workspace-access';
 import type { MutualGuild } from '@/types/discord';
 import { useGuildDirectory } from '../layout/guild-directory-context';
 
@@ -50,8 +55,8 @@ function formatNeedsBotCount(count: number): string {
 }
 
 function getServerSummary(guilds: MutualGuild[], manageableGuilds: MutualGuild[]): string {
-  const installedCount = guilds.filter((guild) => guild.botPresent).length;
-  const needsBotCount = manageableGuilds.filter((guild) => !guild.botPresent).length;
+  const installedCount = guilds.filter(hasBotPresenceAccess).length;
+  const needsBotCount = manageableGuilds.filter((guild) => !hasBotPresenceAccess(guild)).length;
 
   return `${formatCount(guilds.length, 'server')} found, ${installedCount} installed, ${formatNeedsBotCount(needsBotCount)}`;
 }
@@ -62,10 +67,6 @@ function getRoleLabel(guild: MutualGuild): string {
   if (role === 'admin') return 'Admin';
   if (role === 'moderator') return 'Moderator';
   return 'Viewer';
-}
-
-function isBotInstalledOrPresenceDegraded(guild: MutualGuild): boolean {
-  return guild.botPresent || guild.botPresenceAuthoritative === false;
 }
 
 function GuildAvatar({ guild }: { readonly guild: MutualGuild }) {
@@ -305,7 +306,7 @@ function ServerRow({ guild, isInviteConfigured, onAddBot, onManage }: ServerRowP
         {formatMemberCount(guild.memberCount)}
       </div>
       <div className="md:justify-self-end">
-        {guild.botPresent ? (
+        {hasBotPresenceAccess(guild) ? (
           <ManageButton guild={guild} onManage={onManage} />
         ) : isInviteConfigured ? (
           <AddBotButton guild={guild} onAddBot={onAddBot} />
@@ -329,12 +330,13 @@ export function WelcomeServerPicker({
   const handledAutoSelectGuildIdRef = useRef<string | null>(null);
   const { inviteBot, isInviteConfigured } = useBotInvite();
   const { manageableGuilds, serverSummary, viewerOnlyGuilds } = useMemo(() => {
-    const nextManageableGuilds = sortGuildsByName(guilds.filter(isGuildManageable));
+    const groups = getWelcomeWorkspaceGroups(guilds);
+    const nextManageableGuilds = sortGuildsByName(groups.manageableGuilds);
 
     return {
       manageableGuilds: nextManageableGuilds,
       serverSummary: getServerSummary(guilds, nextManageableGuilds),
-      viewerOnlyGuilds: sortGuildsByName(guilds.filter((guild) => !isGuildManageable(guild))),
+      viewerOnlyGuilds: sortGuildsByName(groups.viewerOnlyGuilds),
     };
   }, [guilds]);
 
@@ -352,7 +354,7 @@ export function WelcomeServerPicker({
     if (handledAutoSelectGuildIdRef.current === normalizedGuildId) return;
 
     const guild = guilds.find((candidate) => candidate.id === normalizedGuildId);
-    if (!guild || !isGuildManageable(guild) || !isBotInstalledOrPresenceDegraded(guild)) return;
+    if (!guild || !isSelectableManageableWorkspace(guild)) return;
 
     handledAutoSelectGuildIdRef.current = normalizedGuildId;
     handleManage(guild);

@@ -6,9 +6,11 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo } from 'react';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { AnalyticsProvider } from '@/contexts/analytics-context';
-import { isGuildManageable } from '@/hooks/use-guild-role';
-import { WELCOME_ROUTE } from '@/lib/routes';
-import type { MutualGuild } from '@/types/discord';
+import {
+  DASHBOARD_WELCOME_ROUTE,
+  isDashboardWelcomeRoute,
+  shouldOpenDashboardWelcome,
+} from '@/lib/workspace-access';
 import { DashboardTitleSync } from './dashboard-title-sync';
 import { useGuildDirectory } from './guild-directory-context';
 import { Header } from './header';
@@ -16,18 +18,6 @@ import { Sidebar } from './sidebar';
 
 interface DashboardShellProps {
   children: ReactNode;
-}
-
-function hasAccessibleInstalledWorkspace(guilds: MutualGuild[]): boolean {
-  return guilds.some(
-    (guild) =>
-      guild.botPresent &&
-      (isGuildManageable(guild) || guild.config?.communityHubs?.enabled === true),
-  );
-}
-
-function hasAuthoritativeBotPresence(guilds: MutualGuild[]): boolean {
-  return guilds.every((guild) => guild.botPresenceAuthoritative !== false);
 }
 
 function OpeningServerSetup() {
@@ -99,15 +89,15 @@ export function DashboardShell({ children }: DashboardShellProps) {
   const router = useRouter();
   const { error, guilds, loading } = useGuildDirectory();
 
-  const isWelcomeRoute = pathname === WELCOME_ROUTE || pathname.startsWith(`${WELCOME_ROUTE}/`);
-  const hasInstalledWorkspace = useMemo(() => hasAccessibleInstalledWorkspace(guilds), [guilds]);
-  const hasAuthoritativePresence = useMemo(() => hasAuthoritativeBotPresence(guilds), [guilds]);
-  const shouldOpenWelcome =
-    !isWelcomeRoute && !loading && !error && hasAuthoritativePresence && !hasInstalledWorkspace;
+  const isWelcomeRoute = isDashboardWelcomeRoute(pathname);
+  const shouldOpenWelcome = useMemo(
+    () => shouldOpenDashboardWelcome({ error, guilds, loading, pathname }),
+    [error, guilds, loading, pathname],
+  );
 
   useEffect(() => {
     if (shouldOpenWelcome) {
-      router.replace(WELCOME_ROUTE);
+      router.replace(DASHBOARD_WELCOME_ROUTE);
     }
   }, [router, shouldOpenWelcome]);
 

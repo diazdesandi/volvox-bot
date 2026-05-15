@@ -23,7 +23,6 @@ import type {
   ConfigSearchItem,
 } from '@/components/dashboard/config-workspace/types';
 import { useGuildDirectory } from '@/components/layout/guild-directory-context';
-import { isGuildManageable } from '@/hooks/use-guild-role';
 import {
   DASHBOARD_CONFIG_SAVE_ATTEMPTED_EVENT,
   DASHBOARD_CONFIG_SAVE_FAILED_EVENT,
@@ -37,6 +36,7 @@ import {
   GUILD_SELECTION_CLEARED_EVENT,
   SELECTED_GUILD_KEY,
 } from '@/lib/guild-selection';
+import { getWorkspaceSelectorGroups } from '@/lib/workspace-access';
 import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
 import type { GuildConfig } from './config-editor-utils';
 import { generateId, isGuildConfig } from './config-editor-utils';
@@ -157,16 +157,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
 
   const installedManageableGuildIds = useMemo(
-    () =>
-      new Set(
-        guilds
-          .filter(
-            (guild) =>
-              (guild.botPresent || guild.botPresenceAuthoritative === false) &&
-              isGuildManageable(guild),
-          )
-          .map((guild) => guild.id),
-      ),
+    () => new Set(getWorkspaceSelectorGroups(guilds).manageableGuilds.map((guild) => guild.id)),
     [guilds],
   );
 
