@@ -60,7 +60,7 @@
     "@biomejs/biome": "^2.4.15",
     "@vitest/coverage-v8": "^4.1.6",
     "supertest": "^7.2.2",
-    "turbo": "^2.9.12",
+    "turbo": "^2.9.14",
     "vitest": "^4.1.6"
   }
 }
