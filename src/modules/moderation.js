@@ -543,6 +543,7 @@ async function pollTempbans(client) {
       // 2. Execute Discord unban
       // 3. Only mark executed after successful unban
       const txClient = await pool.connect();
+      let txCommitted = false;
       try {
         await txClient.query('BEGIN');
 
@@ -582,6 +583,7 @@ async function pollTempbans(client) {
           row.id,
         ]);
         await txClient.query('COMMIT');
+        txCommitted = true;
 
         // Log unban failure AFTER successful commit (if there was a real error)
         if (unbanError) {
@@ -602,12 +604,11 @@ async function pollTempbans(client) {
           targetId: row.target_id,
         });
         // Action remains unexecuted (executed = FALSE) and will be retried on next poll
+      } finally {
         txClient.release();
-        continue; // Skip post-commit work since transaction failed
       }
 
-      // Transaction succeeded - release client before post-commit work
-      txClient.release();
+      if (!txCommitted) continue;
 
       // Post-commit work (outside transaction): create case, send mod-log
       // These are non-critical - failures here don't affect the unban itself

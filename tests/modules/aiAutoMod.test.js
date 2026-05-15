@@ -931,6 +931,7 @@ describe('checkAiAutoMod', () => {
       'warn',
       'Actions taken: warning\nTriggered categories: Harassment\nReason: harassment',
       'guild-1',
+      undefined,
     );
     expect(createWarnCaseWithWarning).toHaveBeenCalledWith(
       'guild-1',
@@ -1165,6 +1166,7 @@ describe('checkAiAutoMod', () => {
       'timeout',
       'Actions taken: warning and timeout\nTriggered categories: Toxicity\nReason: toxic',
       'guild-1',
+      undefined,
     );
     expect(createWarnCaseWithWarning).toHaveBeenCalledWith(
       'guild-1',
@@ -1985,6 +1987,7 @@ Reason: toxic`,
       'timeout',
       expect.stringContaining('Actions taken: timeout'),
       'guild-1',
+      undefined,
     );
   });
 

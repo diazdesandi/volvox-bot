@@ -460,10 +460,7 @@ ${responseShape}
 async function sendFlagEmbed(message, client, result, autoModConfig) {
   const channelId = autoModConfig.flagChannelId;
   if (!channelId) {
-    warn('AI auto-mod: flag action skipped because flagChannelId is not configured', {
-      guildId: message.guild?.id,
-      messageId: message.id,
-    });
+    warnMissingFlagChannelOnce(message);
     return false;
   }
 
@@ -983,11 +980,7 @@ async function sendAiAutoModDmNotification(
     : undefined;
 
   try {
-    if (dmOptions) {
-      await sendDmNotification(member, primaryDmAction, dmReason, guildName, dmOptions);
-    } else {
-      await sendDmNotification(member, primaryDmAction, dmReason, guildName);
-    }
+    await sendDmNotification(member, primaryDmAction, dmReason, guildName, dmOptions);
   } catch (err) {
     logError('AI auto-mod: sendAiAutoModDmNotification failed', {
       userId: member.user.id,
@@ -1030,9 +1023,9 @@ async function executeSingleAction(context) {
  * @param {import('discord.js').Client} client - Discord client instance used to perform actions and identify the bot.
  * @param {Object} result - Analysis result containing categories, scores, reason, and suggested actions.
  * @param {Object} autoModConfig - Merged AI auto-mod configuration for the guild.
- * @param {Object} _guildConfig - Full guild configuration (unused by some executors).
+ * @param {Object} guildConfig - Full guild configuration forwarded to action executors.
  * @returns {string[]} An array of action names that were successfully executed (e.g., `['flag','delete']`); empty if no actions succeeded. */
-async function executeAction(message, client, result, autoModConfig, _guildConfig) {
+async function executeAction(message, client, result, autoModConfig, guildConfig) {
   const reason = `AI Auto-Mod: ${result.categories.join(', ')} — ${result.reason}`;
   const botId = client.user?.id ?? 'bot';
   const botTag = client.user?.tag ?? 'Bot#0000';
@@ -1091,7 +1084,7 @@ async function executeAction(message, client, result, autoModConfig, _guildConfi
       result,
       reason,
       autoModConfig,
-      guildConfig: _guildConfig,
+      guildConfig,
       auditedActions: actions,
       botId,
       botTag,

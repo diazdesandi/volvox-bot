@@ -65,7 +65,7 @@ export async function execute(interaction) {
     }
 
     const parts = [];
-    if (reason) parts.push(`reason`);
+    if (reason) parts.push(`reason → ${reason}`);
     if (severity) parts.push(`severity → ${severity}`);
 
     info('Warning edited via command', {
