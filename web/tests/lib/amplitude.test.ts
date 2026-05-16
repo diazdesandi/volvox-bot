@@ -21,11 +21,27 @@ vi.mock('@amplitude/analytics-browser', () => ({
 
 describe('dashboard Amplitude analytics', () => {
   afterEach(() => {
+    globalThis.localStorage?.clear();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.resetModules();
     vi.clearAllMocks();
   });
+
+  function storeAnalyticsConsent(analytics = true) {
+    globalThis.localStorage.setItem(
+      'volvox.cookieConsent.v1',
+      JSON.stringify({
+        version: 1,
+        decidedAt: '2026-05-16T00:00:00.000Z',
+        expiresAt: '2099-05-16T00:00:00.000Z',
+        categories: {
+          essential: true,
+          analytics,
+        },
+      }),
+    );
+  }
 
   it('does not initialize or track events without the public API key', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', '');
@@ -90,6 +106,7 @@ describe('dashboard Amplitude analytics', () => {
 
   it('initializes once and updates the authenticated user id safely', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    storeAnalyticsConsent();
 
     const { initDashboardAmplitude } = await import('@/lib/amplitude');
 
@@ -106,6 +123,36 @@ describe('dashboard Amplitude analytics', () => {
     );
     expect(mockSetUserId).toHaveBeenCalledWith('discord-user-456');
     expect(mockReset).toHaveBeenCalledOnce();
+  });
+
+  it('does not initialize or track events before analytics consent', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+
+    const { initDashboardAmplitude, trackDashboardEvent } =
+      await import('@/lib/amplitude');
+
+    expect(initDashboardAmplitude('discord-user-123')).toBe(false);
+    expect(trackDashboardEvent('dashboard_page_viewed', { route: '/dashboard' })).toBe(false);
+    expect(mockInit).not.toHaveBeenCalled();
+    expect(mockTrack).not.toHaveBeenCalled();
+  });
+
+  it('resets identity and blocks future tracking after analytics consent is revoked', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    storeAnalyticsConsent();
+
+    const { initDashboardAmplitude, trackDashboardEvent } =
+      await import('@/lib/amplitude');
+
+    expect(initDashboardAmplitude('discord-user-123')).toBe(true);
+    storeAnalyticsConsent(false);
+
+    expect(initDashboardAmplitude('discord-user-123')).toBe(false);
+    expect(trackDashboardEvent('dashboard_page_viewed', { route: '/dashboard' })).toBe(false);
+
+    expect(mockInit).toHaveBeenCalledOnce();
+    expect(mockReset).toHaveBeenCalledOnce();
+    expect(mockTrack).not.toHaveBeenCalled();
   });
 
   it('exports all required dashboard event name constants', async () => {
@@ -138,6 +185,7 @@ describe('dashboard Amplitude analytics', () => {
 
   it('tracks sanitized dashboard events', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    storeAnalyticsConsent();
 
     const { trackDashboardEvent } = await import('@/lib/amplitude');
 

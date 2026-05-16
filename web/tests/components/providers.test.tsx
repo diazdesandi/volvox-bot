@@ -19,6 +19,7 @@ vi.mock('@/lib/amplitude', () => ({
   DASHBOARD_GUILD_SELECTED_EVENT: 'dashboard_guild_selected',
   DASHBOARD_PAGE_VIEW_EVENT: 'dashboard_page_viewed',
   initDashboardAmplitude: mockInitDashboardAmplitude,
+  resetDashboardAmplitude: vi.fn(),
   trackDashboardEvent: mockTrackDashboardEvent,
 }));
 
@@ -75,6 +76,19 @@ import { Providers } from '@/components/providers';
 
 describe('Providers', () => {
   beforeEach(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      'volvox.cookieConsent.v1',
+      JSON.stringify({
+        version: 1,
+        decidedAt: '2026-05-16T00:00:00.000Z',
+        expiresAt: '2099-05-16T00:00:00.000Z',
+        categories: {
+          essential: true,
+          analytics: true,
+        },
+      }),
+    );
     mockInitDashboardAmplitude.mockClear();
     mockSetContext.mockClear();
     mockTrackDashboardEvent.mockClear();
@@ -243,6 +257,26 @@ describe('Providers', () => {
       route: '/dashboard/members/[userId]',
     });
     expect(JSON.stringify(mockTrackDashboardEvent.mock.calls)).not.toContain('1234567890');
+  });
+
+  it('does not initialize or track Amplitude before analytics consent', () => {
+    window.localStorage.clear();
+    mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
+    mockUsePathname.mockReturnValue('/dashboard/members/1234567890');
+    mockUseGuildSelection.mockReturnValue('1234567890');
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'discord-user-123' } },
+      status: 'authenticated',
+    });
+
+    render(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    expect(mockInitDashboardAmplitude).not.toHaveBeenCalled();
+    expect(mockTrackDashboardEvent).not.toHaveBeenCalled();
   });
 
   it('tracks dashboard guild selection changes without sending the raw guild id', () => {

@@ -4,16 +4,23 @@ import * as Sentry from '@sentry/nextjs';
 import { usePathname } from 'next/navigation';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { useTheme } from 'next-themes';
-import { type ReactNode, useEffect, useRef } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Toaster } from 'sonner';
+import { CookieConsentBanner } from '@/components/cookie-consent-banner';
 import { ThemeProvider } from '@/components/theme-provider';
 import { useGuildSelection } from '@/hooks/use-guild-selection';
 import {
   DASHBOARD_GUILD_SELECTED_EVENT,
   DASHBOARD_PAGE_VIEW_EVENT,
   initDashboardAmplitude,
+  resetDashboardAmplitude,
   trackDashboardEvent,
 } from '@/lib/amplitude';
+import {
+  COOKIE_CONSENT_CHANGED_EVENT,
+  hasAnalyticsConsent,
+  type StoredCookieConsent,
+} from '@/lib/cookie-consent';
 
 function isDashboardRoute(pathname: string | null): pathname is string {
   return pathname === '/dashboard' || pathname?.startsWith('/dashboard/') === true;
@@ -68,6 +75,31 @@ function getDashboardTelemetryRoute(pathname: string | null): string {
 
 function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
   return guildId ? 'selected' : 'none';
+}
+
+function useAnalyticsConsent() {
+  const [analyticsConsent, setAnalyticsConsent] = useState(false);
+
+  useEffect(() => {
+    setAnalyticsConsent(hasAnalyticsConsent());
+
+    const handleConsentChanged = (event: Event) => {
+      if (event instanceof CustomEvent) {
+        const consent = event.detail as StoredCookieConsent | null;
+        setAnalyticsConsent(consent?.categories.analytics === true);
+        return;
+      }
+
+      setAnalyticsConsent(hasAnalyticsConsent());
+    };
+
+    globalThis.window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, handleConsentChanged);
+    return () => {
+      globalThis.window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, handleConsentChanged);
+    };
+  }, []);
+
+  return analyticsConsent;
 }
 
 /**
@@ -128,6 +160,7 @@ function AmplitudeContextBridge() {
   const pathname = usePathname();
   const guildId = useGuildSelection();
   const { data: session, status } = useSession();
+  const hasConsentedToAnalytics = useAnalyticsConsent();
   const userId = status === 'authenticated' ? session?.user?.id : null;
   const lastTrackedGuildIdRef = useRef<string | null | undefined>(undefined);
   const lastTrackedRouteRef = useRef<string | null>(null);
@@ -135,10 +168,20 @@ function AmplitudeContextBridge() {
   const isAuthenticatedDashboardRoute = status === 'authenticated' && isDashboardRoute(pathname);
 
   useEffect(() => {
+    if (!hasConsentedToAnalytics) {
+      resetDashboardAmplitude();
+      return;
+    }
+
     initDashboardAmplitude(userId);
-  }, [userId]);
+  }, [hasConsentedToAnalytics, userId]);
 
   useEffect(() => {
+    if (!hasConsentedToAnalytics) {
+      lastTrackedRouteRef.current = null;
+      return;
+    }
+
     if (!isDashboardRoute(pathname)) {
       lastTrackedRouteRef.current = null;
       return;
@@ -158,9 +201,14 @@ function AmplitudeContextBridge() {
       guildSelection: getGuildTelemetryScope(guildId),
       route: telemetryRoute,
     });
-  }, [guildId, pathname, status, telemetryRoute]);
+  }, [guildId, hasConsentedToAnalytics, pathname, status, telemetryRoute]);
 
   useEffect(() => {
+    if (!hasConsentedToAnalytics) {
+      lastTrackedGuildIdRef.current = undefined;
+      return;
+    }
+
     if (!isAuthenticatedDashboardRoute) {
       lastTrackedGuildIdRef.current = undefined;
       return;
@@ -177,7 +225,7 @@ function AmplitudeContextBridge() {
       guildSelection: getGuildTelemetryScope(guildId),
       route: telemetryRoute,
     });
-  }, [guildId, isAuthenticatedDashboardRoute, telemetryRoute]);
+  }, [guildId, hasConsentedToAnalytics, isAuthenticatedDashboardRoute, telemetryRoute]);
 
   return null;
 }
@@ -195,6 +243,7 @@ export function Providers({ children }: { children: ReactNode }) {
         <SentryContextBridge />
         <AmplitudeContextBridge />
         {children}
+        <CookieConsentBanner />
         <ThemedToaster />
       </ThemeProvider>
     </SessionProvider>

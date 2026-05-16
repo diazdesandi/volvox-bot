@@ -1,6 +1,7 @@
 'use client';
 
 import * as amplitude from '@amplitude/analytics-browser';
+import { hasAnalyticsConsent } from './cookie-consent';
 import { isSensitiveKey, redactInlineSecrets } from './redaction';
 
 export const DASHBOARD_PAGE_VIEW_EVENT = 'dashboard_page_viewed';
@@ -166,6 +167,11 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
     return false;
   }
 
+  if (!hasAnalyticsConsent()) {
+    resetDashboardAmplitude();
+    return false;
+  }
+
   try {
     if (!hasInitialized) {
       amplitude.init(apiKey, normalizedUserId, getBrowserAmplitudeOptions());
@@ -188,6 +194,20 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
   }
 }
 
+export function resetDashboardAmplitude(): boolean {
+  if (globalThis.window === undefined || !hasInitialized) {
+    return false;
+  }
+
+  try {
+    amplitude.reset();
+    activeUserId = undefined;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Send a named dashboard event to Amplitude after scrubbing sensitive properties.
  *
@@ -201,7 +221,7 @@ export function trackDashboardEvent(
 ): boolean {
   const normalizedEventName = eventName.trim();
 
-  if (!normalizedEventName || !initDashboardAmplitude(activeUserId)) {
+  if (!normalizedEventName || !hasAnalyticsConsent() || !initDashboardAmplitude(activeUserId)) {
     return false;
   }
 

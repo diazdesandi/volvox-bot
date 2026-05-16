@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CookiePreferencesButton } from '@/components/layout/cookie-preferences-button';
 
 const footerLinks = [
   {
@@ -50,6 +51,7 @@ export function SiteFooter() {
               </Link>
             ),
           )}
+          <CookiePreferencesButton />
         </nav>
 
         {/* Brand + social */}
