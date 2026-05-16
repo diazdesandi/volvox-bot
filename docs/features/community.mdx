@@ -25,11 +25,37 @@ Community features help your server members engage and show off their activity. 
 
 ## Starboard
 
-Open **Config → Community Tools → Starboard**, enable the feature, select a destination channel, set the reaction threshold, and select either a specific emoji or **Any**.
+Starboard reposts popular messages into a dedicated channel once they collect enough reactions. Use it to spotlight memes, highlights, or community wins without anyone needing to pin them by hand.
 
-React to messages in a normal source channel, not in the starboard destination channel. The bot ignores messages posted in the destination channel, so it doesn't repost its own starboard entries.
+### When to use it
 
-The bot creates starboard posts from reaction events. It doesn't backfill existing messages that already met the threshold before you enabled starboard or changed the threshold. To trigger the first post, remove and re-add one qualifying reaction, or add another qualifying reaction.
+- You want a "hall of fame" channel that fills itself based on community reactions.
+- You want members to curate content with reactions instead of relying on moderators.
+- You want a single emoji (for example, ⭐) to act as a vote, or you want any emoji over the threshold to qualify.
+
+### Set it up
+
+1. Open **Config → Community Tools → Starboard**.
+2. Toggle **Enabled** on.
+3. Select a **Destination channel** where reposts will land. Use a channel different from where members usually chat.
+4. Set the **Reaction threshold** — the number of reactions a message needs before it's reposted.
+5. Select an **Emoji**: a specific emoji (like ⭐) or **Any** to count every emoji.
+6. Save your changes.
+
+### How it works
+
+- Starboard reacts to live reaction events. Messages that already met the threshold before you enabled Starboard or changed the threshold are not backfilled. To trigger a repost on an older message, remove and re-add a qualifying reaction, or add another one.
+- React to messages in normal channels, not in the Starboard destination channel itself. Messages posted in the destination channel are skipped so the bot doesn't repost its own entries back into the same channel.
+- Each qualifying message is reposted only once. Additional reactions after the first repost don't create duplicates.
+
+### Configuration reference
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| Enabled | Turn Starboard on or off | Off |
+| Destination channel | Channel where popular messages are reposted | None |
+| Reaction threshold | Number of reactions needed to qualify | 3 |
+| Emoji | Specific emoji to count, or **Any** to count every emoji | Any |
 
 <Callout type="tip">
 Community Hubs let non-members see your server's public face — great for recruitment.
@@ -47,7 +73,6 @@ Servers without Community Hubs enabled stay hidden from members who lack managem
 |---------|-------------|---------|
 | Engagement tracking | Track messages and reactions for XP and badges | On |
 | Reputation (XP) | Award XP per message, reaction, and event | On |
-| Starboard | Repost messages once reactions meet the configured threshold | Off |
 | Leaderboard visibility | Public or members-only | Public |
 | XP system | Configure how members earn XP | Built-in defaults |
 | Showcases | Which stats to highlight | Top members |
