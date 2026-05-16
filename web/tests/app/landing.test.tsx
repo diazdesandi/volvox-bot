@@ -106,7 +106,7 @@ describe.skip('LandingPage', () => {
     expect(screen.getByRole('button', { name: /toggle theme/i })).toBeInTheDocument();
   });
 
-  it('renders the product showcase section', () => {
+  it('renders the product preview section', () => {
     render(<LandingPage />);
     expect(screen.getByText('THE PRODUCT')).toBeInTheDocument();
   });

@@ -1,6 +1,6 @@
 /**
  * Tests for src/api/routes/community.js
- * Covers public leaderboard, showcases, stats, profile endpoints + privacy + rate limiting.
+ * Covers public leaderboard, stats, profile endpoints + privacy + rate limiting.
  */
 import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -173,69 +173,10 @@ describe('community routes', () => {
     });
   });
 
-  // ─── Showcases ────────────────────────────────────────────────────────────
+  // ─── Removed project gallery ──────────────────────────────────────────────
 
-  describe('GET /api/v1/community/:guildId/showcases', () => {
-    it('returns showcases sorted by upvotes by default', async () => {
-      mockPool.query.mockResolvedValueOnce({ rows: [{ total: 1 }] }).mockResolvedValueOnce({
-        rows: [
-          {
-            id: 1,
-            name: 'Cool Project',
-            description: 'A cool thing',
-            tech_stack: ['React', 'Node'],
-            repo_url: 'https://github.com/test/cool',
-            live_url: 'https://cool.app',
-            author_id: PUBLIC_USER,
-            upvotes: 42,
-            created_at: '2024-06-15T00:00:00Z',
-          },
-        ],
-      });
-
-      const res = await request(app).get(`/api/v1/community/${GUILD_ID}/showcases`).expect(200);
-
-      expect(res.body.projects).toHaveLength(1);
-      expect(res.body.projects[0]).toMatchObject({
-        id: 1,
-        title: 'Cool Project',
-        tech: ['React', 'Node'],
-        authorName: 'Alice',
-        upvotes: 42,
-      });
-      expect(res.body.total).toBe(1);
-
-      // Verify ORDER BY upvotes
-      const projectsCall = mockPool.query.mock.calls[1];
-      expect(projectsCall[0]).toContain('upvotes DESC');
-    });
-
-    it('supports sort=recent', async () => {
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-        .mockResolvedValueOnce({ rows: [] });
-
-      await request(app).get(`/api/v1/community/${GUILD_ID}/showcases?sort=recent`).expect(200);
-
-      const projectsCall = mockPool.query.mock.calls[1];
-      expect(projectsCall[0]).toContain('created_at DESC');
-    });
-
-    it('caps limit at 50', async () => {
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-        .mockResolvedValueOnce({ rows: [] });
-
-      await request(app).get(`/api/v1/community/${GUILD_ID}/showcases?limit=200`).expect(200);
-
-      const projectsCall = mockPool.query.mock.calls[1];
-      expect(projectsCall[1][1]).toBe(50);
-    });
-
-    it('returns 503 when database unavailable', async () => {
-      const appNoDb = createApp(mockClient, null);
-      await request(appNoDb).get(`/api/v1/community/${GUILD_ID}/showcases`).expect(503);
-    });
+  it('does not expose the removed project gallery endpoint', async () => {
+    await request(app).get(`/api/v1/community/${GUILD_ID}/showcases`).expect(404);
   });
 
   // ─── Stats ────────────────────────────────────────────────────────────────
@@ -245,7 +186,6 @@ describe('community routes', () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ count: 42 }] }) // memberCount
         .mockResolvedValueOnce({ rows: [{ total: 1337 }] }) // totalMessagesSent (all-time)
-        .mockResolvedValueOnce({ rows: [{ count: 15 }] }) // activeProjects
         .mockResolvedValueOnce({ rows: [{ count: 88 }] }) // challengesCompleted
         .mockResolvedValueOnce({
           rows: [{ user_id: PUBLIC_USER, xp: 500, level: 2 }],
@@ -256,7 +196,6 @@ describe('community routes', () => {
       expect(res.body).toMatchObject({
         memberCount: 42,
         totalMessagesSent: 1337,
-        activeProjects: 15,
         challengesCompleted: 88,
       });
       expect(res.body.topContributors).toHaveLength(1);
@@ -281,7 +220,7 @@ describe('community routes', () => {
   // ─── Profile ──────────────────────────────────────────────────────────────
 
   describe('GET /api/v1/community/:guildId/profile/:userId', () => {
-    it('returns public profile with stats, projects, and badges', async () => {
+    it('returns public profile with stats and badges', async () => {
       mockPool.query
         .mockResolvedValueOnce({
           rows: [
@@ -298,21 +237,7 @@ describe('community routes', () => {
         }) // user_stats
         .mockResolvedValueOnce({
           rows: [{ xp: 500, level: 2, messages_count: 100, voice_minutes: 0, helps_given: 5 }],
-        }) // reputation
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 1,
-              name: 'My Project',
-              description: 'Awesome',
-              tech_stack: ['TypeScript'],
-              repo_url: 'https://github.com/test',
-              live_url: null,
-              upvotes: 10,
-              created_at: '2024-06-01T00:00:00Z',
-            },
-          ],
-        }); // showcases
+        }); // reputation
 
       const res = await request(app)
         .get(`/api/v1/community/${GUILD_ID}/profile/${PUBLIC_USER}`)
@@ -329,7 +254,7 @@ describe('community routes', () => {
           daysActive: 35,
         },
       });
-      expect(res.body.projects).toHaveLength(1);
+      expect(res.body).not.toHaveProperty('projects');
       expect(res.body.recentBadges.length).toBeGreaterThan(0);
     });
 
@@ -403,43 +328,6 @@ describe('community routes', () => {
 
       expect(res.body.error).toBe('Profile not found');
     });
-
-    it('showcases query filters out private users via public_profile = TRUE', async () => {
-      // After fix: both count and data queries JOIN user_stats and filter by public_profile.
-      // The DB does the filtering; we verify the SQL contains the privacy guard.
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ total: 1 }] }) // count (only public users)
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 10,
-              name: 'Public Project',
-              description: 'By a public user',
-              tech_stack: ['Node'],
-              repo_url: null,
-              live_url: null,
-              author_id: PUBLIC_USER,
-              upvotes: 5,
-              created_at: '2024-06-01T00:00:00Z',
-            },
-          ],
-        }); // data (private user row excluded by SQL JOIN + filter)
-
-      const res = await request(app).get(`/api/v1/community/${GUILD_ID}/showcases`).expect(200);
-
-      // SQL must include the privacy guard on both count and data queries
-      expect(mockPool.query.mock.calls[0][0]).toContain('public_profile = TRUE');
-      expect(mockPool.query.mock.calls[1][0]).toContain('public_profile = TRUE');
-
-      // Only the public user's project is in the response
-      expect(res.body.projects).toHaveLength(1);
-      expect(res.body.projects[0].title).toBe('Public Project');
-      expect(res.body.projects[0].authorName).toBe('Alice'); // resolved via batch member fetch
-
-      // Private user's project is NOT present
-      const authorNames = res.body.projects.map((p) => p.authorName);
-      expect(authorNames).not.toContain(PRIVATE_USER);
-    });
   });
 
   // ─── No Auth Required ────────────────────────────────────────────────────
@@ -453,19 +341,10 @@ describe('community routes', () => {
       await request(app).get(`/api/v1/community/${GUILD_ID}/leaderboard`).expect(200);
     });
 
-    it('showcases works without auth headers', async () => {
-      mockPool.query
-        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-        .mockResolvedValueOnce({ rows: [] });
-
-      await request(app).get(`/api/v1/community/${GUILD_ID}/showcases`).expect(200);
-    });
-
     it('stats works without auth headers', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ count: 0 }] })
         .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-        .mockResolvedValueOnce({ rows: [{ count: 0 }] })
         .mockResolvedValueOnce({ rows: [{ count: 0 }] })
         .mockResolvedValueOnce({ rows: [] });
 
@@ -481,14 +360,6 @@ describe('community routes', () => {
   });
 
   // ─── Additional coverage ──────────────────────────────────────────────────
-
-  describe('showcases error handling', () => {
-    it('returns 500 on database error', async () => {
-      mockPool.query.mockRejectedValueOnce(new Error('DB down'));
-
-      await request(app).get(`/api/v1/community/${GUILD_ID}/showcases`).expect(500);
-    });
-  });
 
   describe('profile badge coverage', () => {
     it('returns all badge types for power users', async () => {
@@ -508,40 +379,6 @@ describe('community routes', () => {
         })
         .mockResolvedValueOnce({
           rows: [{ xp: 2000, level: 5, messages_count: 500, voice_minutes: 10, helps_given: 20 }],
-        })
-        .mockResolvedValueOnce({
-          rows: [
-            {
-              id: 1,
-              name: 'P1',
-              description: 'd',
-              tech_stack: [],
-              repo_url: null,
-              live_url: null,
-              upvotes: 1,
-              created_at: '2024-06-01',
-            },
-            {
-              id: 2,
-              name: 'P2',
-              description: 'd',
-              tech_stack: [],
-              repo_url: null,
-              live_url: null,
-              upvotes: 2,
-              created_at: '2024-06-02',
-            },
-            {
-              id: 3,
-              name: 'P3',
-              description: 'd',
-              tech_stack: [],
-              repo_url: null,
-              live_url: null,
-              upvotes: 3,
-              created_at: '2024-06-03',
-            },
-          ],
         });
 
       const res = await request(app)
@@ -554,9 +391,7 @@ describe('community routes', () => {
       expect(badgeNames).toContain('📅 Monthly Regular');
       expect(badgeNames).toContain('🔄 Week Warrior');
       expect(badgeNames).toContain('❤️ Generous');
-      expect(badgeNames).toContain('🚀 Prolific Builder');
-      expect(badgeNames).toContain('🛠️ Builder');
-      expect(res.body.projects).toHaveLength(3);
+      expect(res.body).not.toHaveProperty('projects');
     });
 
     it('profile works when user has no reputation row', async () => {
@@ -574,8 +409,7 @@ describe('community routes', () => {
             },
           ],
         })
-        .mockResolvedValueOnce({ rows: [] }) // no reputation
-        .mockResolvedValueOnce({ rows: [] }); // no showcases
+        .mockResolvedValueOnce({ rows: [] }); // no reputation
 
       const res = await request(app)
         .get(`/api/v1/community/${GUILD_ID}/profile/${PUBLIC_USER}`)

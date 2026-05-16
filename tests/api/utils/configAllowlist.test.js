@@ -23,6 +23,10 @@ describe('configAllowlist', () => {
       expect(SAFE_CONFIG_KEYS.has('tickets')).toBe(true);
       expect(SAFE_CONFIG_KEYS.has('botStatus')).toBe(true);
     });
+
+    it('should not allow removed showcase config writes', () => {
+      expect(SAFE_CONFIG_KEYS.has('showcase')).toBe(false);
+    });
   });
 
   describe('READABLE_CONFIG_KEYS', () => {

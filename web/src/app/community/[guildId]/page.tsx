@@ -1,10 +1,9 @@
-import { ExternalLink, MessageSquare, Rocket, ThumbsUp, Trophy, Users } from 'lucide-react';
+import { MessageSquare, Trophy, Users } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GithubIcon } from '@/components/ui/github-icon';
 import { getBotApiBaseUrl } from '@/lib/bot-api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,23 +21,9 @@ interface LeaderboardMember {
   nextLevelXp: number;
 }
 
-interface ShowcaseProject {
-  id: number;
-  title: string;
-  description: string;
-  tech: string[];
-  repoUrl: string | null;
-  liveUrl: string | null;
-  authorName: string;
-  authorAvatar: string | null;
-  upvotes: number;
-  createdAt: string;
-}
-
 interface CommunityStats {
   memberCount: number;
   totalMessagesSent: number;
-  activeProjects: number;
   challengesCompleted: number;
   topContributors: {
     userId: string;
@@ -93,29 +78,6 @@ async function fetchLeaderboard(
   }
 }
 
-/**
- * Fetches the top showcase projects for a guild, sorted by upvotes.
- *
- * @param guildId - The guild identifier to fetch showcases for.
- * @returns An object with `projects` (array of showcase projects) and `total` (total number of showcases), or `null` if the request fails or the response is not OK.
- */
-async function fetchShowcases(
-  guildId: string,
-): Promise<{ projects: ShowcaseProject[]; total: number } | null> {
-  try {
-    const res = await fetch(
-      `${API_BASE}/community/${guildId}/showcases?limit=12&page=1&sort=upvotes`,
-      {
-        next: { revalidate: 60 },
-      },
-    );
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
-
 // ─── SEO ──────────────────────────────────────────────────────────────────────
 
 interface PageProps {
@@ -125,7 +87,7 @@ interface PageProps {
 /**
  * Builds page metadata for the Community Hub, using guild statistics when available.
  *
- * If stats are available the description includes member count, active projects, and challenges completed;
+ * If stats are available the description includes member count and challenges completed;
  * otherwise a generic description is used. The returned metadata also includes Open Graph and Twitter card fields.
  *
  * @param params - Promise resolving to route parameters; expects `guildId` to fetch community stats
@@ -135,10 +97,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { guildId } = await params;
   const stats = await fetchStats(guildId);
 
-  const title = 'Community Hub — Leaderboard & Showcases';
+  const title = 'Community Hub — Leaderboard & Stats';
   const description = stats
-    ? `Join ${stats.memberCount} public members. ${stats.activeProjects} projects showcased, ${stats.challengesCompleted} challenges completed.`
-    : 'Explore our community leaderboard, project showcases, and stats.';
+    ? `Join ${stats.memberCount} public members. ${stats.challengesCompleted} challenges completed.`
+    : 'Explore our community leaderboard and stats.';
 
   return {
     title,
@@ -282,20 +244,16 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 /**
- * Renders the Community Hub page for a given guild, displaying stats, a leaderboard, top contributors, and project showcases.
+ * Renders the Community Hub page for a given guild, displaying stats, a leaderboard, and top contributors.
  *
  * @param params - An object containing `guildId`, the identifier of the community to display.
- * @returns The page's React element containing community statistics, leaderboard entries, contributor highlights, and project showcase cards.
+ * @returns The page's React element containing community statistics, leaderboard entries, and contributor highlights.
  */
 
 export default async function CommunityPage({ params }: PageProps) {
   const { guildId } = await params;
 
-  const [stats, leaderboard, showcases] = await Promise.all([
-    fetchStats(guildId),
-    fetchLeaderboard(guildId),
-    fetchShowcases(guildId),
-  ]);
+  const [stats, leaderboard] = await Promise.all([fetchStats(guildId), fetchLeaderboard(guildId)]);
 
   return (
     <main className="min-h-screen bg-background">
@@ -303,22 +261,19 @@ export default async function CommunityPage({ params }: PageProps) {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2">Community Hub</h1>
-          <p className="text-muted-foreground text-lg">
-            Leaderboards, showcases, and community stats
-          </p>
+          <p className="text-muted-foreground text-lg">Leaderboards and community stats</p>
         </div>
 
         {/* Stats Banner */}
         {stats && (
           <section className="mb-10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <StatCard icon={Users} label="Public Members" value={stats.memberCount} />
               <StatCard
                 icon={MessageSquare}
                 label="Total Messages Sent"
                 value={stats.totalMessagesSent.toLocaleString()}
               />
-              <StatCard icon={Rocket} label="Projects" value={stats.activeProjects} />
               <StatCard
                 icon={Trophy}
                 label="Challenges Completed"
@@ -412,75 +367,6 @@ export default async function CommunityPage({ params }: PageProps) {
             </section>
           )}
         </div>
-
-        {/* Showcase Gallery */}
-        {showcases && showcases.projects.length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-              <Rocket className="h-6 w-6" />
-              Project Showcase
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {showcases.projects.map((project) => (
-                <Card key={project.id} className="flex flex-col">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{project.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">
-                      {project.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex flex-col justify-between gap-4">
-                    <div className="flex flex-wrap gap-1.5">
-                      {project.tech.map((t) => (
-                        <Badge key={t} variant="outline" className="text-xs">
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MemberAvatar
-                          avatar={project.authorAvatar}
-                          name={project.authorName}
-                          size="sm"
-                        />
-                        <span className="text-sm text-muted-foreground">{project.authorName}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <ThumbsUp className="h-3.5 w-3.5" />
-                          {project.upvotes}
-                        </span>
-                        {project.repoUrl && (
-                          <a
-                            href={project.repoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="View repository"
-                          >
-                            <GithubIcon className="h-4 w-4" />
-                          </a>
-                        )}
-                        {project.liveUrl && (
-                          <a
-                            href={project.liveUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="View live demo"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Privacy Notice */}
         <div className="mt-12 text-center text-sm text-muted-foreground">

@@ -71,7 +71,7 @@ const DYNAMIC_VARIABLE_DEFINITIONS = [
   {
     name: 'topChannels',
     description: 'Trending channels',
-    sample: '#general, #projects, #showcase',
+    sample: '#general, #projects, #announcements',
   },
 ] as const;
 const INTRODUCTION_VARIABLE_DEFINITIONS = [

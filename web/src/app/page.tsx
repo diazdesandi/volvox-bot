@@ -5,10 +5,10 @@ import { FeatureGrid, Footer, Hero } from '@/components/landing';
 import { LandingNavbar } from '@/components/layout/LandingNavbar';
 
 // Lower-fold sections lazy-loaded with fixed skeletons to prevent scroll-jump
-const DashboardShowcase = dynamic(
+const DashboardPreview = dynamic(
   () =>
-    import('@/components/landing/DashboardShowcase').then((m) => ({
-      default: m.DashboardShowcase,
+    import('@/components/landing/DashboardPreview').then((m) => ({
+      default: m.DashboardPreview,
     })),
   {
     ssr: false,
@@ -44,9 +44,9 @@ export default function LandingPage() {
       {/* Hero Section */}
       <Hero />
 
-      {/* Dashboard Showcase */}
+      {/* Dashboard Preview */}
       <div id="dashboard">
-        <DashboardShowcase />
+        <DashboardPreview />
       </div>
 
       {/* Competitor Comparison */}

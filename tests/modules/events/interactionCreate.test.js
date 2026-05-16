@@ -5,8 +5,6 @@ const {
   handlePollButton,
   handleChallengeButton,
   handleReviewButton,
-  handleShowcaseButton,
-  handleShowcaseModal,
   handleTicketOpenButton,
   handleTicketModal,
   handleTicketCloseButton,
@@ -17,8 +15,6 @@ const {
   handlePollButton: vi.fn(),
   handleChallengeButton: vi.fn(),
   handleReviewButton: vi.fn(),
-  handleShowcaseButton: vi.fn(),
-  handleShowcaseModal: vi.fn(),
   handleTicketOpenButton: vi.fn(),
   handleTicketModal: vi.fn(),
   handleTicketCloseButton: vi.fn(),
@@ -37,10 +33,6 @@ vi.mock('../../../src/modules/handlers/challengeHandler.js', () => ({
 }));
 vi.mock('../../../src/modules/handlers/reviewHandler.js', () => ({
   handleReviewButton,
-}));
-vi.mock('../../../src/modules/handlers/showcaseHandler.js', () => ({
-  handleShowcaseButton,
-  handleShowcaseModal,
 }));
 vi.mock('../../../src/modules/handlers/ticketHandler.js', () => ({
   handleTicketOpenButton,
@@ -63,8 +55,6 @@ beforeEach(() => {
   handlePollButton.mockResolvedValue(false);
   handleChallengeButton.mockResolvedValue(false);
   handleReviewButton.mockResolvedValue(false);
-  handleShowcaseButton.mockResolvedValue(false);
-  handleShowcaseModal.mockResolvedValue(false);
   handleTicketOpenButton.mockResolvedValue(false);
   handleTicketModal.mockResolvedValue(false);
   handleTicketCloseButton.mockResolvedValue(false);

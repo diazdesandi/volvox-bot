@@ -35,7 +35,7 @@ vi.mock('gsap', () => ({
 vi.mock('gsap/ScrollTrigger', () => ({ ScrollTrigger: {} }));
 vi.mock('@gsap/react', () => ({ useGSAP: vi.fn() }));
 
-import { DashboardShowcase } from '@/components/landing/DashboardShowcase';
+import { DashboardPreview } from '@/components/landing/DashboardPreview';
 
 const mockStats = {
   servers: 42,
@@ -47,7 +47,7 @@ const mockStats = {
   cachedAt: '2026-03-25T12:00:00.000Z',
 };
 
-describe('DashboardShowcase', () => {
+describe('DashboardPreview', () => {
   const originalRaf = globalThis.requestAnimationFrame;
   const originalCaf = globalThis.cancelAnimationFrame;
   let nextHandle = 1;
@@ -80,7 +80,7 @@ describe('DashboardShowcase', () => {
       json: async () => mockStats,
     } as Response);
 
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
     expect(screen.getByText('Control Center')).toBeInTheDocument();
     expect(screen.getByText('Your server, at a glance')).toBeInTheDocument();
   });
@@ -91,7 +91,7 @@ describe('DashboardShowcase', () => {
       json: async () => mockStats,
     } as Response);
 
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
     expect(screen.getByText('Server Activity')).toBeInTheDocument();
     expect(screen.getByText('Moderation')).toBeInTheDocument();
     expect(screen.getByText('AI Chat')).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe('DashboardShowcase', () => {
       json: async () => mockStats,
     } as Response);
 
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
     await waitFor(() => {
       expect(screen.getByText('12.8K')).toBeInTheDocument();
       expect(screen.getByText('48.2K')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('DashboardShowcase', () => {
 
   it('should render loading skeletons initially', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
     // Loading state shows animate-pulse skeleton divs and the section header
     expect(screen.getByText('Control Center')).toBeInTheDocument();
     expect(screen.getByText('Your server, at a glance')).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('DashboardShowcase', () => {
 
   it('should render error fallback dashes on fetch failure', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'));
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
     await waitFor(() => {
       expect(screen.getAllByText('—')).toHaveLength(3);
     });
@@ -134,7 +134,7 @@ describe('DashboardShowcase', () => {
       json: async () => mockStats,
     } as Response);
 
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
     expect(screen.getByText('LIVE')).toBeInTheDocument();
   });
 
@@ -153,7 +153,7 @@ describe('DashboardShowcase', () => {
       }),
     } as Response);
 
-    render(<DashboardShowcase />);
+    render(<DashboardPreview />);
 
     await waitFor(() => {
       expect(screen.getByText('Messages (4)')).toBeInTheDocument();

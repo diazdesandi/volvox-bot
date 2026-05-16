@@ -89,11 +89,6 @@ export function CommunityToolsCategory() {
                   },
                   { key: 'poll', label: 'Polls', desc: '/poll for community voting' },
                   {
-                    key: 'showcase',
-                    label: 'Project Showcase',
-                    desc: '/showcase to browse projects',
-                  },
-                  {
                     key: 'review',
                     label: 'Code Reviews',
                     desc: '/review for peer review requests',

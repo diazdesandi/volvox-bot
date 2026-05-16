@@ -1,19 +1,10 @@
-import {
-  ArrowLeft,
-  Calendar,
-  ExternalLink,
-  Heart,
-  MessageSquare,
-  ThumbsUp,
-  Zap,
-} from 'lucide-react';
+import { ArrowLeft, Calendar, Heart, MessageSquare, Zap } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { GithubIcon } from '@/components/ui/github-icon';
+import { Card, CardContent } from '@/components/ui/card';
 import { getBotApiBaseUrl } from '@/lib/bot-api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -34,16 +25,6 @@ interface UserProfile {
     reactionsReceived: number;
     daysActive: number;
   };
-  projects: {
-    id: number;
-    title: string;
-    description: string;
-    tech: string[];
-    repoUrl: string | null;
-    liveUrl: string | null;
-    upvotes: number;
-    createdAt: string;
-  }[];
   recentBadges: {
     name: string;
     description: string;
@@ -98,7 +79,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const title = `${profile.displayName} — Community Profile`;
-  const description = `Level ${profile.level} ${profile.badge} · ${profile.xp.toLocaleString()} XP · ${profile.stats.messagesSent.toLocaleString()} messages · ${profile.projects.length} projects`;
+  const description = `Level ${profile.level} ${profile.badge} · ${profile.xp.toLocaleString()} XP · ${profile.stats.messagesSent.toLocaleString()} messages`;
 
   return {
     title,
@@ -191,7 +172,7 @@ function XpBar({
  * Render the community member profile page for the given guild and user.
  *
  * Fetches the user's profile and returns the page markup showing avatar, basic info,
- * level and XP, stats, recent badges, and projects. Triggers a 404 page when the profile
+ * level and XP, stats, and recent badges. Triggers a 404 page when the profile
  * cannot be found.
  *
  * @param params - Object containing `guildId` and `userId` path parameters
@@ -303,62 +284,6 @@ export default async function ProfilePage({ params }: PageProps) {
                 >
                   {badge.name}
                 </Badge>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Projects */}
-        {profile.projects.length > 0 && (
-          <section>
-            <h2 className="text-lg font-semibold mb-4">Projects</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {profile.projects.map((project) => (
-                <Card key={project.id}>
-                  <CardHeader>
-                    <CardTitle className="text-base">{project.title}</CardTitle>
-                    <CardDescription className="line-clamp-2">
-                      {project.description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {project.tech.map((t) => (
-                        <Badge key={t} variant="outline" className="text-xs">
-                          {t}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <ThumbsUp className="h-3.5 w-3.5" />
-                        {project.upvotes}
-                      </span>
-                      {project.repoUrl && (
-                        <a
-                          href={project.repoUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="View repository"
-                        >
-                          <GithubIcon className="h-4 w-4" />
-                        </a>
-                      )}
-                      {project.liveUrl && (
-                        <a
-                          href={project.liveUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                          aria-label="View live demo"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
               ))}
             </div>
           </section>

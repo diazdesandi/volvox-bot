@@ -17,11 +17,6 @@ const COMMUNITY_FEATURES = [
   { key: 'snippet', label: 'Code Snippets', desc: '/snippet for saving and sharing code' },
   { key: 'poll', label: 'Polls', desc: '/poll for community voting' },
   {
-    key: 'showcase',
-    label: 'Project Showcase',
-    desc: '/showcase to submit, browse, and upvote projects',
-  },
-  {
     key: 'review',
     label: 'Code Reviews',
     desc: '/review peer code review requests with claim workflow',

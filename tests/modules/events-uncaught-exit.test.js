@@ -62,10 +62,6 @@ vi.mock('../../src/modules/reputation.js', () => ({
 vi.mock('../../src/modules/reviewHandler.js', () => ({
   handleReviewClaim: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../../src/commands/showcase.js', () => ({
-  handleShowcaseUpvote: vi.fn().mockResolvedValue(undefined),
-  handleShowcaseModalSubmit: vi.fn().mockResolvedValue(undefined),
-}));
 vi.mock('../../src/modules/challengeScheduler.js', () => ({
   handleSolveButton: vi.fn().mockResolvedValue(undefined),
   handleHintButton: vi.fn().mockResolvedValue(undefined),

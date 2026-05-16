@@ -90,7 +90,7 @@
     "src/components/landing/index.ts",
     "src/components/landing/AnimatedCounter.tsx",
     "src/components/landing/ComparisonTable.tsx",
-    "src/components/landing/DashboardShowcase.tsx",
+    "src/components/landing/DashboardPreview.tsx",
     "src/components/landing/FeatureGrid.tsx",
     "src/components/landing/Footer.tsx",
     "src/components/landing/Hero.tsx",

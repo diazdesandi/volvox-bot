@@ -135,7 +135,7 @@ Current section order:
 
 1. `LandingNavbar`
 2. `Hero`
-3. `DashboardShowcase`
+3. `DashboardPreview`
 4. `ComparisonTable`
 5. `FeatureGrid`
 6. `Stats`
@@ -164,9 +164,9 @@ The hero is brand-first.
 - Background uses prismatic shard, grid overlay, grain, vignette, vertical data threads, and small particles.
 - Scroll parallax and entrance animation use GSAP and Framer Motion.
 
-### Dashboard Showcase
+### Dashboard Preview
 
-The showcase is a mock dashboard browser window.
+The dashboard preview is a mock dashboard browser window.
 
 - Large rounded window with title bar and faux controls.
 - KPI row: members, commands served, servers.

@@ -476,7 +476,6 @@ export interface BotConfig {
   announce?: ToggleSectionConfig;
   snippet?: ToggleSectionConfig;
   poll?: ToggleSectionConfig;
-  showcase?: ToggleSectionConfig;
   tldr?: TldrConfig;
   reputation?: ReputationConfig;
   xp?: XpConfig;
@@ -503,7 +502,6 @@ export type ConfigSection =
   | 'announce'
   | 'snippet'
   | 'poll'
-  | 'showcase'
   | 'tldr'
   | 'reputation'
   | 'xp'

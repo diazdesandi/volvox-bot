@@ -17,7 +17,6 @@ export const SAFE_CONFIG_KEYS = new Set([
   'announce',
   'snippet',
   'poll',
-  'showcase',
   'tldr',
   'reputation',
   'engagement',

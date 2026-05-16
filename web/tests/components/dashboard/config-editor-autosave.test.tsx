@@ -132,7 +132,6 @@ const minimalConfig = {
   announce: { enabled: false },
   snippet: { enabled: false },
   poll: { enabled: false },
-  showcase: { enabled: false },
   review: { enabled: false },
   tldr: { enabled: false, defaultMessages: 25, maxMessages: 100, cooldownSeconds: 30 },
 };

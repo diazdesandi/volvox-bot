@@ -1,6 +1,6 @@
 /**
  * Community Routes — Public API
- * Public endpoints for community leaderboards, showcases, stats, and profiles.
+ * Public endpoints for community leaderboards, stats, and profiles.
  * NO authentication required. Heavy rate limiting applied.
  *
  * @see https://github.com/VolvoxLLC/volvox-bot/issues/36
@@ -217,169 +217,6 @@ router.get('/:guildId/leaderboard', async (req, res) => {
   }
 });
 
-// ─── GET /:guildId/showcases ──────────────────────────────────────────────────
-
-/**
- * @openapi
- * /community/{guildId}/showcases:
- *   get:
- *     tags:
- *       - Community
- *     summary: Project showcase gallery
- *     description: Returns community project showcases sorted by upvotes or recency. No auth required.
- *     parameters:
- *       - in: path
- *         name: guildId
- *         required: true
- *         schema:
- *           type: string
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 12
- *           minimum: 1
- *           maximum: 50
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *       - in: query
- *         name: sort
- *         schema:
- *           type: string
- *           enum: [upvotes, recent]
- *           default: upvotes
- *     responses:
- *       "200":
- *         description: Showcase gallery page
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 projects:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       title:
- *                         type: string
- *                       description:
- *                         type: string
- *                       tech:
- *                         type: array
- *                         items:
- *                           type: string
- *                       repoUrl:
- *                         type: string
- *                         nullable: true
- *                       liveUrl:
- *                         type: string
- *                         nullable: true
- *                       authorName:
- *                         type: string
- *                       authorAvatar:
- *                         type: string
- *                         nullable: true
- *                       upvotes:
- *                         type: integer
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *                 total:
- *                   type: integer
- *                 page:
- *                   type: integer
- *       "429":
- *         $ref: "#/components/responses/RateLimited"
- *       "500":
- *         $ref: "#/components/responses/ServerError"
- *       "503":
- *         $ref: "#/components/responses/ServiceUnavailable"
- */
-router.get('/:guildId/showcases', async (req, res) => {
-  const { guildId } = req.params;
-  const pool = getDbPool(req);
-  if (!pool) return res.status(503).json({ error: 'Database not available' });
-
-  let limit = Number.parseInt(req.query.limit, 10) || 12;
-  let page = Number.parseInt(req.query.page, 10) || 1;
-  if (limit < 1) limit = 1;
-  if (limit > 50) limit = 50;
-  if (page < 1) page = 1;
-  const offset = (page - 1) * limit;
-
-  const sort = req.query.sort === 'recent' ? 'recent' : 'upvotes';
-  const orderBy = sort === 'recent' ? 's.created_at DESC' : 's.upvotes DESC, s.created_at DESC';
-
-  try {
-    const [countResult, projectsResult] = await Promise.all([
-      pool.query(
-        `SELECT COUNT(*)::int AS total
-         FROM showcases s
-         INNER JOIN user_stats us ON us.guild_id = s.guild_id AND us.user_id = s.author_id
-         WHERE s.guild_id = $1 AND us.public_profile = TRUE`,
-        [guildId],
-      ),
-      pool.query(
-        `SELECT s.id, s.name, s.description, s.tech_stack, s.repo_url, s.live_url,
-                s.author_id, s.upvotes, s.created_at
-         FROM showcases s
-         INNER JOIN user_stats us ON us.guild_id = s.guild_id AND us.user_id = s.author_id
-         WHERE s.guild_id = $1 AND us.public_profile = TRUE
-         ORDER BY ${orderBy}
-         LIMIT $2 OFFSET $3`,
-        [guildId, limit, offset],
-      ),
-    ]);
-
-    const total = countResult.rows[0]?.total ?? 0;
-    const { client } = req.app.locals;
-    const guild = client?.guilds?.cache?.get(guildId);
-
-    const authorIds = projectsResult.rows.map((r) => r.author_id);
-    const fetchedAuthors = guild
-      ? await guild.members.fetch({ user: authorIds }).catch(() => new Map())
-      : new Map();
-
-    const projects = projectsResult.rows.map((row) => {
-      let authorName = row.author_id;
-      let authorAvatar = null;
-
-      const member = fetchedAuthors.get(row.author_id);
-      if (member) {
-        authorName = member.displayName;
-        authorAvatar = member.user.displayAvatarURL();
-      }
-
-      return {
-        id: row.id,
-        title: row.name,
-        description: row.description,
-        tech: row.tech_stack || [],
-        repoUrl: row.repo_url,
-        liveUrl: row.live_url,
-        authorName,
-        authorAvatar,
-        upvotes: row.upvotes,
-        createdAt: row.created_at,
-      };
-    });
-
-    res.json({ projects, total, page });
-  } catch (err) {
-    logError('Failed to fetch community showcases', {
-      error: err.message,
-      guildId,
-    });
-    res.status(500).json({ error: 'Failed to fetch showcases' });
-  }
-});
-
 // ─── GET /:guildId/stats ──────────────────────────────────────────────────────
 
 /**
@@ -389,7 +226,7 @@ router.get('/:guildId/showcases', async (req, res) => {
  *     tags:
  *       - Community
  *     summary: Community statistics
- *     description: Returns aggregate community statistics including member count, messages, projects, and top contributors. No auth required.
+ *     description: Returns aggregate community statistics including member count, messages, challenges, and top contributors. No auth required.
  *     parameters:
  *       - in: path
  *         name: guildId
@@ -409,8 +246,6 @@ router.get('/:guildId/showcases', async (req, res) => {
  *                 totalMessagesSent:
  *                   type: integer
  *                   description: All-time cumulative message count across all tracked users in the guild (clamped to Number.MAX_SAFE_INTEGER)
- *                 activeProjects:
- *                   type: integer
  *                 challengesCompleted:
  *                   type: integer
  *                 topContributors:
@@ -448,40 +283,32 @@ router.get('/:guildId/stats', async (req, res) => {
   try {
     const xpConfig = getXpConfig(guildId);
 
-    const [memberCount, messagesResult, projectsResult, challengesResult, topContributors] =
-      await Promise.all([
-        pool.query(
-          `SELECT COUNT(*)::int AS count
+    const [memberCount, messagesResult, challengesResult, topContributors] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS count
            FROM user_stats
            WHERE guild_id = $1 AND public_profile = TRUE`,
-          [guildId],
-        ),
-        pool.query(
-          `SELECT COALESCE(SUM(messages_sent), 0)::bigint AS total
+        [guildId],
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(messages_sent), 0)::bigint AS total
            FROM user_stats
            WHERE guild_id = $1`,
-          [guildId],
-        ),
-        pool.query(
-          `SELECT COUNT(*)::int AS count
-           FROM showcases s
-           INNER JOIN user_stats us ON us.guild_id = s.guild_id AND us.user_id = s.author_id
-           WHERE s.guild_id = $1 AND us.public_profile = TRUE`,
-          [guildId],
-        ),
-        pool.query('SELECT COUNT(*)::int AS count FROM challenge_solves WHERE guild_id = $1', [
-          guildId,
-        ]),
-        pool.query(
-          `SELECT us.user_id, r.xp, r.level
+        [guildId],
+      ),
+      pool.query('SELECT COUNT(*)::int AS count FROM challenge_solves WHERE guild_id = $1', [
+        guildId,
+      ]),
+      pool.query(
+        `SELECT us.user_id, r.xp, r.level
            FROM user_stats us
            INNER JOIN reputation r ON r.guild_id = us.guild_id AND r.user_id = us.user_id
            WHERE us.guild_id = $1 AND us.public_profile = TRUE
            ORDER BY r.xp DESC
            LIMIT 3`,
-          [guildId],
-        ),
-      ]);
+        [guildId],
+      ),
+    ]);
 
     const { client } = req.app.locals;
     const guild = client?.guilds?.cache?.get(guildId);
@@ -521,7 +348,6 @@ router.get('/:guildId/stats', async (req, res) => {
         Number(messagesResult.rows[0]?.total ?? 0),
         Number.MAX_SAFE_INTEGER,
       ),
-      activeProjects: projectsResult.rows[0]?.count ?? 0,
       challengesCompleted: challengesResult.rows[0]?.count ?? 0,
       topContributors: top3,
     });
@@ -543,7 +369,7 @@ router.get('/:guildId/stats', async (req, res) => {
  *     tags:
  *       - Community
  *     summary: Public user profile
- *     description: Returns a user's public profile including stats, XP, badges, and project showcases. Returns 404 if the user has not opted in to a public profile.
+ *     description: Returns a user's public profile including stats, XP, and badges. Returns 404 if the user has not opted in to a public profile.
  *     parameters:
  *       - in: path
  *         name: guildId
@@ -595,32 +421,6 @@ router.get('/:guildId/stats', async (req, res) => {
  *                       type: integer
  *                     daysActive:
  *                       type: integer
- *                 projects:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: integer
- *                       title:
- *                         type: string
- *                       description:
- *                         type: string
- *                       tech:
- *                         type: array
- *                         items:
- *                           type: string
- *                       repoUrl:
- *                         type: string
- *                         nullable: true
- *                       liveUrl:
- *                         type: string
- *                         nullable: true
- *                       upvotes:
- *                         type: integer
- *                       createdAt:
- *                         type: string
- *                         format: date-time
  *                 recentBadges:
  *                   type: array
  *                   items:
@@ -661,23 +461,12 @@ router.get('/:guildId/profile/:userId', async (req, res) => {
     const stats = statsResult.rows[0];
     const xpConfig = getXpConfig(guildId);
 
-    // Fetch reputation and showcase data in parallel
-    const [repResult, showcasesResult] = await Promise.all([
-      pool.query(
-        `SELECT xp, level, messages_count, voice_minutes, helps_given
+    const repResult = await pool.query(
+      `SELECT xp, level, messages_count, voice_minutes, helps_given
          FROM reputation
          WHERE guild_id = $1 AND user_id = $2`,
-        [guildId, userId],
-      ),
-      pool.query(
-        `SELECT id, name, description, tech_stack, repo_url, live_url, upvotes, created_at
-         FROM showcases
-         WHERE guild_id = $1 AND author_id = $2
-         ORDER BY created_at DESC
-         LIMIT 10`,
-        [guildId, userId],
-      ),
-    ]);
+      [guildId, userId],
+    );
 
     const rep = repResult.rows[0] || { xp: 0, level: 0 };
     const level = computeLevel(rep.xp, xpConfig.levelThresholds);
@@ -708,17 +497,6 @@ router.get('/:guildId/profile/:userId', async (req, res) => {
       }
     }
 
-    const projects = showcasesResult.rows.map((row) => ({
-      id: row.id,
-      title: row.name,
-      description: row.description,
-      tech: row.tech_stack || [],
-      repoUrl: row.repo_url,
-      liveUrl: row.live_url,
-      upvotes: row.upvotes,
-      createdAt: row.created_at,
-    }));
-
     // Build recent badges based on activity milestones
     const recentBadges = [];
     if (stats.messages_sent >= 1000)
@@ -731,10 +509,6 @@ router.get('/:guildId/profile/:userId', async (req, res) => {
       recentBadges.push({ name: '🔄 Week Warrior', description: '7+ days active' });
     if (stats.reactions_given >= 50)
       recentBadges.push({ name: '❤️ Generous', description: '50+ reactions given' });
-    if (projects.length >= 3)
-      recentBadges.push({ name: '🚀 Prolific Builder', description: '3+ projects showcased' });
-    if (projects.length >= 1)
-      recentBadges.push({ name: '🛠️ Builder', description: 'Has a project showcase' });
 
     res.json({
       username,
@@ -752,7 +526,6 @@ router.get('/:guildId/profile/:userId', async (req, res) => {
         reactionsReceived: stats.reactions_received,
         daysActive: stats.days_active,
       },
-      projects,
       recentBadges,
     });
   } catch (err) {

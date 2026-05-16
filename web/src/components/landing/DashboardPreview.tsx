@@ -29,7 +29,7 @@ interface BotStats {
   cachedAt: string;
 }
 
-export function DashboardShowcase() {
+export function DashboardPreview() {
   const sectionRef = useRef<HTMLElement>(null);
   const [stats, setStats] = useState<BotStats | null>(null);
   const [loading, setLoading] = useState(true);

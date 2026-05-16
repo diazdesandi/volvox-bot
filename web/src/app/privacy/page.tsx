@@ -46,8 +46,8 @@ export default function PrivacyPage() {
               <h3 className={subheadingClassName}>Moderation and community records</h3>
               <p className={bodyClassName}>
                 We store moderation case records, warnings, temporary role actions, user tags,
-                moderator identity, ticket transcripts, showcases, reviews, poll votes, command
-                usage, and engagement data such as XP or reputation where those features are used.
+                moderator identity, ticket transcripts, reviews, poll votes, command usage, and
+                engagement data such as XP or reputation where those features are used.
               </p>
             </div>
             <div className="space-y-2">

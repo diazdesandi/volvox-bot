@@ -1,7 +1,6 @@
 /**
  * Additional tests for src/modules/events.js — handler branches not covered by events.test.js.
- * Covers: registerReviewClaimHandler, registerShowcaseButtonHandler, registerShowcaseModalHandler,
- * registerChallengeButtonHandler, plus edge-case branches in existing handlers.
+ * Covers: registerReviewClaimHandler, registerChallengeButtonHandler, plus edge-case branches in existing handlers.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -48,10 +47,6 @@ vi.mock('../../src/modules/config.js', () => ({
 vi.mock('../../src/modules/reviewHandler.js', () => ({
   handleReviewClaim: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../../src/commands/showcase.js', () => ({
-  handleShowcaseUpvote: vi.fn().mockResolvedValue(undefined),
-  handleShowcaseModalSubmit: vi.fn().mockResolvedValue(undefined),
-}));
 vi.mock('../../src/modules/challengeScheduler.js', () => ({
   handleSolveButton: vi.fn().mockResolvedValue(undefined),
   handleHintButton: vi.fn().mockResolvedValue(undefined),
@@ -73,7 +68,6 @@ vi.mock('../../src/modules/reputation.js', () => ({
   handleXpGain: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { handleShowcaseModalSubmit, handleShowcaseUpvote } from '../../src/commands/showcase.js';
 import { handleHintButton, handleSolveButton } from '../../src/modules/challengeScheduler.js';
 import { getConfig } from '../../src/modules/config.js';
 import { registerMessageCreateHandler } from '../../src/modules/events/messageCreate.js';
@@ -81,10 +75,6 @@ import { registerReactionHandlers } from '../../src/modules/events/reactions.js'
 import { registerReadyHandler } from '../../src/modules/events/ready.js';
 import { handleChallengeButton } from '../../src/modules/handlers/challengeHandler.js';
 import { handleReviewButton } from '../../src/modules/handlers/reviewHandler.js';
-import {
-  handleShowcaseButton,
-  handleShowcaseModal,
-} from '../../src/modules/handlers/showcaseHandler.js';
 import { checkLinks } from '../../src/modules/linkFilter.js';
 import { checkRateLimit } from '../../src/modules/rateLimit.js';
 import { handleReviewClaim } from '../../src/modules/reviewHandler.js';
@@ -192,114 +182,6 @@ describe('handleReviewButton', () => {
         reply,
       }),
     ).resolves.toBe(true);
-  });
-});
-
-// ── handleShowcaseButton ─────────────────────────────────────────────
-
-describe('handleShowcaseButton', () => {
-  it('should ignore non-button interactions', async () => {
-    expect(await handleShowcaseButton({ isButton: () => false })).toBe(false);
-    expect(handleShowcaseUpvote).not.toHaveBeenCalled();
-  });
-
-  it('should ignore buttons with non-showcase customId', async () => {
-    expect(await handleShowcaseButton({ isButton: () => true, customId: 'other' })).toBe(false);
-    expect(handleShowcaseUpvote).not.toHaveBeenCalled();
-  });
-
-  it('should call handleShowcaseUpvote for showcase_upvote_ buttons', async () => {
-    const interaction = {
-      isButton: () => true,
-      customId: 'showcase_upvote_abc',
-      user: { id: 'u1' },
-    };
-    await handleShowcaseButton(interaction);
-    expect(handleShowcaseUpvote).toHaveBeenCalledWith(interaction, expect.anything());
-  });
-
-  it('should handle upvote error and reply ephemerally', async () => {
-    handleShowcaseUpvote.mockRejectedValueOnce(new Error('upvote boom'));
-    const reply = vi.fn().mockResolvedValue(undefined);
-    await handleShowcaseButton({
-      isButton: () => true,
-      customId: 'showcase_upvote_abc',
-      user: { id: 'u1' },
-      replied: false,
-      deferred: false,
-      reply,
-    });
-    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
-  });
-
-  it('should skip error reply when already replied', async () => {
-    handleShowcaseUpvote.mockRejectedValueOnce(new Error('boom'));
-    const reply = vi.fn();
-    await handleShowcaseButton({
-      isButton: () => true,
-      customId: 'showcase_upvote_abc',
-      user: { id: 'u1' },
-      replied: true,
-      deferred: false,
-      reply,
-    });
-    expect(reply).not.toHaveBeenCalled();
-  });
-});
-
-// ── handleShowcaseModal ──────────────────────────────────────────────
-
-describe('handleShowcaseModal', () => {
-  it('should ignore non-modal interactions', async () => {
-    expect(await handleShowcaseModal({ isModalSubmit: () => false })).toBe(false);
-    expect(handleShowcaseModalSubmit).not.toHaveBeenCalled();
-  });
-
-  it('should ignore modals with wrong customId', async () => {
-    expect(await handleShowcaseModal({ isModalSubmit: () => true, customId: 'other_modal' })).toBe(
-      false,
-    );
-    expect(handleShowcaseModalSubmit).not.toHaveBeenCalled();
-  });
-
-  it('should call handleShowcaseModalSubmit for showcase_submit_modal', async () => {
-    const interaction = {
-      isModalSubmit: () => true,
-      customId: 'showcase_submit_modal',
-      deferred: false,
-    };
-    await handleShowcaseModal(interaction);
-    expect(handleShowcaseModalSubmit).toHaveBeenCalledWith(interaction, expect.anything());
-  });
-
-  it('should handle error with safeReply when not deferred', async () => {
-    handleShowcaseModalSubmit.mockRejectedValueOnce(new Error('modal boom'));
-    const reply = vi.fn().mockResolvedValue(undefined);
-    await handleShowcaseModal({
-      isModalSubmit: () => true,
-      customId: 'showcase_submit_modal',
-      deferred: false,
-      reply,
-      editReply: vi.fn(),
-    });
-    expect(reply).toHaveBeenCalledWith(
-      expect.objectContaining({ content: expect.stringContaining('wrong') }),
-    );
-  });
-
-  it('should handle error with safeEditReply when deferred', async () => {
-    handleShowcaseModalSubmit.mockRejectedValueOnce(new Error('modal boom'));
-    const editReply = vi.fn().mockResolvedValue(undefined);
-    await handleShowcaseModal({
-      isModalSubmit: () => true,
-      customId: 'showcase_submit_modal',
-      deferred: true,
-      reply: vi.fn(),
-      editReply,
-    });
-    expect(editReply).toHaveBeenCalledWith(
-      expect.objectContaining({ content: expect.stringContaining('wrong') }),
-    );
   });
 });
 

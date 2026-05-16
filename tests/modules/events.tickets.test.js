@@ -60,11 +60,6 @@ vi.mock('../../src/modules/welcome.js', () => ({
   sendWelcomeMessage: vi.fn(),
 }));
 
-vi.mock('../../src/commands/showcase.js', () => ({
-  handleShowcaseModalSubmit: vi.fn(),
-  handleShowcaseUpvote: vi.fn(),
-}));
-
 vi.mock('../../src/utils/errors.js', () => ({
   getUserFriendlyMessage: vi.fn(() => 'friendly'),
 }));

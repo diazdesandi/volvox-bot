@@ -296,27 +296,26 @@ describe('previously unexcluded app pages', () => {
   it('renders community hub data and metadata from public API responses', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
-        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, activeProjects: 3, challengesCompleted: 4, topContributors: [] }),
+        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, challengesCompleted: 4, topContributors: [] }),
       )
       .mockResolvedValueOnce(
-        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, activeProjects: 3, challengesCompleted: 4, topContributors: [] }),
+        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, challengesCompleted: 4, topContributors: [] }),
       )
       .mockResolvedValueOnce(
         jsonResponse({ members: [{ userId: 'u1', username: 'ada', displayName: 'Ada', avatar: null, xp: 1200, level: 4, badge: 'Helper', rank: 1, currentLevelXp: 1000, nextLevelXp: 1500 }], total: 1 }),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ projects: [{ id: 1, title: 'Bot Tools', description: 'Useful utilities', tech: ['TS'], repoUrl: 'https://github.com/example/repo', liveUrl: null, authorName: 'Ada', authorAvatar: null, upvotes: 9, createdAt: '2026-04-28T08:00:00Z' }], total: 1 }),
       );
 
     await expect(generateCommunityMetadata({ params: Promise.resolve({ guildId: 'guild-1' }) })).resolves.toMatchObject({
-      title: 'Community Hub — Leaderboard & Showcases',
+      title: 'Community Hub — Leaderboard & Stats',
     });
 
     render(await CommunityPage({ params: Promise.resolve({ guildId: 'guild-1' }) }));
 
     expect(screen.getByRole('heading', { name: /community hub/i })).toBeInTheDocument();
     expect(screen.getAllByText('Ada').length).toBeGreaterThan(0);
-    expect(screen.getByText('Bot Tools')).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/showcases'))).toBe(
+      false,
+    );
   });
 
   it('renders community profile data and metadata', async () => {
@@ -331,7 +330,6 @@ describe('previously unexcluded app pages', () => {
       badge: 'Mentor',
       joinedAt: '2026-01-01T00:00:00Z',
       stats: { messagesSent: 100, reactionsGiven: 8, reactionsReceived: 12, daysActive: 20 },
-      projects: [{ id: 2, title: 'Analytical Engine', description: 'Math notes', tech: ['Docs'], repoUrl: null, liveUrl: 'https://example.com', upvotes: 4, createdAt: '2026-04-01T00:00:00Z' }],
       recentBadges: [{ name: 'Helpful', description: 'Helped people' }],
     };
     vi.mocked(fetch)
@@ -345,7 +343,6 @@ describe('previously unexcluded app pages', () => {
     render(await ProfilePage({ params: Promise.resolve({ guildId: 'guild-1', userId: 'u1' }) }));
 
     expect(screen.getByRole('heading', { name: /ada lovelace/i })).toBeInTheDocument();
-    expect(screen.getByText('Analytical Engine')).toBeInTheDocument();
     expect(screen.getByText('Helpful')).toBeInTheDocument();
   });
 
@@ -662,15 +659,16 @@ describe('previously unexcluded app page alternate states', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse({}, { status: 500 }))
       .mockResolvedValueOnce(jsonResponse({}, { status: 500 }))
-      .mockResolvedValueOnce(jsonResponse({}, { status: 500 }))
       .mockResolvedValueOnce(jsonResponse({}, { status: 500 }));
 
     await expect(generateCommunityMetadata({ params: Promise.resolve({ guildId: 'guild-empty' }) })).resolves.toMatchObject({
-      description: 'Explore our community leaderboard, project showcases, and stats.',
+      description: 'Explore our community leaderboard and stats.',
     });
     render(await CommunityPage({ params: Promise.resolve({ guildId: 'guild-empty' }) }));
     expect(screen.getByText(/no public members yet/i)).toBeInTheDocument();
-    expect(screen.queryByText(/project showcase/i)).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/showcases'))).toBe(
+      false,
+    );
 
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({}, { status: 404 }));
     await expect(generateProfileMetadata({ params: Promise.resolve({ guildId: 'guild-1', userId: 'missing' }) })).resolves.toMatchObject({ title: 'Profile Not Found' });
@@ -678,12 +676,11 @@ describe('previously unexcluded app page alternate states', () => {
 });
 
 describe('community public page variants', () => {
-  it('covers community rank, avatar, contributor, and showcase link variants', async () => {
+  it('covers community rank, avatar, and contributor variants', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse({
         memberCount: 5,
         totalMessagesSent: 1000,
-        activeProjects: 2,
         challengesCompleted: 1,
         topContributors: [
           { userId: 'c1', username: 'grace', displayName: undefined, avatar: 'https://cdn.example/grace.png', xp: 3000, level: 6, badge: 'Builder' },
@@ -697,13 +694,6 @@ describe('community public page variants', () => {
           { userId: 'u4', username: 'margaret', displayName: 'Margaret', avatar: null, xp: 900, level: 2, badge: 'Member', rank: 4, currentLevelXp: 500, nextLevelXp: 1000 },
         ],
         total: 3,
-      }))
-      .mockResolvedValueOnce(jsonResponse({
-        projects: [
-          { id: 11, title: 'Live Demo', description: 'Running app', tech: ['Next'], repoUrl: null, liveUrl: 'https://example.com/live', authorName: 'Grace', authorAvatar: 'https://cdn.example/grace.png', upvotes: 7, createdAt: '2026-04-28T08:00:00Z' },
-          { id: 12, title: 'Private Notes', description: 'No links', tech: [], repoUrl: null, liveUrl: null, authorName: 'Linus', authorAvatar: null, upvotes: 0, createdAt: '2026-04-28T08:00:00Z' },
-        ],
-        total: 2,
       }));
 
     render(await CommunityPage({ params: Promise.resolve({ guildId: 'guild-rich' }) }));
@@ -712,9 +702,9 @@ describe('community public page variants', () => {
     expect(screen.getByText('🥉')).toBeInTheDocument();
     expect(screen.getByText('#4')).toBeInTheDocument();
     expect(screen.getByText(/Top Contributors/)).toBeInTheDocument();
-    expect(screen.getByText('Live Demo')).toBeInTheDocument();
-    expect(screen.getByLabelText('View live demo')).toHaveAttribute('href', 'https://example.com/live');
-    expect(screen.getByText('Private Notes')).toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('/showcases'))).toBe(
+      false,
+    );
   });
 
   it('covers community profile avatar, maxed XP, and hidden optional sections', async () => {
@@ -729,7 +719,6 @@ describe('community public page variants', () => {
       badge: 'Admiral',
       joinedAt: null,
       stats: { messagesSent: 1000, reactionsGiven: 10, reactionsReceived: 15, daysActive: 99 },
-      projects: [],
       recentBadges: [],
     };
     vi.mocked(fetch)
@@ -745,6 +734,5 @@ describe('community public page variants', () => {
     expect(screen.getByAltText('Grace Hopper')).toBeInTheDocument();
     expect(screen.queryByText(/Joined/)).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Badges' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Projects' })).not.toBeInTheDocument();
   });
 });

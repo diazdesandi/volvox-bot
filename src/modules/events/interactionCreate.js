@@ -11,7 +11,6 @@ import { handleChallengeButton } from '../handlers/challengeHandler.js';
 import { handlePollButton } from '../handlers/pollHandler.js';
 import { handleReminderButton } from '../handlers/reminderHandler.js';
 import { handleReviewButton } from '../handlers/reviewHandler.js';
-import { handleShowcaseButton, handleShowcaseModal } from '../handlers/showcaseHandler.js';
 import {
   handleTicketCloseButton,
   handleTicketModal,
@@ -28,10 +27,6 @@ export { registerPollButtonHandler } from '../handlers/pollHandler.js';
 export { registerReminderButtonHandler } from '../handlers/reminderHandler.js';
 export { registerReviewClaimHandler } from '../handlers/reviewHandler.js';
 export {
-  registerShowcaseButtonHandler,
-  registerShowcaseModalHandler,
-} from '../handlers/showcaseHandler.js';
-export {
   registerTicketCloseButtonHandler,
   registerTicketModalHandler,
   registerTicketOpenButtonHandler,
@@ -43,8 +38,6 @@ const handlers = [
   handlePollButton,
   handleChallengeButton,
   handleReviewButton,
-  handleShowcaseButton,
-  handleShowcaseModal,
   handleTicketOpenButton,
   handleTicketModal,
   handleTicketCloseButton,

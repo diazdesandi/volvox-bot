@@ -209,7 +209,6 @@
       "remind": "everyone",
       "challenge": "everyone",
       "review": "everyone",
-      "showcase": "everyone",
       "reload": "admin"
     }
   },
@@ -223,9 +222,6 @@
     "enabled": false
   },
   "poll": {
-    "enabled": false
-  },
-  "showcase": {
     "enabled": false
   },
   "github": {

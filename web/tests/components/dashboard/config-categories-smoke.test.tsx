@@ -49,7 +49,6 @@ const baseConfig: GuildConfig = {
     selfStarAllowed: false,
     ignoredChannels: [],
   },
-  showcase: { enabled: true },
   memory: { enabled: true, maxContextMemories: 10, autoExtract: true },
   engagement: {
     enabled: true,
