@@ -2,14 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockReplace, mockGuildSelection, mockModerationState } = vi.hoisted(() => ({
-  mockReplace: vi.fn(),
-  mockGuildSelection: vi.fn(),
-  mockModerationState: {} as Record<string, unknown>,
-}));
+const { mockReplace, mockGuildSelection, mockModerationState, mockSearchParamsState } =
+  vi.hoisted(() => ({
+    mockReplace: vi.fn(),
+    mockGuildSelection: vi.fn(),
+    mockModerationState: {} as Record<string, unknown>,
+    mockSearchParamsState: { value: new URLSearchParams() },
+  }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: mockReplace }),
+  useSearchParams: () => mockSearchParamsState.value,
 }));
 
 vi.mock('@/hooks/use-guild-selection', () => ({
@@ -72,6 +75,7 @@ import ModerationClient from '@/app/dashboard/moderation/moderation-client';
 function resetState() {
   vi.clearAllMocks();
   mockGuildSelection.mockReturnValue('guild-1');
+  mockSearchParamsState.value = new URLSearchParams();
 
   Object.assign(mockModerationState, {
     page: 1,
@@ -152,5 +156,19 @@ describe('ModerationClient', () => {
     rerender(<ModerationClient />);
     expect(screen.getByText('Search a user')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /look up/i })).toBeDisabled();
+  });
+
+  it('preloads user history lookup from the userId query param', async () => {
+    mockModerationState.userHistoryInput = '';
+    mockModerationState.lookupUserId = null;
+    mockSearchParamsState.value = new URLSearchParams('userId=user-42');
+
+    render(<ModerationClient />);
+
+    await waitFor(() => {
+      expect(mockModerationState.setUserHistoryInput).toHaveBeenCalledWith('user-42');
+      expect(mockModerationState.setLookupUserId).toHaveBeenCalledWith('user-42');
+      expect(mockModerationState.setUserHistoryPage).toHaveBeenCalledWith(1);
+    });
   });
 });

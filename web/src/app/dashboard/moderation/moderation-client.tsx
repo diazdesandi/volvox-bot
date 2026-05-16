@@ -1,7 +1,7 @@
 'use client';
 
 import { RefreshCw, Search, Shield, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect } from 'react';
 import { CaseTable } from '@/components/dashboard/case-table';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -14,6 +14,8 @@ import { useModerationStore } from '@/stores/moderation-store';
 
 export default function ModerationClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const preloadedUserId = searchParams.get('userId')?.trim() ?? '';
 
   const {
     page,
@@ -54,6 +56,13 @@ export default function ModerationClient() {
   const guildId = useGuildSelection({ onGuildChange });
 
   const onUnauthorized = useCallback(() => router.replace('/login'), [router]);
+
+  useEffect(() => {
+    if (!guildId || !preloadedUserId) return;
+    setUserHistoryInput(preloadedUserId);
+    setLookupUserId(preloadedUserId);
+    setUserHistoryPage(1);
+  }, [guildId, preloadedUserId, setUserHistoryInput, setLookupUserId, setUserHistoryPage]);
 
   useEffect(() => {
     if (!guildId) return;

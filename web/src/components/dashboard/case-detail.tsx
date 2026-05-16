@@ -85,6 +85,18 @@ export function CaseDetail({ modCase }: CaseDetailProps) {
           value={formatDate(modCase.created_at)}
         />
 
+        {modCase.log_message_id && (
+          <FieldRow
+            icon={<MessageSquare className="h-4 w-4" />}
+            label="Log Message"
+            value={
+              <span className="font-mono text-sm text-muted-foreground">
+                {modCase.log_message_id}
+              </span>
+            }
+          />
+        )}
+
         {modCase.duration && (
           <FieldRow
             icon={<Clock className="h-4 w-4" />}

@@ -444,6 +444,7 @@ describe('previously unexcluded app pages', () => {
           warnings: { count: 1, recent: [{ case_number: 12, action: 'warn', reason: null, moderator_tag: 'Mod#0001', created_at: '2026-04-28T08:00:00Z' }] },
         }),
       )
+      .mockResolvedValueOnce(jsonResponse({ userId: 'user-1', cases: [{ id: 12, case_number: 12, action: 'warn', target_id: 'user-1', target_tag: 'Ada#0001', moderator_id: 'mod-1', moderator_tag: 'Mod#0001', reason: null, duration: null, expires_at: null, log_message_id: null, created_at: '2026-04-28T08:00:00Z' }], total: 1, page: 1, limit: 10, pages: 1, byAction: { warn: 1 } }))
       .mockResolvedValueOnce(jsonResponse({ xp: 250, level: 2, current_level_xp: 100, next_level_xp: 300 }))
       .mockResolvedValueOnce(new Response('id,name\n1,Ada', { status: 200 }));
 
@@ -629,7 +630,9 @@ describe('previously unexcluded app page alternate states', () => {
     noMember.unmount();
 
     mockGuildSelection.mockReturnValue('guild-1');
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: 'missing' }, { status: 404 }));
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ error: 'missing' }, { status: 404 }))
+      .mockResolvedValueOnce(jsonResponse({ userId: 'user-2', cases: [], total: 0, page: 1, limit: 10, pages: 0, byAction: {} }));
     const missing = render(<MemberDetailPage />);
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Member not found'));
     await userEvent.click(screen.getByRole('button', { name: /back to members/i }));
@@ -643,6 +646,7 @@ describe('previously unexcluded app page alternate states', () => {
         reputation: { xp: 500, level: 9, messages_count: 0, voice_minutes: 0, helps_given: 0, last_xp_gain: null, current_level_xp: null, next_level_xp: null },
         warnings: { count: 0, recent: [] },
       }))
+      .mockResolvedValueOnce(jsonResponse({ userId: 'user-2', cases: [], total: 0, page: 1, limit: 10, pages: 0, byAction: {} }))
       .mockResolvedValueOnce(jsonResponse({ error: 'Bad amount' }, { status: 400 }))
       .mockResolvedValueOnce(jsonResponse({}, { status: 500 }));
     render(<MemberDetailPage />);

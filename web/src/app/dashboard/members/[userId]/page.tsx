@@ -3,7 +3,11 @@
 import {
   ArrowLeft,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   Download,
+  ExternalLink,
+  History,
   Loader2,
   MessageSquare,
   Smile,
@@ -11,11 +15,16 @@ import {
   Zap,
 } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionBadge } from '@/components/dashboard/action-badge';
-import type { ModAction } from '@/components/dashboard/moderation-types';
+import {
+  ACTION_META,
+  type ModAction,
+  type UserHistoryResponse,
+} from '@/components/dashboard/moderation-types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -33,6 +42,8 @@ import { useGuildSelection } from '@/hooks/use-guild-selection';
 import { formatDate } from '@/lib/format-time';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+const HISTORY_LIMIT = 10;
 
 interface MemberDetailResponse {
   id: string;
@@ -59,18 +70,9 @@ interface MemberDetailResponse {
     current_level_xp?: number | null;
     next_level_xp: number | null;
   };
-  warnings: {
+  warnings?: {
     count: number;
-    recent: MemberCase[];
   };
-}
-
-interface MemberCase {
-  case_number: number;
-  action: ModAction;
-  reason: string | null;
-  moderator_tag: string;
-  created_at: string;
 }
 
 function roleColorStyle(hexColor: string): string {
@@ -173,6 +175,11 @@ export default function MemberDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [historyData, setHistoryData] = useState<UserHistoryResponse | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+
   const [xpAmount, setXpAmount] = useState('');
   const [xpReason, setXpReason] = useState('');
   const [xpSubmitting, setXpSubmitting] = useState(false);
@@ -215,6 +222,60 @@ export default function MemberDetailPage() {
       cancelled = true;
     };
   }, [guildId, userId, router]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset history state when the selected member changes
+  useEffect(() => {
+    setHistoryPage(1);
+    setHistoryData(null);
+    setHistoryError(null);
+  }, [guildId, userId]);
+
+  useEffect(() => {
+    if (!guildId || !userId) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          guildId,
+          page: String(historyPage),
+          limit: String(HISTORY_LIMIT),
+        });
+        const res = await fetch(
+          `/api/moderation/user/${encodeURIComponent(userId)}/history?${params.toString()}`,
+          { cache: 'no-store' },
+        );
+        if (res.status === 401) {
+          router.replace('/login');
+          return;
+        }
+        const payload: unknown = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const msg =
+            typeof payload === 'object' &&
+            payload !== null &&
+            'error' in payload &&
+            typeof (payload as Record<string, unknown>).error === 'string'
+              ? (payload as Record<string, string>).error
+              : `Failed to load moderation history (${res.status})`;
+          throw new Error(msg);
+        }
+        if (!cancelled) setHistoryData(payload as UserHistoryResponse);
+      } catch (err) {
+        if (!cancelled) {
+          setHistoryError(err instanceof Error ? err.message : 'Failed to load moderation history');
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [guildId, userId, historyPage, router]);
 
   const handleAdjustXp = useCallback(
     async (e: React.FormEvent) => {
@@ -370,8 +431,16 @@ export default function MemberDetailPage() {
     );
   }
 
-  const cases = data.warnings.recent;
   const displayName = data.displayName || data.username;
+  const historyCases = historyData?.cases ?? [];
+  const historyTotal = historyData?.total ?? 0;
+  const historyPages = Math.max(historyData?.pages ?? 1, 1);
+  const moderationHref = `/dashboard/moderation?userId=${encodeURIComponent(userId)}`;
+  const actionBreakdown = Object.entries(historyData?.byAction ?? {})
+    .filter(
+      (entry): entry is [ModAction, number] => entry[0] in ACTION_META && Number(entry[1]) > 0,
+    )
+    .sort(([, a], [, b]) => b - a);
 
   return (
     <ErrorBoundary
@@ -521,73 +590,147 @@ export default function MemberDetailPage() {
           />
         </div>
 
-        {/* Warning History */}
+        {/* Moderation History */}
         <div className="group relative overflow-hidden rounded-[24px] border border-border/40 bg-card/40 backdrop-blur-2xl shadow-lg transition-all">
-          <div className="border-b border-border/30 px-6 py-5">
-            <h3 className="text-sm font-bold uppercase tracking-[0.14em] text-foreground/80">
-              Warning History
-            </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground/60">
-              {cases.length === 0
-                ? 'No warnings on record.'
-                : `${data.warnings.count} ${data.warnings.count === 1 ? 'warning' : 'warnings'} total · showing ${cases.length} most recent`}
-            </p>
-          </div>
-          {cases.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-border/20 hover:bg-transparent">
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 w-20">
-                      Case #
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 w-28">
-                      Action
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                      Reason
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 hidden md:table-cell">
-                      Moderator
-                    </TableHead>
-                    <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 w-36">
-                      Date
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cases.map((c) => (
-                    <TableRow
-                      key={c.case_number}
-                      className="border-border/10 hover:bg-white/[0.02]"
-                    >
-                      <TableCell className="font-mono text-xs text-muted-foreground/60">
-                        #{c.case_number}
-                      </TableCell>
-                      <TableCell>
-                        <ActionBadge action={c.action} />
-                      </TableCell>
-                      <TableCell className="max-w-[300px] truncate text-sm text-foreground/80">
-                        {c.reason ?? <span className="italic text-muted-foreground/40">—</span>}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground/60">
-                        {c.moderator_tag}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground/50">
-                        {formatDate(c.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="px-6 pb-6 pt-2">
-              <p className="text-sm text-muted-foreground/50 italic">
-                Clean record — no moderation actions found.
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border/30 px-6 py-5">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.14em] text-foreground/80">
+                <History className="h-4 w-4 text-primary/70" />
+                Moderation History
+              </h3>
+              <p className="mt-0.5 text-xs text-muted-foreground/60">
+                {historyLoading && !historyData
+                  ? 'Loading moderation history...'
+                  : historyTotal === 0
+                    ? 'No moderation actions on record.'
+                    : `${historyTotal} ${historyTotal === 1 ? 'case' : 'cases'} total · page ${historyData?.page ?? historyPage} of ${historyPages}`}
               </p>
             </div>
-          )}
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="text-[10px] font-black uppercase tracking-[0.2em]"
+            >
+              <Link href={moderationHref}>
+                <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                View full history
+              </Link>
+            </Button>
+          </div>
+
+          <div className="space-y-4 p-6 pt-4">
+            {actionBreakdown.length > 0 && (
+              <ul className="flex flex-wrap gap-2" aria-label="Moderation action breakdown">
+                {actionBreakdown.map(([action, count]) => (
+                  <li
+                    key={action}
+                    className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-background/30 px-3 py-1.5"
+                  >
+                    <ActionBadge action={action} />
+                    <span className="font-mono text-xs font-semibold tabular-nums text-muted-foreground">
+                      {count}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {historyError ? (
+              <div
+                role="alert"
+                className="rounded-[16px] border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+              >
+                {historyError}
+              </div>
+            ) : historyLoading && !historyData ? (
+              <div className="space-y-2">
+                {(['history-sk-0', 'history-sk-1', 'history-sk-2'] as const).map((key) => (
+                  <Skeleton key={key} className="h-10 rounded-xl" />
+                ))}
+              </div>
+            ) : historyCases.length > 0 ? (
+              <div className="overflow-x-auto rounded-[18px] border border-border/30">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border/20 hover:bg-transparent">
+                      <TableHead className="w-20 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                        Case #
+                      </TableHead>
+                      <TableHead className="w-28 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                        Action
+                      </TableHead>
+                      <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                        Reason
+                      </TableHead>
+                      <TableHead className="hidden text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 md:table-cell">
+                        Moderator
+                      </TableHead>
+                      <TableHead className="w-36 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                        Date
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {historyCases.map((c) => (
+                      <TableRow key={c.id} className="border-border/10 hover:bg-white/[0.02]">
+                        <TableCell className="font-mono text-xs text-muted-foreground/60">
+                          #{c.case_number}
+                        </TableCell>
+                        <TableCell>
+                          <ActionBadge action={c.action} />
+                        </TableCell>
+                        <TableCell className="max-w-[300px] truncate text-sm text-foreground/80">
+                          {c.reason ?? <span className="italic text-muted-foreground/40">—</span>}
+                        </TableCell>
+                        <TableCell className="hidden text-sm text-muted-foreground/60 md:table-cell">
+                          {c.moderator_tag}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground/50">
+                          {formatDate(c.created_at)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <p className="text-sm italic text-muted-foreground/50">
+                Clean record — no moderation actions found.
+              </p>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+                {historyTotal} total cases
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Previous history page"
+                  disabled={historyPage <= 1 || historyLoading}
+                  onClick={() => setHistoryPage((page) => Math.max(1, page - 1))}
+                  className="text-[10px] font-black uppercase tracking-[0.2em]"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 tabular-nums">
+                  Page {historyData?.page ?? historyPage} of {historyPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Next history page"
+                  disabled={historyPage >= historyPages || historyLoading}
+                  onClick={() => setHistoryPage((page) => page + 1)}
+                  className="text-[10px] font-black uppercase tracking-[0.2em]"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Admin Actions */}
