@@ -55,7 +55,7 @@ describe('config workspace category helpers', () => {
   });
 
   it('matches search items by label, description, and keywords', () => {
-    expect(getMatchingSearchItems('  role menu  ').map((item) => item.id)).toContain('welcome-role-menu');
+    expect(getMatchingSearchItems('  role menu  ')).toEqual([]);
     expect(getMatchingSearchItems('AUTO-PURGE').map((item) => item.id)).toContain('audit-log-retention');
     expect(getMatchingSearchItems('')).toEqual([]);
   });

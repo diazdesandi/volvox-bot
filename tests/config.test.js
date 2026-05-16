@@ -74,7 +74,8 @@ describe('config.json', () => {
     expect(config).toHaveProperty('welcome');
     expect(typeof config.welcome.enabled).toBe('boolean');
     expect(config.welcome.channelId).toBeNull();
-    expect(config.welcome.roleMenuChannel).toBeNull();
+    expect(config.welcome).not.toHaveProperty('roleMenuChannel');
+    expect(config.welcome).not.toHaveProperty('roleMenu');
     expect(config.welcome.returningMessage).toBe(
       'Welcome back, {{user}}! Glad to see you again. Jump back in whenever you are ready.',
     );

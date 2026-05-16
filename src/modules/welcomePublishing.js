@@ -6,12 +6,11 @@ import { safeEditMessage, safeSend } from '../utils/safeSend.js';
 import { DISCORD_MAX_LENGTH } from '../utils/splitMessage.js';
 import { getConfig } from './config.js';
 import {
-  buildRoleMenuMessage,
   buildRulesAgreementMessage,
   normalizeWelcomeOnboardingConfig,
 } from './welcomeOnboarding.js';
 
-export const WELCOME_PANEL_TYPES = new Set(['rules', 'role_menu']);
+export const WELCOME_PANEL_TYPES = new Set(['rules']);
 
 function stableStringify(value) {
   if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(',')}]`;
@@ -42,36 +41,20 @@ export function getWelcomePanelPayload(panelType, welcomeConfig) {
     };
   }
 
-  if (panelType === 'role_menu') {
-    const onboarding = normalizeWelcomeOnboardingConfig(welcomeConfig);
-    const message = buildRoleMenuMessage(welcomeConfig);
-    if (!message || !onboarding.roleMenuChannel) return null;
-    return {
-      panelType,
-      channelId: onboarding.roleMenuChannel,
-      message,
-      configHash: hashWelcomePanelConfig(panelType, welcomeConfig),
-      configured: true,
-    };
-  }
-
   throw new Error(`Unknown welcome panel type: ${panelType}`);
 }
 
 export function hashWelcomePanelConfig(panelType, welcomeConfig = {}) {
+  if (!WELCOME_PANEL_TYPES.has(panelType)) {
+    throw new Error(`Unknown welcome panel type: ${panelType}`);
+  }
+
   const onboarding = normalizeWelcomeOnboardingConfig(welcomeConfig);
-  const relevant =
-    panelType === 'rules'
-      ? {
-          panelType,
-          channelId: onboarding.rulesChannel,
-          rulesMessage: onboarding.rulesMessage,
-        }
-      : {
-          panelType,
-          channelId: onboarding.roleMenuChannel,
-          roleMenu: onboarding.roleMenu,
-        };
+  const relevant = {
+    panelType,
+    channelId: onboarding.rulesChannel,
+    rulesMessage: onboarding.rulesMessage,
+  };
 
   return createHash('sha256').update(stableStringify(relevant)).digest('hex');
 }

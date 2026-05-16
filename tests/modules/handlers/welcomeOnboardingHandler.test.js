@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockGetConfig = vi.fn();
 const mockHandleRulesAcceptButton = vi.fn();
-const mockHandleRoleMenuSelection = vi.fn();
 const mockSafeEditReply = vi.fn().mockResolvedValue(undefined);
 const mockLogError = vi.fn();
 
@@ -16,7 +15,6 @@ vi.mock('../../../src/modules/welcomeOnboarding.js', async (importOriginal) => {
   return {
     ...actual,
     handleRulesAcceptButton: (...args) => mockHandleRulesAcceptButton(...args),
-    handleRoleMenuSelection: (...args) => mockHandleRoleMenuSelection(...args),
   };
 });
 
@@ -29,10 +27,7 @@ vi.mock('../../../src/logger.js', () => ({
 }));
 
 import { registerWelcomeOnboardingHandlers } from '../../../src/modules/handlers/welcomeOnboardingHandler.js';
-import {
-  ROLE_MENU_SELECT_ID,
-  RULES_ACCEPT_BUTTON_ID,
-} from '../../../src/modules/welcomeOnboarding.js';
+import { RULES_ACCEPT_BUTTON_ID } from '../../../src/modules/welcomeOnboarding.js';
 
 function createClient() {
   return {
@@ -69,7 +64,6 @@ describe('welcome onboarding interaction handler', () => {
     await handler({ guildId: 'guild-1' });
 
     expect(mockHandleRulesAcceptButton).not.toHaveBeenCalled();
-    expect(mockHandleRoleMenuSelection).not.toHaveBeenCalled();
   });
 
   it('handles the rules accept button', async () => {
@@ -116,7 +110,7 @@ describe('welcome onboarding interaction handler', () => {
     });
   });
 
-  it('handles the role menu selection', async () => {
+  it('ignores string select menus', async () => {
     const guildConfig = { welcome: { enabled: true } };
     mockGetConfig.mockReturnValueOnce(guildConfig);
     const client = createClient();
@@ -124,39 +118,14 @@ describe('welcome onboarding interaction handler', () => {
     const handler = getRegisteredHandler(client);
     const interaction = {
       guildId: 'guild-1',
-      customId: ROLE_MENU_SELECT_ID,
+      customId: 'welcome_role_select',
       isButton: () => false,
       isStringSelectMenu: () => true,
     };
 
-    await handler(interaction);
+    const handled = await handler(interaction);
 
-    expect(mockHandleRoleMenuSelection).toHaveBeenCalledWith(interaction, guildConfig);
-  });
-
-  it('sends a fallback reply when the role menu handler fails', async () => {
-    const guildConfig = { welcome: { enabled: true } };
-    mockGetConfig.mockReturnValueOnce(guildConfig);
-    mockHandleRoleMenuSelection.mockRejectedValueOnce(new Error('bad roles'));
-    const client = createClient();
-    registerWelcomeOnboardingHandlers(client);
-    const handler = getRegisteredHandler(client);
-    const interaction = {
-      guildId: 'guild-1',
-      customId: ROLE_MENU_SELECT_ID,
-      isButton: () => false,
-      isStringSelectMenu: () => true,
-      user: { id: 'user-1' },
-    };
-
-    await handler(interaction);
-
-    expect(mockLogError).toHaveBeenCalledWith(
-      'Role menu handler failed',
-      expect.objectContaining({ guildId: 'guild-1', userId: 'user-1', error: 'bad roles' }),
-    );
-    expect(mockSafeEditReply).toHaveBeenCalledWith(interaction, {
-      content: '❌ Failed to update roles. Please try again.',
-    });
+    expect(handled).toBe(false);
+    expect(mockHandleRulesAcceptButton).not.toHaveBeenCalled();
   });
 });

@@ -7,7 +7,7 @@ exports.up = (pgm) => {
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS welcome_publications (
       guild_id TEXT NOT NULL,
-      panel_type TEXT NOT NULL CHECK (panel_type IN ('rules', 'role_menu')),
+      panel_type TEXT NOT NULL CHECK (panel_type IN ('rules')),
       channel_id TEXT,
       message_id TEXT,
       config_hash TEXT,

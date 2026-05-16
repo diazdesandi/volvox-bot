@@ -98,7 +98,6 @@ const minimalConfig = {
   welcome: {
     enabled: false,
     message: '',
-    roleMenu: { enabled: false, options: [] },
     dmSequence: { enabled: false, steps: [] },
   },
   moderation: {

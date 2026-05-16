@@ -11,7 +11,7 @@ export const data = new SlashCommandBuilder()
   .setName('welcome')
   .setDescription('Welcome/onboarding admin helpers')
   .addSubcommand((sub) =>
-    sub.setName('setup').setDescription('Publish or refresh rules and role menu onboarding panels'),
+    sub.setName('setup').setDescription('Publish or refresh the rules onboarding panel'),
   );
 
 function formatPublishWarning(result) {
@@ -25,7 +25,7 @@ function formatPublishWarning(result) {
 }
 
 function formatPublishLine(result) {
-  const label = result.panelType === 'rules' ? 'Rules agreement panel' : 'Role menu panel';
+  const label = 'Rules agreement panel';
   if (result.status === 'posted') {
     const action = result.action === 'updated' ? 'Updated' : 'Posted';
     return `${action} ${label.toLowerCase()} in <#${result.channelId}>.${formatPublishWarning(result)}`;

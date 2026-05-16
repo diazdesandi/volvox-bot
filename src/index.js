@@ -40,7 +40,6 @@ import { startGithubFeed, stopGithubFeed } from './modules/githubFeed.js';
 import { checkMem0Health, markUnavailable } from './modules/memory.js';
 import { startTempbanScheduler, stopTempbanScheduler } from './modules/moderation.js';
 import { loadOptOuts } from './modules/optout.js';
-import { seedBuiltinTemplates } from './modules/roleMenuTemplates.js';
 import { startScheduler, stopScheduler } from './modules/scheduler.js';
 import { startTriage, stopTriage } from './modules/triage.js';
 import {
@@ -336,9 +335,6 @@ async function initializeDatabaseForStartup() {
     info('Database initialized');
 
     await recordRestart(dbPool, 'startup', BOT_VERSION);
-    await seedBuiltinTemplates().catch((err) =>
-      warn('Failed to seed built-in role menu templates', { error: err.message }),
-    );
 
     return dbPool;
   } catch (err) {

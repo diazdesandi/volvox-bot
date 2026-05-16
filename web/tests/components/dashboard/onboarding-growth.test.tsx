@@ -231,7 +231,6 @@ function createWelcomeDraftConfig({
       enabled: true,
       message: '',
       dynamic,
-      roleMenu: { options: [] },
       dmSequence: { steps: [] },
       ...welcomeOverrides,
     },
@@ -257,6 +256,14 @@ function mockWelcomeContext({
   });
 
   return updateDraftConfig;
+}
+
+function createWelcomeFetchMock(...responses: Response[]) {
+  const responseQueue = [...responses];
+
+  return vi.fn(async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+    responseQueue.shift() ?? Response.json({ guildId: 'guild-1', panels: {} }),
+  );
 }
 
 describe('OnboardingGrowthCategory', () => {
@@ -452,14 +459,6 @@ describe('OnboardingGrowthCategory', () => {
             messageId: 'message-1',
             stale: false,
           },
-          role_menu: {
-            status: 'missing',
-            configured: true,
-            channelId: 'welcome-channel',
-            configuredChannelId: 'welcome-channel',
-            messageId: null,
-            stale: false,
-          },
         },
       }),
     ));
@@ -523,7 +522,6 @@ describe('OnboardingGrowthCategory', () => {
           message: '',
           returningMessageEnabled: false,
           dynamic: { enabled: false },
-          roleMenu: { options: [] },
           dmSequence: { steps: [] },
         },
       },
@@ -537,7 +535,7 @@ describe('OnboardingGrowthCategory', () => {
     render(<OnboardingGrowthCategory />);
 
     const editors = screen.getAllByTestId('discord-markdown-editor');
-    expect(editors).toHaveLength(4);
+    expect(editors).toHaveLength(3);
     expect(editors[0]).toHaveAttribute(
       'data-placeholder',
       'Welcome {{user}} to {{server}}!',
@@ -643,22 +641,6 @@ describe('OnboardingGrowthCategory', () => {
     expect(updateDraftConfig.mock.results[0]?.value.welcome.channelId).toBe('new-channel');
   });
 
-  it('clarifies that an unset role menu channel uses the welcome message channel', () => {
-    mockWelcomeContext({
-      draftConfig: createWelcomeDraftConfig({
-        dynamic: { enabled: false },
-        welcomeOverrides: { channelId: 'welcome-channel', roleMenuChannel: null },
-      }),
-    });
-
-    render(<OnboardingGrowthCategory />);
-
-    const selector = screen.getByTestId('channel-selector-welcome-role-menu-channel');
-    expect(selector).toHaveAttribute('data-selected', '');
-    expect(selector).toHaveAttribute('data-placeholder', 'Defaults to welcome message channel');
-    expect(screen.getByText('Leave unset to use the welcome message channel.')).toBeInTheDocument();
-  });
-
   it('shows publish setup actions before message editing with operational copy', async () => {
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
@@ -678,7 +660,6 @@ describe('OnboardingGrowthCategory', () => {
     render(<OnboardingGrowthCategory />);
 
     expect(await screen.findByText('#rules')).toBeInTheDocument();
-    expect(await screen.findByText('#welcome')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Copy Rules Agreement channel ID' })).toBeInTheDocument();
   });
 
@@ -697,14 +678,6 @@ describe('OnboardingGrowthCategory', () => {
               messageId: 'message-1',
               stale: true,
               lastError: 'Discord message missing',
-            },
-            role_menu: {
-              status: 'posted',
-              configured: true,
-              channelId: 'welcome-channel',
-              configuredChannelId: 'welcome-channel',
-              messageId: 'message-2',
-              stale: false,
             },
           },
         }),
@@ -732,23 +705,15 @@ describe('OnboardingGrowthCategory', () => {
           messageId: null,
           stale: false,
         },
-        role_menu: {
-          status: 'missing',
-          configured: true,
-          channelId: 'welcome-channel',
-          configuredChannelId: 'welcome-channel',
-          messageId: null,
-          stale: false,
-        },
       },
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(Response.json(statusResponse))
-        .mockResolvedValueOnce(Response.json({ panelType: 'rules', status: 'unconfigured' }))
-        .mockResolvedValueOnce(Response.json(statusResponse)),
+      createWelcomeFetchMock(
+        Response.json(statusResponse),
+        Response.json({ panelType: 'rules', status: 'unconfigured' }),
+        Response.json(statusResponse),
+      ),
     );
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
@@ -776,37 +741,24 @@ describe('OnboardingGrowthCategory', () => {
           messageId: null,
           stale: false,
         },
-        role_menu: {
-          status: 'unconfigured',
-          configured: false,
-          channelId: null,
-          configuredChannelId: null,
-          messageId: null,
-          stale: false,
-        },
       },
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(Response.json(statusResponse))
-        .mockResolvedValueOnce(
-          Response.json({
-            results: [
-              { panelType: 'rules', status: 'unconfigured' },
-              { panelType: 'role_menu', status: 'unconfigured' },
-            ],
-          }),
-        )
-        .mockResolvedValueOnce(Response.json(statusResponse)),
+      createWelcomeFetchMock(
+        Response.json(statusResponse),
+        Response.json({
+          results: [{ panelType: 'rules', status: 'unconfigured' }],
+        }),
+        Response.json(statusResponse),
+      ),
     );
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
     render(<OnboardingGrowthCategory />);
 
     await screen.findAllByText('No channel configured');
-    await user.click(screen.getByRole('button', { name: 'Publish All' }));
+    await user.click(screen.getByRole('button', { name: 'Publish Setup' }));
 
     await waitFor(() => {
       expect(toast.info).toHaveBeenCalledWith(
@@ -830,35 +782,27 @@ describe('OnboardingGrowthCategory', () => {
           messageId: 'message-1',
           stale: false,
         },
-        role_menu: {
-          status: 'missing',
-          configured: true,
-          channelId: 'welcome-channel',
-          configuredChannelId: 'welcome-channel',
-          messageId: null,
-          stale: false,
-        },
       },
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(Response.json(statusResponse))
-        .mockResolvedValueOnce(Response.json({ panelType: 'rules', status: 'posted' }))
-        .mockResolvedValueOnce(Response.json(statusResponse)),
+      createWelcomeFetchMock(
+        Response.json(statusResponse),
+        Response.json({ panelType: 'rules', status: 'posted' }),
+        Response.json(statusResponse),
+      ),
     );
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
     render(<OnboardingGrowthCategory />);
 
     await screen.findByText('#rules');
-    await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Publish Changes' }));
 
     await waitFor(() => {
       expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_welcome_published', {
         failedCount: 0,
-        panelScope: 'role_menu',
+        panelScope: 'rules',
         persistWarning: false,
         postedCount: 1,
         unconfiguredCount: 0,
@@ -882,14 +826,6 @@ describe('OnboardingGrowthCategory', () => {
           messageId: null,
           stale: false,
         },
-        role_menu: {
-          status: 'missing',
-          configured: true,
-          channelId: 'welcome-channel',
-          configuredChannelId: 'welcome-channel',
-          messageId: null,
-          stale: false,
-        },
       },
     };
     const refreshedStatusResponse = {
@@ -903,35 +839,30 @@ describe('OnboardingGrowthCategory', () => {
         },
       },
     };
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(Response.json(initialStatusResponse))
-      .mockResolvedValueOnce(
-        Response.json({
-          results: [
-            { panelType: 'rules', status: 'posted' },
-            { panelType: 'role_menu', status: 'failed', lastError: 'Missing channel' },
-          ],
-        }),
-      )
-      .mockResolvedValueOnce(Response.json(refreshedStatusResponse));
+    const fetchMock = createWelcomeFetchMock(
+      Response.json(initialStatusResponse),
+      Response.json({
+        results: [{ panelType: 'rules', status: 'failed', lastError: 'Missing channel' }],
+      }),
+      Response.json(refreshedStatusResponse),
+    );
     vi.stubGlobal('fetch', fetchMock);
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
     render(<OnboardingGrowthCategory />);
 
     await screen.findByText('#rules');
-    await user.click(screen.getByRole('button', { name: 'Publish All' }));
+    await user.click(screen.getByRole('button', { name: 'Publish Setup' }));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('Failed to publish welcome panel', {
-        description: 'role menu: Missing channel',
+        description: 'rules: Missing channel',
       });
     });
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/guilds/guild-1/welcome/status');
     });
-    expect(fetchMock.mock.calls[2]?.[0]).toBe('/api/guilds/guild-1/welcome/status');
     expect(mockTrackDashboardEvent).toHaveBeenCalledWith(
       'dashboard_welcome_publish_failed',
       expect.objectContaining({
@@ -955,37 +886,27 @@ describe('OnboardingGrowthCategory', () => {
           messageId: 'message-1',
           stale: false,
         },
-        role_menu: {
-          status: 'missing',
-          configured: true,
-          channelId: 'welcome-channel',
-          configuredChannelId: 'welcome-channel',
-          messageId: null,
-          stale: false,
-        },
       },
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(Response.json(statusResponse))
-        .mockResolvedValueOnce(
-          Response.json({
-            panelType: 'rules',
-            status: 'posted',
-            persistWarning: true,
-            lastError: persistWarning,
-          }),
-        )
-        .mockResolvedValueOnce(Response.json(statusResponse)),
+      createWelcomeFetchMock(
+        Response.json(statusResponse),
+        Response.json({
+          panelType: 'rules',
+          status: 'posted',
+          persistWarning: true,
+          lastError: persistWarning,
+        }),
+        Response.json(statusResponse),
+      ),
     );
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
     render(<OnboardingGrowthCategory />);
 
     await screen.findByText('#rules');
-    await user.click(screen.getAllByRole('button', { name: 'Publish' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Publish Changes' }));
 
     await waitFor(() => {
       expect(toast.info).toHaveBeenCalledWith('Welcome panel published with a warning', {
@@ -1009,41 +930,28 @@ describe('OnboardingGrowthCategory', () => {
           messageId: 'message-1',
           stale: false,
         },
-        role_menu: {
-          status: 'posted',
-          configured: true,
-          channelId: 'welcome-channel',
-          configuredChannelId: 'welcome-channel',
-          messageId: 'message-2',
-          stale: false,
-        },
       },
     };
     vi.stubGlobal(
       'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(Response.json(statusResponse))
-        .mockResolvedValueOnce(
-          Response.json({
-            results: [
-              { panelType: 'rules', status: 'posted' },
-              { panelType: 'role_menu', status: 'posted', persistWarning },
-            ],
-          }),
-        )
-        .mockResolvedValueOnce(Response.json(statusResponse)),
+      createWelcomeFetchMock(
+        Response.json(statusResponse),
+        Response.json({
+          results: [{ panelType: 'rules', status: 'posted', persistWarning }],
+        }),
+        Response.json(statusResponse),
+      ),
     );
     mockWelcomeContext({ draftConfig: createWelcomeDraftConfig({ dynamic: { enabled: false } }) });
 
     render(<OnboardingGrowthCategory />);
 
     await screen.findByText('#rules');
-    await user.click(screen.getByRole('button', { name: 'Publish All' }));
+    await user.click(screen.getByRole('button', { name: 'Publish Setup' }));
 
     await waitFor(() => {
       expect(toast.info).toHaveBeenCalledWith('Welcome panels published with a warning', {
-        description: `role menu: ${persistWarning}`,
+        description: `rules: ${persistWarning}`,
       });
     });
     expect(toast.success).not.toHaveBeenCalledWith('Welcome panels published');

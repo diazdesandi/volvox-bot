@@ -29,12 +29,11 @@ vi.mock('../../../src/modules/config.js', () => ({
 }));
 
 vi.mock('../../../src/modules/welcomePublishing.js', () => ({
-  WELCOME_PANEL_TYPES: new Set(['rules', 'role_menu']),
+  WELCOME_PANEL_TYPES: new Set(['rules']),
   getWelcomePublicationStatus: vi.fn().mockResolvedValue({
     guildId: 'guild1',
     panels: {
       rules: { panelType: 'rules', status: 'missing', configured: true },
-      role_menu: { panelType: 'role_menu', status: 'missing', configured: false },
     },
   }),
   publishWelcomePanel: vi.fn().mockResolvedValue({
@@ -93,6 +92,21 @@ describe('welcome routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.rendered).toBe('Hello <@123456789> in Test Guild!');
       expect(res.body.template).toBe('Hello {{user}} in {{server}}!');
+    });
+
+    it('rejects removed welcome panel types', async () => {
+      const res = await request(app)
+        .post('/api/v1/guilds/guild1/welcome/publish/role_menu')
+        .set('x-api-secret', secret);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('Invalid welcome panel type');
+      expect(publishWelcomePanel).not.toHaveBeenCalledWith(
+        expect.anything(),
+        'guild1',
+        'role_menu',
+        expect.anything(),
+      );
     });
 
     it('renders from variants when provided in body', async () => {

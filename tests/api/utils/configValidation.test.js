@@ -177,10 +177,11 @@ describe('configValidation', () => {
 
     it('should validate new welcome onboarding fields', () => {
       expect(validateSingleValue('welcome.rulesChannel', null)).toEqual([]);
-      expect(validateSingleValue('welcome.roleMenuChannel', null)).toEqual([]);
       expect(validateSingleValue('welcome.verifiedRole', '123')).toEqual([]);
-      expect(validateSingleValue('welcome.roleMenu.enabled', true)).toEqual([]);
       expect(validateSingleValue('welcome.dmSequence.steps', ['hi', 'there'])).toEqual([]);
+      expect(validateSingleValue('welcome.roleMenu.enabled', true)).toEqual(
+        expect.arrayContaining([expect.stringContaining('Unknown config path')]),
+      );
     });
 
     it('should allow zero welcome milestone interval to disable interval milestones', () => {
@@ -206,15 +207,6 @@ describe('configValidation', () => {
       expect(validateSingleValue('challenges.timezone', 'Mars/Base')).toEqual([
         'challenges.timezone: expected a valid IANA timezone or UTC/GMT offset, got "Mars/Base"',
       ]);
-    });
-
-    it('should reject malformed roleMenu.options items', () => {
-      const errors = validateSingleValue('welcome.roleMenu', {
-        enabled: true,
-        options: [{ label: 'Test' }],
-      });
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors.some((e) => e.includes('missing required key "roleId"'))).toBe(true);
     });
 
     it('should reject dmSequence.steps as non-array', () => {

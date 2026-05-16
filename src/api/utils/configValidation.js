@@ -285,17 +285,8 @@ export const CONFIG_SCHEMA = {
         },
       },
       rulesChannel: { type: 'string', nullable: true },
-      roleMenuChannel: { type: 'string', nullable: true },
       verifiedRole: { type: 'string', nullable: true },
       introChannel: { type: 'string', nullable: true },
-      roleMenu: {
-        type: 'object',
-        properties: {
-          enabled: { type: 'boolean' },
-          message: { type: 'string', maxLength: 2000 },
-          options: { type: 'array', items: { type: 'object', required: ['label', 'roleId'] } },
-        },
-      },
       dmSequence: {
         type: 'object',
         properties: {

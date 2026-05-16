@@ -189,15 +189,6 @@ export const CONFIG_SEARCH_ITEMS: ConfigSearchItem[] = [
     isAdvanced: false,
   },
   {
-    id: 'welcome-role-menu',
-    featureId: 'welcome',
-    categoryId: 'onboarding-growth',
-    label: 'Welcome Role Menu',
-    description: 'Configure self-assignable role options.',
-    keywords: ['role menu', 'self assign', 'onboarding roles'],
-    isAdvanced: true,
-  },
-  {
     id: 'welcome-dm-sequence',
     featureId: 'welcome',
     categoryId: 'onboarding-growth',

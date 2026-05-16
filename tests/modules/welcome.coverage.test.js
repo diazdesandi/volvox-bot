@@ -24,7 +24,6 @@ vi.mock('../../src/utils/discordCache.js', () => ({
 vi.mock('../../src/modules/welcomeOnboarding.js', () => ({
   isReturningMember: vi.fn(),
   buildRulesAgreementMessage: vi.fn(),
-  buildRoleMenuMessage: vi.fn(),
 }));
 
 vi.mock('../../src/logger.js', () => ({

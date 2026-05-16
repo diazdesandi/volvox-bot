@@ -99,7 +99,7 @@ export function updateNestedField<K extends GuildConfigSectionKey>(
  *
  * If the provided path is empty or the index is not an integer or out of bounds, the original config is returned unchanged.
  *
- * @param path - Sequence of keys that locates the target array within the section (e.g., ['roleMenu', 'options'])
+ * @param path - Sequence of keys that locates the target array within the section (e.g., ['dmSequence', 'steps'])
  * @param index - Zero-based index of the array element to replace
  * @param item - The new value to place at `index`
  * @returns A new GuildConfig with the array item replaced, or the original `config` if no update was performed
@@ -157,7 +157,7 @@ export function updateArrayItem<T>(
  *
  * @param config - The current guild configuration
  * @param section - Top-level section key containing the nested path
- * @param path - Sequence of keys to traverse to the target array (e.g., ['roleMenu', 'options'])
+ * @param path - Sequence of keys to traverse to the target array (e.g., ['dmSequence', 'steps'])
  * @param index - The index of the item to remove
  * @returns A new GuildConfig with the item removed. If `path` is empty or `index` is not an integer or out of bounds, returns the original config unchanged.
  */

@@ -31,6 +31,7 @@ import {
   hashWelcomePanelConfig,
   publishWelcomePanel,
   publishWelcomePanels,
+  WELCOME_PANEL_TYPES,
 } from '../../src/modules/welcomePublishing.js';
 import { fetchChannelCached } from '../../src/utils/discordCache.js';
 import { safeEditMessage, safeSend } from '../../src/utils/safeSend.js';
@@ -48,13 +49,7 @@ function createWelcomeConfig(overrides = {}) {
   return {
     enabled: true,
     rulesChannel: RULES_CHANNEL,
-    roleMenuChannel: 'roles-channel',
     rulesMessage: 'Accept these rules.',
-    roleMenu: {
-      enabled: true,
-      message: 'Pick a role.',
-      options: [{ label: 'Updates', roleId: 'role-1' }],
-    },
     ...overrides,
   };
 }
@@ -171,17 +166,19 @@ function arrangeChangedChannel({
 describe('welcomePublishing module', () => {
   beforeEach(resetDefaultMocks);
 
+  it('only exposes the rules agreement panel', () => {
+    expect([...WELCOME_PANEL_TYPES]).toEqual(['rules']);
+    expect(() => getWelcomePanelPayload('role_menu', createWelcomeConfig())).toThrow(
+      'Unknown welcome panel type',
+    );
+  });
+
   it('builds configured panel payloads and stable config hashes', () => {
     const config = createWelcomeConfig();
 
     expect(getWelcomePanelPayload('rules', config)).toMatchObject({
       panelType: 'rules',
       channelId: RULES_CHANNEL,
-      configured: true,
-    });
-    expect(getWelcomePanelPayload('role_menu', config)).toMatchObject({
-      panelType: 'role_menu',
-      channelId: 'roles-channel',
       configured: true,
     });
     expect(hashWelcomePanelConfig('rules', config)).toBe(hashWelcomePanelConfig('rules', config));
@@ -194,35 +191,10 @@ describe('welcomePublishing module', () => {
     for (const [panelType, config] of [
       ['rules', createWelcomeConfig({ enabled: false })],
       ['rules', createWelcomeConfig({ rulesChannel: null })],
-      ['role_menu', createWelcomeConfig({ roleMenuChannel: null })],
     ]) {
       expect(getWelcomePanelPayload(panelType, config)).toBeNull();
     }
     expect(() => getWelcomePanelPayload('bogus', {})).toThrow('Unknown welcome panel type');
-  });
-
-  it('uses the welcome message channel as the legacy role menu channel fallback', () => {
-    const payload = getWelcomePanelPayload(
-      'role_menu',
-      createWelcomeConfig({ channelId: 'legacy-welcome-channel', roleMenuChannel: null }),
-    );
-
-    expect(payload).toMatchObject({
-      panelType: 'role_menu',
-      channelId: 'legacy-welcome-channel',
-      configured: true,
-    });
-    expect(
-      hashWelcomePanelConfig(
-        'role_menu',
-        createWelcomeConfig({ channelId: 'channel-a', roleMenuChannel: null }),
-      ),
-    ).not.toBe(
-      hashWelcomePanelConfig(
-        'role_menu',
-        createWelcomeConfig({ channelId: 'channel-b', roleMenuChannel: null }),
-      ),
-    );
   });
 
   it('marks stored messages stale when welcome publishing is disabled', async () => {
@@ -261,12 +233,7 @@ describe('welcomePublishing module', () => {
       channelId: 'old-rules',
       configuredChannelId: RULES_CHANNEL,
     });
-    expect(status.panels.role_menu).toMatchObject({
-      configured: true,
-      status: 'missing',
-      stale: false,
-      channelId: 'roles-channel',
-    });
+    expect(status.panels).not.toHaveProperty('role_menu');
   });
 
   it('handles missing database pools and status query failures', async () => {
@@ -519,6 +486,6 @@ describe('welcomePublishing module', () => {
 
     const result = await publishWelcomePanels({}, GUILD_ID);
     expect(result.guildId).toBe(GUILD_ID);
-    expect(result.results.map((panel) => panel.panelType)).toEqual(['rules', 'role_menu']);
+    expect(result.results.map((panel) => panel.panelType)).toEqual(['rules']);
   });
 });

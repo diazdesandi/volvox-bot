@@ -32,13 +32,10 @@ vi.mock('../../src/utils/safeSend.js', () => ({
 }));
 
 import {
-  buildRoleMenuMessage,
   buildRulesAgreementMessage,
-  handleRoleMenuSelection,
   handleRulesAcceptButton,
   isReturningMember,
   normalizeWelcomeOnboardingConfig,
-  ROLE_MENU_SELECT_ID,
   RULES_ACCEPT_BUTTON_ID,
 } from '../../src/modules/welcomeOnboarding.js';
 import { safeEditReply, safeSend } from '../../src/utils/safeSend.js';
@@ -53,37 +50,21 @@ describe('welcomeOnboarding module', () => {
 
     expect(result).toEqual({
       rulesChannel: null,
-      roleMenuChannel: null,
       verifiedRole: null,
       introChannel: null,
       rulesMessage: 'Read the server rules, then click below to verify your access.',
-      roleMenu: {
-        enabled: false,
-        message: 'Pick your roles below. You can update them anytime.',
-        options: [],
-      },
       introMessage: 'Welcome {{user}}! Drop a quick intro so we can meet you.',
       dmSequence: { enabled: false, steps: [] },
     });
   });
 
-  it('normalizes onboarding config by trimming values and dropping junk options', () => {
+  it('normalizes onboarding config by trimming values', () => {
     const result = normalizeWelcomeOnboardingConfig({
       rulesChannel: '  rules-1  ',
-      roleMenuChannel: ' role-menu-1 ',
       verifiedRole: ' verified-role ',
       introChannel: ' intro-1 ',
       rulesMessage: ' Custom rules ',
       introMessage: ' Say hi {{username}} ',
-      roleMenu: {
-        enabled: true,
-        message: ' Choose roles ',
-        options: [
-          { label: '  Gamer ', roleId: ' role-1 ', description: '  likes games  ' },
-          { label: '', roleId: 'role-2' },
-          null,
-        ],
-      },
       dmSequence: {
         enabled: true,
         steps: ['  welcome  ', '', '  read the rules '],
@@ -92,30 +73,15 @@ describe('welcomeOnboarding module', () => {
 
     expect(result).toEqual({
       rulesChannel: 'rules-1',
-      roleMenuChannel: 'role-menu-1',
       verifiedRole: 'verified-role',
       introChannel: 'intro-1',
       rulesMessage: 'Custom rules',
-      roleMenu: {
-        enabled: true,
-        message: 'Choose roles',
-        options: [{ label: 'Gamer', roleId: 'role-1', description: 'likes games' }],
-      },
       introMessage: 'Say hi {{username}}',
       dmSequence: {
         enabled: true,
         steps: ['welcome', 'read the rules'],
       },
     });
-  });
-
-  it('falls back to the welcome message channel for legacy role menu configs', () => {
-    const result = normalizeWelcomeOnboardingConfig({
-      channelId: ' legacy-welcome-channel ',
-      roleMenuChannel: null,
-    });
-
-    expect(result.roleMenuChannel).toBe('legacy-welcome-channel');
   });
 
   it('builds the rules agreement message with accept button', () => {
@@ -128,19 +94,10 @@ describe('welcomeOnboarding module', () => {
     expect(button.custom_id).toBe(RULES_ACCEPT_BUTTON_ID);
   });
 
-  it('uses configurable rules and role menu messages', () => {
+  it('uses configurable rules messages', () => {
     expect(buildRulesAgreementMessage({ rulesMessage: 'Custom rules panel' }).content).toBe(
       'Custom rules panel',
     );
-    expect(
-      buildRoleMenuMessage({
-        roleMenu: {
-          enabled: true,
-          message: 'Custom roles panel',
-          options: [{ label: 'Role A', roleId: 'role-a' }],
-        },
-      })?.content,
-    ).toBe('Custom roles panel');
   });
 
   it('detects returning members via the DidRejoin flag', () => {
@@ -151,28 +108,6 @@ describe('welcomeOnboarding module', () => {
     const hasNotRejoined = vi.fn().mockReturnValue(false);
     expect(isReturningMember({ flags: { has: hasNotRejoined } })).toBe(false);
     expect(hasNotRejoined).toHaveBeenCalledWith(GuildMemberFlagsBitField.Flags.DidRejoin);
-  });
-
-  it('returns null when role menu is disabled or empty', () => {
-    expect(
-      buildRoleMenuMessage({
-        roleMenu: { enabled: false, options: [{ label: 'A', roleId: '1' }] },
-      }),
-    ).toBeNull();
-    expect(buildRoleMenuMessage({ roleMenu: { enabled: true, options: [] } })).toBeNull();
-  });
-
-  it('buildRoleMenuMessage enforces max 25 options', () => {
-    const options = Array.from({ length: 30 }, (_, i) => ({
-      label: `Role ${i + 1}`,
-      roleId: `r${i + 1}`,
-    }));
-
-    const message = buildRoleMenuMessage({ roleMenu: { enabled: true, options } });
-    const select = message?.components?.[0]?.components?.[0]?.toJSON();
-
-    expect(select?.custom_id).toBe(ROLE_MENU_SELECT_ID);
-    expect(select?.options).toHaveLength(25);
   });
 
   it('handles rules acceptance by granting verified role and posting intro prompt', async () => {
@@ -402,117 +337,6 @@ describe('welcomeOnboarding module', () => {
     expect(safeEditReply).toHaveBeenCalledWith(
       interaction,
       expect.objectContaining({ content: expect.stringContaining('Rules accepted') }),
-    );
-  });
-
-  it('updates self-assignable roles by adding selected and removing deselected', async () => {
-    const roleA = { id: 'role-a', editable: true };
-    const roleB = { id: 'role-b', editable: true };
-
-    const member = {
-      roles: {
-        cache: new Map([['role-a', roleA]]),
-        add: vi.fn(async () => {}),
-        remove: vi.fn(async () => {}),
-      },
-    };
-
-    const interaction = {
-      user: { id: 'user-2' },
-      member,
-      values: ['role-b'],
-      guild: {
-        roles: {
-          cache: new Map([
-            ['role-a', roleA],
-            ['role-b', roleB],
-          ]),
-          fetch: vi.fn(async (id) => (id === 'role-a' ? roleA : roleB)),
-        },
-      },
-      reply: vi.fn(async () => {}),
-      deferReply: vi.fn(async () => {}),
-      editReply: vi.fn(async () => {}),
-      deferred: false,
-      replied: false,
-    };
-
-    await handleRoleMenuSelection(interaction, {
-      welcome: {
-        roleMenu: {
-          enabled: true,
-          options: [
-            { label: 'Role A', roleId: 'role-a' },
-            { label: 'Role B', roleId: 'role-b' },
-          ],
-        },
-      },
-    });
-
-    expect(member.roles.remove).toHaveBeenCalledWith(
-      ['role-a'],
-      'Updated self-assignable onboarding roles',
-    );
-    expect(member.roles.add).toHaveBeenCalledWith(
-      ['role-b'],
-      'Updated self-assignable onboarding roles',
-    );
-  });
-
-  it('handles unconfigured role menus and no-op updates', async () => {
-    const interaction = {
-      user: { id: 'user-3' },
-      values: [],
-      member: {
-        roles: {
-          cache: new Map(),
-          add: vi.fn(async () => {}),
-          remove: vi.fn(async () => {}),
-        },
-      },
-      guild: {
-        roles: {
-          cache: new Map(),
-          fetch: vi.fn(async () => null),
-        },
-      },
-      deferReply: vi.fn(async () => {}),
-    };
-
-    await handleRoleMenuSelection(interaction, { welcome: { roleMenu: { enabled: false } } });
-    expect(safeEditReply).toHaveBeenCalledWith(
-      interaction,
-      expect.objectContaining({ content: expect.stringContaining('not configured') }),
-    );
-
-    const role = { id: 'role-a', editable: true };
-    const noChangeInteraction = {
-      ...interaction,
-      values: ['role-a'],
-      member: {
-        roles: {
-          cache: new Map([['role-a', role]]),
-          add: vi.fn(async () => {}),
-          remove: vi.fn(async () => {}),
-        },
-      },
-      guild: {
-        roles: {
-          cache: new Map([['role-a', role]]),
-          fetch: vi.fn(async () => role),
-        },
-      },
-    };
-
-    await handleRoleMenuSelection(noChangeInteraction, {
-      welcome: {
-        roleMenu: { enabled: true, options: [{ label: 'Role A', roleId: 'role-a' }] },
-      },
-    });
-
-    expect(safeEditReply).toHaveBeenCalledWith(
-      noChangeInteraction,
-      expect.objectContaining({ content: '✅ No role changes were needed.' }),
     );
   });
 });

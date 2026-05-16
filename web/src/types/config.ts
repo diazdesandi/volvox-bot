@@ -64,21 +64,6 @@ export interface WelcomeDynamic {
   excludeChannels: string[];
 }
 
-/** Self-assignable role menu option. */
-export interface WelcomeRoleOption {
-  id?: string;
-  label: string;
-  roleId: string;
-  description?: string;
-}
-
-/** Self-assignable role menu settings. */
-export interface WelcomeRoleMenu {
-  enabled: boolean;
-  message?: string;
-  options: WelcomeRoleOption[];
-}
-
 /** Direct-message onboarding sequence. */
 export interface WelcomeDmSequence {
   enabled: boolean;
@@ -96,10 +81,8 @@ export interface WelcomeConfig {
   introMessage?: string;
   dynamic: WelcomeDynamic;
   rulesChannel: string | null;
-  roleMenuChannel: string | null;
   verifiedRole: string | null;
   introChannel: string | null;
-  roleMenu: WelcomeRoleMenu;
   dmSequence: WelcomeDmSequence;
 }
 

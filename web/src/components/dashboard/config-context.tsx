@@ -39,7 +39,7 @@ import {
 import { getWorkspaceSelectorGroups } from '@/lib/workspace-access';
 import { SYSTEM_PROMPT_MAX_LENGTH } from '@/types/config';
 import type { GuildConfig } from './config-editor-utils';
-import { generateId, isGuildConfig } from './config-editor-utils';
+import { isGuildConfig } from './config-editor-utils';
 
 export type { GuildConfig } from './config-editor-utils';
 
@@ -252,13 +252,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid config response');
       }
 
-      // Ensure role menu options have stable IDs
-      if (data.welcome?.roleMenu?.options) {
-        data.welcome.roleMenu.options = data.welcome.roleMenu.options.map((opt) => ({
-          ...opt,
-          id: opt.id || generateId(),
-        }));
-      }
       setSavedConfig(data);
       setDraftConfig(structuredClone(data));
     } catch (err) {
@@ -333,12 +326,6 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
 
   const hasValidationErrors = useMemo(() => {
     if (!draftConfig) return false;
-    const roleMenuEnabled = draftConfig.welcome?.roleMenu?.enabled ?? false;
-    const roleMenuOptions = draftConfig.welcome?.roleMenu?.options ?? [];
-    const hasRoleMenuErrors = roleMenuOptions.some(
-      (opt) => !opt.label?.trim() || !opt.roleId?.trim(),
-    );
-    if (roleMenuEnabled && hasRoleMenuErrors) return true;
     const promptLength = draftConfig.ai?.systemPrompt?.length ?? 0;
     return promptLength > SYSTEM_PROMPT_MAX_LENGTH;
   }, [draftConfig]);

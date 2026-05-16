@@ -1,24 +1,14 @@
-import {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  GuildMemberFlagsBitField,
-  StringSelectMenuBuilder,
-} from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMemberFlagsBitField } from 'discord.js';
 import { info } from '../logger.js';
 import { fetchChannelCached } from '../utils/discordCache.js';
 import { safeEditReply, safeSend } from '../utils/safeSend.js';
 import { renderTemplate } from '../utils/templateEngine.js';
 
 export const RULES_ACCEPT_BUTTON_ID = 'welcome_rules_accept';
-export const ROLE_MENU_SELECT_ID = 'welcome_role_select';
 export const DEFAULT_RULES_AGREEMENT_MESSAGE =
   'Read the server rules, then click below to verify your access.';
-export const DEFAULT_ROLE_MENU_MESSAGE = 'Pick your roles below. You can update them anytime.';
 export const DEFAULT_INTRODUCTION_MESSAGE =
   'Welcome {{user}}! Drop a quick intro so we can meet you.';
-
-const MAX_ROLE_MENU_OPTIONS = 25;
 
 function getTrimmedString(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -30,20 +20,6 @@ function getOptionalString(value) {
 
 function getStringOrDefault(value, fallback) {
   return getTrimmedString(value) || fallback;
-}
-
-function normalizeRoleMenuOptions(options) {
-  if (!Array.isArray(options)) return [];
-
-  return options
-    .filter((opt) => opt && typeof opt === 'object')
-    .map((opt) => ({
-      label: String(opt.label || '').trim(),
-      roleId: String(opt.roleId || '').trim(),
-      ...(opt.description ? { description: String(opt.description).trim() } : {}),
-    }))
-    .filter((opt) => opt.label && opt.roleId)
-    .slice(0, MAX_ROLE_MENU_OPTIONS);
 }
 
 function normalizeDmSteps(steps) {
@@ -58,29 +34,19 @@ function normalizeDmSteps(steps) {
  * @param {object} welcomeConfig
  * @returns {{
  *   rulesChannel: string|null,
- *   roleMenuChannel: string|null,
  *   verifiedRole: string|null,
  *   introChannel: string|null,
  *   rulesMessage: string,
- *   roleMenu: {enabled: boolean, message: string, options: Array<{label: string, roleId: string, description?: string}>},
  *   introMessage: string,
  *   dmSequence: {enabled: boolean, steps: string[]},
  * }}
  */
 export function normalizeWelcomeOnboardingConfig(welcomeConfig = {}) {
-  const legacyRoleMenuChannel = getOptionalString(welcomeConfig?.channelId);
-
   return {
     rulesChannel: getOptionalString(welcomeConfig?.rulesChannel),
-    roleMenuChannel: getOptionalString(welcomeConfig?.roleMenuChannel) ?? legacyRoleMenuChannel,
     verifiedRole: getOptionalString(welcomeConfig?.verifiedRole),
     introChannel: getOptionalString(welcomeConfig?.introChannel),
     rulesMessage: getStringOrDefault(welcomeConfig?.rulesMessage, DEFAULT_RULES_AGREEMENT_MESSAGE),
-    roleMenu: {
-      enabled: welcomeConfig?.roleMenu?.enabled === true,
-      message: getStringOrDefault(welcomeConfig?.roleMenu?.message, DEFAULT_ROLE_MENU_MESSAGE),
-      options: normalizeRoleMenuOptions(welcomeConfig?.roleMenu?.options),
-    },
     introMessage: getStringOrDefault(welcomeConfig?.introMessage, DEFAULT_INTRODUCTION_MESSAGE),
     dmSequence: {
       enabled: welcomeConfig?.dmSequence?.enabled === true,
@@ -110,33 +76,6 @@ export function buildRulesAgreementMessage(welcomeConfig = {}) {
 
   return {
     content: onboarding.rulesMessage,
-    components: [row],
-  };
-}
-
-export function buildRoleMenuMessage(welcomeConfig) {
-  const onboarding = normalizeWelcomeOnboardingConfig(welcomeConfig);
-  if (!onboarding.roleMenu.enabled || onboarding.roleMenu.options.length === 0) {
-    return null;
-  }
-
-  const select = new StringSelectMenuBuilder()
-    .setCustomId(ROLE_MENU_SELECT_ID)
-    .setPlaceholder('Choose your roles')
-    .setMinValues(0)
-    .setMaxValues(onboarding.roleMenu.options.length)
-    .addOptions(
-      onboarding.roleMenu.options.map((opt) => ({
-        label: opt.label.slice(0, 100),
-        value: opt.roleId,
-        ...(opt.description ? { description: opt.description.slice(0, 100) } : {}),
-      })),
-    );
-
-  const row = new ActionRowBuilder().addComponents(select);
-
-  return {
-    content: onboarding.roleMenu.message,
     components: [row],
   };
 }
@@ -238,54 +177,5 @@ export async function handleRulesAcceptButton(interaction, config) {
     guildId: interaction.guildId,
     userId: interaction.user.id,
     roleId: role.id,
-  });
-}
-
-export async function handleRoleMenuSelection(interaction, config) {
-  await interaction.deferReply({ ephemeral: true });
-  const welcome = normalizeWelcomeOnboardingConfig(config?.welcome);
-
-  if (!welcome.roleMenu.enabled || welcome.roleMenu.options.length === 0) {
-    await safeEditReply(interaction, {
-      content: '⚠️ Role menu is not configured on this server.',
-    });
-    return;
-  }
-
-  const member = interaction.member || (await interaction.guild.members.fetch(interaction.user.id));
-
-  const configuredRoleIds = [...new Set(welcome.roleMenu.options.map((opt) => opt.roleId))];
-  const selectedIds = new Set(interaction.values.filter((id) => configuredRoleIds.includes(id)));
-
-  const removable = [];
-  const addable = [];
-
-  for (const roleId of configuredRoleIds) {
-    const role = await fetchRole(interaction.guild, roleId);
-    if (!role?.editable) continue;
-
-    const hasRole = member.roles.cache.has(role.id);
-    if (selectedIds.has(role.id) && !hasRole) addable.push(role);
-    if (!selectedIds.has(role.id) && hasRole) removable.push(role);
-  }
-
-  if (removable.length > 0) {
-    await member.roles.remove(
-      removable.map((r) => r.id),
-      'Updated self-assignable onboarding roles',
-    );
-  }
-  if (addable.length > 0) {
-    await member.roles.add(
-      addable.map((r) => r.id),
-      'Updated self-assignable onboarding roles',
-    );
-  }
-
-  await safeEditReply(interaction, {
-    content:
-      addable.length === 0 && removable.length === 0
-        ? '✅ No role changes were needed.'
-        : `✅ Updated roles. Added: ${addable.length}, Removed: ${removable.length}.`,
   });
 }

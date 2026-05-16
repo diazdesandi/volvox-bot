@@ -585,25 +585,6 @@ exports.up = (pgm) => {
   `);
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_reaction_role_entries_menu ON reaction_role_entries(menu_id)');
 
-  // ── role_menu_templates ───────────────────────────────────────────
-  pgm.sql(`
-    CREATE TABLE IF NOT EXISTS role_menu_templates (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      category TEXT NOT NULL DEFAULT 'custom',
-      created_by_guild_id TEXT,
-      is_builtin BOOLEAN NOT NULL DEFAULT FALSE,
-      is_shared BOOLEAN NOT NULL DEFAULT FALSE,
-      options JSONB NOT NULL DEFAULT '[]',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  pgm.sql("CREATE UNIQUE INDEX IF NOT EXISTS idx_rmt_name_guild ON role_menu_templates (LOWER(name), COALESCE(created_by_guild_id, '__builtin__'))");
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_rmt_guild ON role_menu_templates(created_by_guild_id)');
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_rmt_shared ON role_menu_templates(is_shared) WHERE is_shared = TRUE');
-
   // ── temp_roles ────────────────────────────────────────────────────
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS temp_roles (
@@ -631,7 +612,6 @@ exports.up = (pgm) => {
 /** @param {import('node-pg-migrate').MigrationBuilder} pgm */
 exports.down = (pgm) => {
   pgm.sql('DROP TABLE IF EXISTS temp_roles CASCADE');
-  pgm.sql('DROP TABLE IF EXISTS role_menu_templates CASCADE');
   pgm.sql('DROP TABLE IF EXISTS reaction_role_entries CASCADE');
   pgm.sql('DROP TABLE IF EXISTS reaction_role_menus CASCADE');
   pgm.sql('DROP TABLE IF EXISTS guild_command_aliases CASCADE');

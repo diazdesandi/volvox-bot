@@ -1,20 +1,15 @@
 /**
  * Welcome Onboarding Handlers
- * Handles Discord button and select menu interactions for rules acceptance and role selection.
+ * Handles Discord button interactions for rules acceptance.
  */
 
 import { error as logError } from '../../logger.js';
 import { safeEditReply } from '../../utils/safeSend.js';
 import { getConfig } from '../config.js';
-import {
-  handleRoleMenuSelection,
-  handleRulesAcceptButton,
-  ROLE_MENU_SELECT_ID,
-  RULES_ACCEPT_BUTTON_ID,
-} from '../welcomeOnboarding.js';
+import { handleRulesAcceptButton, RULES_ACCEPT_BUTTON_ID } from '../welcomeOnboarding.js';
 
 /**
- * Handle welcome onboarding interactions (rules acceptance + role selection).
+ * Handle welcome onboarding interactions.
  *
  * @param {import('discord.js').Interaction} interaction
  * @returns {Promise<boolean>} true if handled, false if not applicable
@@ -39,27 +34,6 @@ export async function handleWelcomeOnboarding(interaction) {
       try {
         await safeEditReply(interaction, {
           content: '❌ Failed to verify. Please ping an admin.',
-        });
-      } catch {
-        // ignore
-      }
-    }
-    return true;
-  }
-
-  if (interaction.isStringSelectMenu() && interaction.customId === ROLE_MENU_SELECT_ID) {
-    try {
-      await handleRoleMenuSelection(interaction, guildConfig);
-    } catch (err) {
-      logError('Role menu handler failed', {
-        guildId,
-        userId: interaction.user?.id,
-        error: err?.message,
-      });
-
-      try {
-        await safeEditReply(interaction, {
-          content: '❌ Failed to update roles. Please try again.',
         });
       } catch {
         // ignore

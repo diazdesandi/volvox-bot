@@ -8,7 +8,6 @@ import { AiModelSelect } from '@/components/dashboard/ai-model-select';
 import { useConfigContext } from '@/components/dashboard/config-context';
 import {
   DEFAULT_ACTIVITY_BADGES,
-  generateId,
   inputClasses,
   parseNumberInput,
 } from '@/components/dashboard/config-editor-utils';
@@ -81,7 +80,7 @@ const INTRODUCTION_VARIABLE_DEFINITIONS = [
 ] as const;
 
 type WelcomePanelStatus = {
-  panelType: 'rules' | 'role_menu';
+  panelType: 'rules';
   configured: boolean;
   status: 'unconfigured' | 'missing' | 'posted' | 'failed';
   channelId: string | null;
@@ -96,12 +95,11 @@ type WelcomePublicationStatus = {
   guildId: string;
   panels: {
     rules?: WelcomePanelStatus;
-    role_menu?: WelcomePanelStatus;
   };
 };
 
 type WelcomePublishResult = {
-  panelType?: 'rules' | 'role_menu';
+  panelType?: 'rules';
   status?: WelcomePanelStatus['status'];
   lastError?: string | null;
   persistWarning?: boolean | string | null;
@@ -113,7 +111,7 @@ type WelcomeBulkPublishResult = {
 
 function getWelcomePublishFailureMessage(
   data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ) {
   if (panelType) {
     if (data?.status === 'posted' || data?.status === 'unconfigured') return null;
@@ -134,8 +132,7 @@ function getWelcomePublishFailureMessage(
   if (failed.length > 0) {
     return failed
       .map((entry) => {
-        const label = entry.panelType === 'role_menu' ? 'role menu' : entry.panelType || 'panel';
-        return `${label}: ${entry.lastError || entry.status || 'unknown'}`;
+        return `${entry.panelType || 'panel'}: ${entry.lastError || entry.status || 'unknown'}`;
       })
       .join('; ');
   }
@@ -145,7 +142,7 @@ function getWelcomePublishFailureMessage(
 
 function getWelcomePublishWarningMessage(
   data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ) {
   const fallback = 'Published to Discord, but saving publication state failed.';
   const hasPersistWarning = (entry: WelcomePublishResult) =>
@@ -167,15 +164,14 @@ function getWelcomePublishWarningMessage(
 
   return warnings
     .map((entry) => {
-      const label = entry.panelType === 'role_menu' ? 'role menu' : entry.panelType || 'panel';
-      return `${label}: ${warningText(entry)}`;
+      return `${entry.panelType || 'panel'}: ${warningText(entry)}`;
     })
     .join('; ');
 }
 
 function getWelcomePublishInfoMessage(
   data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ) {
   if (panelType && data?.status === 'unconfigured') {
     return 'Panel is not configured — set a channel first.';
@@ -207,7 +203,7 @@ function getWelcomePanelStatusClassName(statusText: string) {
 
 function getWelcomePublishTelemetryProperties(
   data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ) {
   const results = panelType
     ? [{ panelType, status: data?.status, persistWarning: data?.persistWarning }]
@@ -226,7 +222,7 @@ function getWelcomePublishTelemetryProperties(
 
 async function postWelcomePanel(
   guildId: string,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ): Promise<(WelcomePublishResult & WelcomeBulkPublishResult) | null> {
   const suffix = panelType ? `/publish/${encodeURIComponent(panelType)}` : '/publish';
   const response = await fetch(`/api/guilds/${encodeURIComponent(guildId)}/welcome${suffix}`, {
@@ -241,7 +237,7 @@ async function postWelcomePanel(
 
 function assertWelcomePublishSucceeded(
   data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ) {
   const failureMessage = getWelcomePublishFailureMessage(data, panelType);
   if (failureMessage) {
@@ -251,7 +247,7 @@ function assertWelcomePublishSucceeded(
 
 function showWelcomePublishOutcome(
   data: (WelcomePublishResult & WelcomeBulkPublishResult) | null,
-  panelType?: 'rules' | 'role_menu',
+  panelType?: 'rules',
 ) {
   const warningMessage = getWelcomePublishWarningMessage(data, panelType);
   if (warningMessage) {
@@ -319,19 +315,6 @@ export function OnboardingGrowthCategory() {
         welcome: {
           ...(prev.welcome ?? {}),
           dynamic: { ...(prev.welcome?.dynamic ?? {}), [field]: value },
-        },
-      }));
-    },
-    [updateDraftConfig],
-  );
-
-  const updateWelcomeRoleMenu = useCallback(
-    (field: string, value: unknown) => {
-      updateDraftConfig((prev) => ({
-        ...prev,
-        welcome: {
-          ...(prev.welcome ?? {}),
-          roleMenu: { ...(prev.welcome?.roleMenu ?? {}), [field]: value },
         },
       }));
     },
@@ -432,7 +415,7 @@ export function OnboardingGrowthCategory() {
   }, [fetchWelcomeStatus]);
 
   const publishWelcomePanel = useCallback(
-    async (panelType?: 'rules' | 'role_menu') => {
+    async (panelType?: 'rules') => {
       if (!guildId) return;
 
       const initiatingGuildId = guildId;
@@ -478,7 +461,7 @@ export function OnboardingGrowthCategory() {
   }, [publishWelcomePanel]);
 
   const handlePublishWelcomePanel = useCallback(
-    (panelType: 'rules' | 'role_menu') => {
+    (panelType: 'rules') => {
       publishWelcomePanel(panelType).catch(() => undefined);
     },
     [publishWelcomePanel],
@@ -500,14 +483,6 @@ export function OnboardingGrowthCategory() {
     [guildChannels, draftConfig?.welcome?.dynamic?.highlightChannels],
   );
 
-  const welcomeRoleOptions = useMemo(
-    () =>
-      (draftConfig?.welcome?.roleMenu?.options ?? []).map((option) => ({
-        ...option,
-        id: option.id ?? generateId(),
-      })),
-    [draftConfig?.welcome?.roleMenu?.options],
-  );
   const channelNameById = useMemo(
     () => new Map(guildChannels.map((channel) => [channel.id, channel.name])),
     [guildChannels],
@@ -528,18 +503,6 @@ export function OnboardingGrowthCategory() {
     },
     [copyChannelId],
   );
-
-  useEffect(() => {
-    if (!draftConfig) return;
-
-    const hasLegacyWelcomeRoleOptions = (draftConfig.welcome?.roleMenu?.options ?? []).some(
-      (option) => !option.id,
-    );
-
-    if (hasLegacyWelcomeRoleOptions) {
-      updateWelcomeRoleMenu('options', welcomeRoleOptions);
-    }
-  }, [draftConfig, updateWelcomeRoleMenu, welcomeRoleOptions]);
 
   const currentTldrModel = draftConfig?.tldr?.model;
   const tldrModelValue = getVisibleProviderModelValue(currentTldrModel);
@@ -567,11 +530,6 @@ export function OnboardingGrowthCategory() {
   if (!activeTab) return null;
 
   const welcomePanels = welcomeStatus?.panels;
-  const welcomeChannelId = draftConfig.welcome?.channelId;
-  const roleMenuChannelId = draftConfig.welcome?.roleMenuChannel;
-  const roleMenuChannelPlaceholder = welcomeChannelId
-    ? 'Defaults to welcome message channel'
-    : 'Select role menu channel';
 
   let isCurrentFeatureEnabled = false;
   let handleToggleCurrentFeature = (_v: boolean) => {};
@@ -640,8 +598,8 @@ export function OnboardingGrowthCategory() {
                   <h3 className="text-sm font-bold text-foreground/90">Publish setup actions</h3>
                 </div>
                 <p className="text-[11px] text-muted-foreground/60 font-medium">
-                  What this does: posts or updates the rules agreement and self-assign role menu in
-                  Discord. Set the channels below first, then publish when you are ready.
+                  What this does: posts or updates the rules agreement in Discord. Set the channel
+                  below first, then publish when you are ready.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -664,16 +622,13 @@ export function OnboardingGrowthCategory() {
                   className="h-8 gap-2 text-[10px] uppercase tracking-widest font-bold rounded-xl"
                 >
                   <Send className="h-3.5 w-3.5" />
-                  Publish All
+                  Publish Setup
                 </Button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                { key: 'rules' as const, label: 'Rules Agreement' },
-                { key: 'role_menu' as const, label: 'Self-Assign Roles' },
-              ].map((panel) => {
+              {[{ key: 'rules' as const, label: 'Rules Agreement' }].map((panel) => {
                 const status = welcomePanels?.[panel.key];
                 const statusText = getWelcomePanelStatusText(status, welcomeStatusLoading);
                 const channelId = status?.configuredChannelId ?? status?.channelId;
@@ -851,7 +806,7 @@ export function OnboardingGrowthCategory() {
               </CollapsiblePrimitive.Content>
             </CollapsiblePrimitive.Root>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-6 pt-4 border-t border-border/40">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 pt-4 border-t border-border/40">
               <div className="space-y-2">
                 <label
                   htmlFor="welcome-channel-id"
@@ -886,28 +841,6 @@ export function OnboardingGrowthCategory() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1">
-                  Role Menu
-                </div>
-                <ChannelSelector
-                  id="welcome-role-menu-channel"
-                  guildId={guildId}
-                  selected={roleMenuChannelId ? [roleMenuChannelId] : []}
-                  onChange={(selected) =>
-                    updateWelcomeField('roleMenuChannel', selected[0] ?? null)
-                  }
-                  disabled={saving}
-                  placeholder={roleMenuChannelPlaceholder}
-                  maxSelections={1}
-                  filter="text"
-                />
-                <p className="text-[11px] text-muted-foreground/60 font-medium ml-1">
-                  {welcomeChannelId
-                    ? 'Leave unset to use the welcome message channel.'
-                    : 'Set this or a welcome message channel before publishing.'}
-                </p>
-              </div>
               <div className="space-y-2">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1">
                   Verification Role
@@ -1054,104 +987,6 @@ export function OnboardingGrowthCategory() {
                 className={cn(inputClasses, 'resize-none font-mono text-[13px]')}
                 placeholder="One guiding message per line..."
               />
-            </div>
-          </div>
-
-          {/* Role Menu Setup */}
-          <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-8">
-              <div className="space-y-0.5">
-                <h3 className="text-sm font-bold text-foreground/90">Self-Assign Tiers</h3>
-                <p className="text-[11px] text-muted-foreground/60 font-medium">
-                  Members pick their own starting roles.
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={saving || welcomeRoleOptions.length >= 25}
-                  onClick={() => {
-                    const opts = [
-                      ...welcomeRoleOptions,
-                      { id: generateId(), label: '', roleId: '' },
-                    ];
-                    updateWelcomeRoleMenu('options', opts);
-                  }}
-                  className="h-8 text-[10px] uppercase tracking-widest font-bold text-primary hover:bg-primary/5 border border-primary/20 rounded-xl"
-                >
-                  + Add Role Option
-                </Button>
-                <ToggleSwitch
-                  checked={draftConfig.welcome?.roleMenu?.enabled ?? false}
-                  onChange={(v) => updateWelcomeRoleMenu('enabled', v)}
-                  disabled={saving}
-                  label="Role Menu"
-                />
-              </div>
-            </div>
-
-            <div className="mb-6 space-y-2">
-              <span className="block text-sm font-bold tracking-tight text-foreground/80">
-                Self-assign roles message
-              </span>
-              <DiscordMarkdownEditor
-                value={draftConfig.welcome?.roleMenu?.message ?? ''}
-                onChange={(v) => updateWelcomeRoleMenu('message', v)}
-                variables={[]}
-                variableSamples={{}}
-                maxLength={2000}
-                placeholder="Pick your roles below. You can update them anytime."
-                disabled={saving}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {welcomeRoleOptions.map((opt, i) => (
-                <div
-                  key={opt.id}
-                  className="relative p-4 rounded-2xl bg-background border border-border/40 shadow-sm group"
-                >
-                  <div className="space-y-4">
-                    <input
-                      type="text"
-                      value={opt.label ?? ''}
-                      onChange={(e) => {
-                        const opts = [...welcomeRoleOptions];
-                        opts[i] = { ...opts[i], label: e.target.value };
-                        updateWelcomeRoleMenu('options', opts);
-                      }}
-                      onFocus={(e) => e.target.select()}
-                      className={cn(inputClasses, 'text-xs font-bold')}
-                      placeholder="Display Label"
-                    />
-                    <RoleSelector
-                      guildId={guildId}
-                      selected={opt.roleId ? [opt.roleId] : []}
-                      onChange={(s) => {
-                        const opts = [...welcomeRoleOptions];
-                        opts[i] = { ...opts[i], roleId: s[0] ?? '' };
-                        updateWelcomeRoleMenu('options', opts);
-                      }}
-                      maxSelections={1}
-                      placeholder="Select Role"
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-destructive/10 text-destructive border border-destructive/20 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center text-[10px]"
-                    onClick={() => {
-                      const opts = [...(draftConfig.welcome?.roleMenu?.options ?? [])].filter(
-                        (o) => o.id !== opt.id,
-                      );
-                      updateWelcomeRoleMenu('options', opts);
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
             </div>
           </div>
         </div>

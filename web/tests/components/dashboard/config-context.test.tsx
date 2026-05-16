@@ -39,7 +39,6 @@ const minimalConfig = {
   moderation: { enabled: false },
   welcome: {
     enabled: false,
-    roleMenu: { enabled: false, options: [] },
     dmSequence: { enabled: false, steps: [] },
   },
   triage: { enabled: false },
@@ -445,23 +444,16 @@ describe('ConfigProvider', () => {
     await waitFor(() => expect(result.current.guildId).toBe(''));
   });
 
-  it('normalizes role menu option ids and reports fetch failures', async () => {
-    const configWithMissingRoleId = {
-      ...minimalConfig,
-      welcome: {
-        ...minimalConfig.welcome,
-        roleMenu: { enabled: true, options: [{ label: 'Member', roleId: 'role-1' }] },
-      },
-    };
+  it('reports fetch failures when reloading config', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(configResponse(configWithMissingRoleId))
+      .mockResolvedValueOnce(configResponse(minimalConfig))
       .mockResolvedValueOnce(configResponse({ error: 'Nope' }, 500));
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = await renderConfigContext();
 
-    await waitFor(() => expect(result.current.draftConfig?.welcome?.roleMenu?.options?.[0]?.id).toBeTruthy());
+    await waitFor(() => expect(result.current.draftConfig).not.toBeNull());
 
     await act(async () => {
       await result.current.fetchConfig('broken-guild');
@@ -515,7 +507,7 @@ describe('ConfigProvider', () => {
     getItemSpy.mockRestore();
   });
 
-  it('handles fetch redirects, invalid payloads, API errors, and role menu id backfill', async () => {
+  it('handles fetch redirects, invalid payloads, and API errors', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(configResponse({}, 401))
@@ -528,17 +520,7 @@ describe('ConfigProvider', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve({
-            ...minimalConfig,
-            welcome: {
-              ...minimalConfig.welcome,
-              roleMenu: {
-                enabled: true,
-                options: [{ id: '', label: 'Members', roleId: 'role-1' }],
-              },
-            },
-          }),
+        json: () => Promise.resolve(minimalConfig),
       });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -558,7 +540,7 @@ describe('ConfigProvider', () => {
       });
 
       await act(async () => result.current.fetchConfig('guild-ok'));
-      await waitFor(() => expect(result.current.draftConfig?.welcome?.roleMenu?.options?.[0]?.id).toBeTruthy());
+      await waitFor(() => expect(result.current.draftConfig?.welcome?.enabled).toBe(false));
     });
   });
 
@@ -586,15 +568,15 @@ describe('ConfigProvider', () => {
     expect(result.current.activeTabId).toBeTruthy();
     expect(result.current.visibleFeatureIds.size).toBeGreaterThan(0);
 
-    act(() => result.current.handleSearchChange('role menu'));
+    act(() => result.current.handleSearchChange('dm sequence'));
     await waitFor(() => expect(result.current.searchResults.length).toBeGreaterThan(0));
     expect(result.current.visibleFeatureIds.has('welcome')).toBe(true);
 
-    const roleMenuResult = result.current.searchResults.find(
-      (item) => item.id === 'welcome-role-menu',
+    const dmSequenceResult = result.current.searchResults.find(
+      (item) => item.id === 'welcome-dm-sequence',
     );
-    expect(roleMenuResult).toBeDefined();
-    act(() => result.current.handleSearchSelect(roleMenuResult!));
+    expect(dmSequenceResult).toBeDefined();
+    act(() => result.current.handleSearchSelect(dmSequenceResult!));
 
     expect(result.current.forceOpenAdvancedFeatureId).toBe('welcome');
     expect(mockPush).toHaveBeenCalledWith('/dashboard/settings/onboarding-growth');
@@ -639,10 +621,7 @@ describe('ConfigProvider', () => {
     act(() => {
       result.current.updateDraftConfig((prev) => ({
         ...prev,
-        welcome: {
-          ...prev.welcome,
-          roleMenu: { enabled: true, options: [{ id: '1', label: '', roleId: '' }] },
-        },
+        ai: { ...prev.ai, systemPrompt: 'x'.repeat(4001) },
       }));
     });
     expect(result.current.hasValidationErrors).toBe(true);

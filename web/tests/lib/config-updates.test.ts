@@ -15,13 +15,7 @@ describe('config-updates', () => {
     welcome: {
       enabled: true,
       message: 'Hello!',
-      roleMenu: {
-        enabled: false,
-        options: [
-          { id: '1', label: 'Option 1', roleId: 'role-1' },
-          { id: '2', label: 'Option 2', roleId: 'role-2' },
-        ],
-      },
+      dmSequence: { enabled: true, steps: ['Option 1', 'Option 2'] },
     },
     moderation: {
       enabled: false,
@@ -94,85 +88,77 @@ describe('config-updates', () => {
 
   describe('updateArrayItem', () => {
     it('updates an item at specified index', () => {
-      const newOption = { id: '1', label: 'Updated', roleId: 'role-1' };
-      const result = updateArrayItem(
-        baseConfig,
-        'welcome',
-        ['roleMenu', 'options'],
-        0,
-        newOption,
-      );
-      expect(result.welcome?.roleMenu?.options?.[0]).toEqual(newOption);
+      const newOption = 'Updated';
+      const result = updateArrayItem(baseConfig, 'welcome', ['dmSequence', 'steps'], 0, newOption);
+      expect(result.welcome?.dmSequence?.steps?.[0]).toEqual(newOption);
     });
 
     it('preserves other array items', () => {
-      const newOption = { id: '1', label: 'Updated', roleId: 'role-1' };
-      const result = updateArrayItem(
-        baseConfig,
-        'welcome',
-        ['roleMenu', 'options'],
-        0,
-        newOption,
+      const newOption = 'Updated';
+      const result = updateArrayItem(baseConfig, 'welcome', ['dmSequence', 'steps'], 0, newOption);
+      expect(result.welcome?.dmSequence?.steps?.[1]).toEqual(
+        baseConfig.welcome?.dmSequence?.steps?.[1],
       );
-      expect(result.welcome?.roleMenu?.options?.[1]).toEqual(baseConfig.welcome?.roleMenu?.options?.[1]);
     });
 
     it('creates array if it does not exist', () => {
       const config: GuildConfig = { welcome: { enabled: true } };
-      const newOption = { id: '1', label: 'New', roleId: 'role-1' };
-      const result = updateArrayItem(config, 'welcome', ['roleMenu', 'options'], 0, newOption);
-      expect(result.welcome?.roleMenu?.options).toHaveLength(1);
-      expect(result.welcome?.roleMenu?.options?.[0]).toEqual(newOption);
+      const newOption = 'New';
+      const result = updateArrayItem(config, 'welcome', ['dmSequence', 'steps'], 0, newOption);
+      expect(result.welcome?.dmSequence?.steps).toHaveLength(1);
+      expect(result.welcome?.dmSequence?.steps?.[0]).toEqual(newOption);
     });
   });
 
   describe('removeArrayItem', () => {
     it('removes item at specified index', () => {
-      const result = removeArrayItem(baseConfig, 'welcome', ['roleMenu', 'options'], 0);
-      expect(result.welcome?.roleMenu?.options).toHaveLength(1);
-      expect(result.welcome?.roleMenu?.options?.[0].id).toBe('2');
+      const result = removeArrayItem(baseConfig, 'welcome', ['dmSequence', 'steps'], 0);
+      expect(result.welcome?.dmSequence?.steps).toHaveLength(1);
+      expect(result.welcome?.dmSequence?.steps?.[0]).toBe('Option 2');
     });
 
     it('handles removing last item', () => {
       const config: GuildConfig = {
         welcome: {
-          roleMenu: {
-            options: [{ id: '1', label: 'Only', roleId: 'role-1' }],
-          },
+          dmSequence: { steps: ['Only'] },
         },
       };
-      const result = removeArrayItem(config, 'welcome', ['roleMenu', 'options'], 0);
-      expect(result.welcome?.roleMenu?.options).toHaveLength(0);
+      const result = removeArrayItem(config, 'welcome', ['dmSequence', 'steps'], 0);
+      expect(result.welcome?.dmSequence?.steps).toHaveLength(0);
     });
 
     it('handles empty array gracefully', () => {
-      const config: GuildConfig = { welcome: { roleMenu: { options: [] } } };
-      const result = removeArrayItem(config, 'welcome', ['roleMenu', 'options'], 0);
-      expect(result.welcome?.roleMenu?.options).toHaveLength(0);
+      const config: GuildConfig = { welcome: { dmSequence: { steps: [] } } };
+      const result = removeArrayItem(config, 'welcome', ['dmSequence', 'steps'], 0);
+      expect(result.welcome?.dmSequence?.steps).toHaveLength(0);
     });
   });
 
   describe('appendArrayItem', () => {
     it('appends item to array', () => {
-      const newOption = { id: '3', label: 'Option 3', roleId: 'role-3' };
-      const result = appendArrayItem(baseConfig, 'welcome', ['roleMenu', 'options'], newOption);
-      expect(result.welcome?.roleMenu?.options).toHaveLength(3);
-      expect(result.welcome?.roleMenu?.options?.[2]).toEqual(newOption);
+      const newOption = 'Option 3';
+      const result = appendArrayItem(baseConfig, 'welcome', ['dmSequence', 'steps'], newOption);
+      expect(result.welcome?.dmSequence?.steps).toHaveLength(3);
+      expect(result.welcome?.dmSequence?.steps?.[2]).toEqual(newOption);
     });
 
     it('creates array if it does not exist', () => {
       const config: GuildConfig = { welcome: { enabled: true } };
-      const newOption = { id: '1', label: 'First', roleId: 'role-1' };
-      const result = appendArrayItem(config, 'welcome', ['roleMenu', 'options'], newOption);
-      expect(result.welcome?.roleMenu?.options).toHaveLength(1);
-      expect(result.welcome?.roleMenu?.options?.[0]).toEqual(newOption);
+      const newOption = 'First';
+      const result = appendArrayItem(config, 'welcome', ['dmSequence', 'steps'], newOption);
+      expect(result.welcome?.dmSequence?.steps).toHaveLength(1);
+      expect(result.welcome?.dmSequence?.steps?.[0]).toEqual(newOption);
     });
 
     it('preserves existing items', () => {
-      const newOption = { id: '3', label: 'Option 3', roleId: 'role-3' };
-      const result = appendArrayItem(baseConfig, 'welcome', ['roleMenu', 'options'], newOption);
-      expect(result.welcome?.roleMenu?.options?.[0]).toEqual(baseConfig.welcome?.roleMenu?.options?.[0]);
-      expect(result.welcome?.roleMenu?.options?.[1]).toEqual(baseConfig.welcome?.roleMenu?.options?.[1]);
+      const newOption = 'Option 3';
+      const result = appendArrayItem(baseConfig, 'welcome', ['dmSequence', 'steps'], newOption);
+      expect(result.welcome?.dmSequence?.steps?.[0]).toEqual(
+        baseConfig.welcome?.dmSequence?.steps?.[0],
+      );
+      expect(result.welcome?.dmSequence?.steps?.[1]).toEqual(
+        baseConfig.welcome?.dmSequence?.steps?.[1],
+      );
     });
   });
 });

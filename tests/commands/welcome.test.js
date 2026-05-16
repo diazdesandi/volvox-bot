@@ -12,7 +12,6 @@ vi.mock('../../src/modules/config.js', () => ({
 }));
 
 vi.mock('../../src/modules/welcomeOnboarding.js', () => ({
-  buildRoleMenuMessage: vi.fn().mockReturnValue(null),
   buildRulesAgreementMessage: vi.fn().mockReturnValue({ content: 'rules' }),
   normalizeWelcomeOnboardingConfig: vi.fn().mockReturnValue({}),
 }));
@@ -20,10 +19,7 @@ vi.mock('../../src/modules/welcomeOnboarding.js', () => ({
 vi.mock('../../src/modules/welcomePublishing.js', () => ({
   publishWelcomePanels: vi.fn().mockResolvedValue({
     guildId: 'guild-1',
-    results: [
-      { panelType: 'rules', status: 'unconfigured', action: 'skipped' },
-      { panelType: 'role_menu', status: 'unconfigured', action: 'skipped' },
-    ],
+    results: [{ panelType: 'rules', status: 'unconfigured', action: 'skipped' }],
   }),
 }));
 
@@ -106,7 +102,7 @@ describe('welcome command', () => {
     );
   });
 
-  it('should publish both onboarding panels through the shared publisher', async () => {
+  it('should publish the rules onboarding panel through the shared publisher', async () => {
     isModerator.mockReturnValueOnce(true);
     publishWelcomePanels.mockResolvedValueOnce({
       guildId: 'guild-1',
@@ -116,12 +112,6 @@ describe('welcome command', () => {
           status: 'posted',
           action: 'created',
           channelId: 'rules-channel',
-        },
-        {
-          panelType: 'role_menu',
-          status: 'posted',
-          action: 'updated',
-          channelId: 'welcome-channel',
         },
       ],
     });
@@ -137,7 +127,6 @@ describe('welcome command', () => {
 
     const reply = safeEditReply.mock.calls.at(-1)?.[1]?.content ?? '';
     expect(reply).toContain('Posted rules agreement panel');
-    expect(reply).toContain('Updated role menu panel');
   });
 
   it('should surface persistence warnings on posted onboarding panels', async () => {
@@ -153,13 +142,6 @@ describe('welcome command', () => {
           persistWarning: true,
           lastError: 'Published to Discord but failed to save publication state.',
         },
-        {
-          panelType: 'role_menu',
-          status: 'posted',
-          action: 'updated',
-          channelId: 'welcome-channel',
-          lastError: 'Database pool unavailable',
-        },
       ],
     });
 
@@ -170,9 +152,6 @@ describe('welcome command', () => {
     const reply = safeEditReply.mock.calls.at(-1)?.[1]?.content ?? '';
     expect(reply).toContain(
       'Posted rules agreement panel in <#rules-channel>. Warning: Published to Discord but failed to save publication state.',
-    );
-    expect(reply).toContain(
-      'Updated role menu panel in <#welcome-channel>. Warning: Database pool unavailable.',
     );
   });
 
