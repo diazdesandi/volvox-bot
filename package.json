@@ -1,6 +1,6 @@
 {
   "name": "volvox-bot",
-  "packageManager": "pnpm@11.0.9",
+  "packageManager": "pnpm@11.1.2",
   "version": "0.1.0",
   "description": "Volvox Discord bot - AI chat, welcome messages, and moderation",
   "main": "src/index.js",

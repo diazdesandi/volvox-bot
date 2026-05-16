@@ -12,6 +12,7 @@ Community features help your server members engage and show off their activity. 
 
 - **Leaderboards** — XP-based leaderboards (experience points earned through activity) visible in Discord and on the web
 - **Showcases** — Highlight top members or content
+- **Starboard** — Repost popular messages to a dedicated channel once reactions reach your threshold
 - **Public profiles** — Give your members a web-accessible profile page
 - **Community hubs** — Read-only public views of server stats and leaderboards
 
@@ -21,6 +22,14 @@ Community features help your server members engage and show off their activity. 
 2. Leaderboards update automatically
 3. View public profiles at `https://volvox.bot/community/{guildId}`
 4. Open **Config → Community** to fine-tune XP rates, badges, or turn features off
+
+## Starboard
+
+Open **Config → Community Tools → Starboard**, enable the feature, choose a destination channel, set the reaction threshold, and choose either a specific emoji or **Any**.
+
+React to messages in a normal source channel, not in the starboard destination channel. Messages posted in the destination channel are ignored so the bot does not repost its own starboard entries back into the same channel.
+
+Starboard posts are created from reaction events. Existing messages that already met the threshold before starboard was enabled or before the threshold changed are not backfilled automatically; remove and re-add one qualifying reaction, or add another qualifying reaction, to trigger the first post.
 
 <Callout type="tip">
 Community Hubs let non-members see your server's public face — great for recruitment.
@@ -38,6 +47,7 @@ Servers without Community Hubs enabled stay hidden from members who lack managem
 |---------|-------------|---------|
 | Engagement tracking | Track messages and reactions for XP and badges | On |
 | Reputation (XP) | Award XP per message, reaction, and event | On |
+| Starboard | Repost messages once reactions meet the configured threshold | Off |
 | Leaderboard visibility | Public or members-only | Public |
 | XP system | Configure how members earn XP | Built-in defaults |
 | Showcases | Which stats to highlight | Top members |
