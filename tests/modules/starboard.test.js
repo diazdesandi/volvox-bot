@@ -63,7 +63,7 @@ function makeMockMessage(overrides = {}) {
       displayName: 'Test User',
       displayAvatarURL: () => 'https://cdn.example.com/avatar.png',
     },
-    channel: { id: 'ch-1' },
+    channel: { id: 'ch-1', name: 'general' },
     guild: { id: 'guild-1' },
     createdAt: new Date('2025-01-01'),
     attachments: new Map(),
@@ -133,18 +133,19 @@ describe('starboard module', () => {
   // ── buildStarboardEmbed ─────────────────────────────────────────────
 
   describe('buildStarboardEmbed', () => {
-    it('should build a gold embed with message content', () => {
+    it('should keep all starboard metadata inside the embed', () => {
       const message = makeMockMessage();
       const embed = buildStarboardEmbed(message, 5);
       const json = embed.toJSON();
 
       expect(json.color).toBe(0xffd700);
+      expect(json.title).toBe('⭐ 5 stars in #general');
+      expect(json.url).toBe('https://discord.com/channels/guild-1/ch-1/msg-1');
       expect(json.author.name).toBe('Test User');
       expect(json.description).toBe('Hello world!');
-      expect(json.fields).toHaveLength(3);
-      expect(json.fields[0].value).toBe('<#ch-1>');
-      expect(json.fields[1].value).toBe('⭐ 5');
-      expect(json.fields[2].value).toContain('discord.com/channels/guild-1/ch-1/msg-1');
+      expect(json.fields).toBeUndefined();
+      expect(json.footer).toBeUndefined();
+      expect(json.timestamp).toBe('2025-01-01T00:00:00.000Z');
     });
 
     it('should handle message with no content', () => {
@@ -511,12 +512,9 @@ describe('starboard module', () => {
       );
 
       expect(client.channels.fetch).toHaveBeenCalledWith('starboard-ch');
-      expect(mockSend).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('3'),
-          embeds: expect.any(Array),
-        }),
-      );
+      const payload = mockSend.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('content');
+      expect(payload.embeds).toHaveLength(1);
       // Should have called SELECT (findStarboardPost) + INSERT (insertStarboardPost)
       expect(pool.query).toHaveBeenCalledTimes(2);
     });
@@ -563,11 +561,9 @@ describe('starboard module', () => {
       );
 
       expect(mockFetchMessage).toHaveBeenCalledWith('sb-msg-1');
-      expect(mockEdit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('5'),
-        }),
-      );
+      const payload = mockEdit.mock.calls[0][0];
+      expect(payload.content).toBeNull();
+      expect(payload.embeds).toHaveLength(1);
       // SELECT + UPDATE
       expect(pool.query).toHaveBeenCalledTimes(2);
     });
@@ -734,11 +730,9 @@ describe('starboard module', () => {
         makeStarboardConfig(),
       );
 
-      expect(mockEdit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('4'),
-        }),
-      );
+      const payload = mockEdit.mock.calls[0][0];
+      expect(payload.content).toBeNull();
+      expect(payload.embeds).toHaveLength(1);
       // SELECT + UPDATE
       expect(pool.query).toHaveBeenCalledTimes(2);
     });

@@ -25,31 +25,49 @@ export const STARBOARD_DEFAULTS = {
 /** Gold color for starboard embeds */
 const STARBOARD_COLOR = 0xffd700;
 
+function buildStarboardJumpUrl(message) {
+  return `https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id}`;
+}
+
+function formatStarCount(starCount) {
+  return `${starCount} ${starCount === 1 ? 'star' : 'stars'}`;
+}
+
+function formatChannelName(channel) {
+  return channel?.name ? `#${channel.name}` : `#${channel.id}`;
+}
+
+function buildStarboardPayload(message, starCount, displayEmoji, { clearContent = false } = {}) {
+  const payload = { embeds: [buildStarboardEmbed(message, starCount, displayEmoji)] };
+
+  if (clearContent) {
+    payload.content = null;
+  }
+
+  return payload;
+}
+
 /**
  * Build the starboard embed for a message.
  *
  * @param {import('discord.js').Message} message - The original message
  * @param {number} starCount - Current star count
- * @param {string} [displayEmoji='⭐'] - Emoji to display in the Stars field
+ * @param {string} [displayEmoji='⭐'] - Emoji to display in the title
  * @returns {EmbedBuilder} The starboard embed
  */
 export function buildStarboardEmbed(message, starCount, displayEmoji = '⭐') {
+  const jumpUrl = buildStarboardJumpUrl(message);
   const embed = new EmbedBuilder()
     .setColor(STARBOARD_COLOR)
+    .setTitle(
+      `${displayEmoji} ${formatStarCount(starCount)} in ${formatChannelName(message.channel)}`,
+    )
+    .setURL(jumpUrl)
     .setAuthor({
       name: message.author?.displayName ?? message.author?.username ?? 'Unknown',
       iconURL: message.author?.displayAvatarURL?.() ?? undefined,
     })
-    .setTimestamp(message.createdAt)
-    .addFields(
-      { name: 'Source', value: `<#${message.channel.id}>`, inline: true },
-      { name: 'Stars', value: `${displayEmoji} ${starCount}`, inline: true },
-      {
-        name: 'Jump',
-        value: `[Go to message](https://discord.com/channels/${message.guild.id}/${message.channel.id}/${message.id})`,
-        inline: true,
-      },
-    );
+    .setTimestamp(message.createdAt);
 
   if (message.content) {
     embed.setDescription(message.content);
@@ -292,8 +310,10 @@ export async function handleReactionAdd(reaction, user, client, config) {
       return;
     }
 
-    const embed = buildStarboardEmbed(message, starCount, displayEmoji);
-    const content = `${displayEmoji} **${starCount}** | <#${message.channel.id}>`;
+    const createPayload = buildStarboardPayload(message, starCount, displayEmoji);
+    const editPayload = buildStarboardPayload(message, starCount, displayEmoji, {
+      clearContent: true,
+    });
 
     if (existing) {
       // Update existing starboard message
@@ -301,7 +321,7 @@ export async function handleReactionAdd(reaction, user, client, config) {
         const starboardMessage = await starboardChannel.messages.fetch(
           existing.starboard_message_id,
         );
-        await starboardMessage.edit({ content, embeds: [embed] });
+        await starboardMessage.edit(editPayload);
         await updateStarboardPostCount(message.id, starCount);
         debug('Starboard post updated', {
           guildId: message.guild?.id,
@@ -312,7 +332,7 @@ export async function handleReactionAdd(reaction, user, client, config) {
       } catch (err) {
         warn('Failed to update starboard message, reposting', { error: err.message });
         // If the starboard message was deleted, repost
-        const newMsg = await safeSend(starboardChannel, { content, embeds: [embed] });
+        const newMsg = await safeSend(starboardChannel, createPayload);
         await insertStarboardPost({
           guildId: message.guild.id,
           sourceMessageId: message.id,
@@ -323,7 +343,7 @@ export async function handleReactionAdd(reaction, user, client, config) {
       }
     } else {
       // New starboard post
-      const newMsg = await safeSend(starboardChannel, { content, embeds: [embed] });
+      const newMsg = await safeSend(starboardChannel, createPayload);
       await insertStarboardPost({
         guildId: message.guild.id,
         sourceMessageId: message.id,
@@ -426,9 +446,9 @@ export async function handleReactionRemove(reaction, _user, client, config) {
         const starboardMessage = await starboardChannel.messages.fetch(
           existing.starboard_message_id,
         );
-        const embed = buildStarboardEmbed(message, starCount, displayEmoji);
-        const content = `${displayEmoji} **${starCount}** | <#${message.channel.id}>`;
-        await starboardMessage.edit({ content, embeds: [embed] });
+        await starboardMessage.edit(
+          buildStarboardPayload(message, starCount, displayEmoji, { clearContent: true }),
+        );
         await updateStarboardPostCount(message.id, starCount);
         debug('Starboard post updated on reaction remove', {
           guildId: message.guild?.id,
