@@ -61,23 +61,10 @@ See [AGENTS.md](AGENTS.md) for repo-specific agent rules, workflows, and gotchas
 See [DESIGN.md](DESIGN.md) for dashboard visual direction and the design system.
 
 
-## GitHub Wiki workflow
+## GitHub Wiki Workflow
 
-Do not treat the project wiki as files inside this repository. GitHub wikis are a separate git repository.
-
-1. Update source pages under `docs/wiki-pages/` (see `docs/wiki-pages/README.md` for page inventory).
-2. Clone the wiki repo using GitHub's documented flow (`<repo>.wiki.git`).
-3. Copy updated pages into the cloned wiki repo, commit, and push.
-
-Example commands:
+Do not treat the project wiki as files inside this repository. GitHub wikis are a separate git repository. Edit it via the wiki git repo:
 
 ```bash
 git clone https://github.com/VolvoxLLC/volvox-bot.wiki.git
-cp docs/wiki-pages/{Home,Quick-Start,Configuration-Reference,Operations-Runbook,Troubleshooting,Manual-Test-Plan}.md volvox-bot.wiki/
-cd volvox-bot.wiki
-git add *.md
-git commit -m "docs: update wiki pages"
-git push origin master
 ```
-
-This follows GitHub's "cloning wikis to your computer" process directly without additional helper tooling.

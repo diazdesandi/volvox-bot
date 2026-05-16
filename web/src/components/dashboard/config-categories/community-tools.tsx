@@ -8,12 +8,11 @@ import {
   selectNumericValueOnFocus,
 } from '@/components/dashboard/config-editor-utils';
 import { ChannelSelector } from '@/components/ui/channel-selector';
-import { cn } from '@/lib/utils';
 import { ToggleSwitch } from '../toggle-switch';
 import { ConfigCategoryLayout } from './config-category-layout';
 
 /**
- * Community Tools category — renders community command toggles and bot presence settings.
+ * Community Tools category — renders community command toggles and starboard settings.
  */
 export function CommunityToolsCategory() {
   const { draftConfig, saving, guildId, updateDraftConfig, activeTabId } = useConfigContext();
@@ -34,21 +33,13 @@ export function CommunityToolsCategory() {
   let hasMasterToggle = false;
   let isCurrentFeatureEnabled = false;
 
-  if (activeTabId === 'bot-status') {
-    hasMasterToggle = true;
-    isCurrentFeatureEnabled = draftConfig.botStatus?.enabled ?? true;
-  } else if (activeTabId === 'starboard') {
+  if (activeTabId === 'starboard') {
     hasMasterToggle = true;
     isCurrentFeatureEnabled = draftConfig.starboard?.enabled ?? false;
   }
 
   const handleToggleCurrentFeature = (v: boolean) => {
-    if (activeTabId === 'bot-status') {
-      updateDraftConfig((prev) => ({
-        ...prev,
-        botStatus: { ...prev.botStatus, enabled: v },
-      }));
-    } else if (activeTabId === 'starboard') {
+    if (activeTabId === 'starboard') {
       updateStarboardField('enabled', v);
     }
   };
@@ -247,133 +238,6 @@ export function CommunityToolsCategory() {
                 placeholder="Select ignored channels"
                 filter="text"
               />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bot Presence Layout */}
-      {activeTabId === 'bot-status' && (
-        <div className="space-y-6">
-          <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
-            <div className="mb-4 space-y-1">
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/90">Appearance</h3>
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
-                Configure how the bot appears in the member list
-              </p>
-            </div>
-            <div className="space-y-3">
-              <label
-                htmlFor="bot-status-value"
-                className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
-              >
-                Presence Status
-              </label>
-              <select
-                id="bot-status-value"
-                value={draftConfig.botStatus?.status ?? 'online'}
-                onChange={(event) =>
-                  updateDraftConfig((prev) => ({
-                    ...prev,
-                    botStatus: {
-                      ...prev.botStatus,
-                      status: event.target.value as 'online' | 'idle' | 'dnd' | 'invisible',
-                    },
-                  }))
-                }
-                disabled={saving}
-                className={cn(inputClasses, 'bg-background/50 backdrop-blur-md')}
-              >
-                <option value="online">Online</option>
-                <option value="idle">Idle</option>
-                <option value="dnd">Do Not Disturb</option>
-                <option value="invisible">Invisible</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl space-y-6">
-            <div className="mb-4 space-y-1">
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/90">
-                Status Rotation
-              </h3>
-              <p className="text-[11px] text-muted-foreground/60 uppercase tracking-wider">
-                Automatically cycle through configured messages
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/10 border border-border/40">
-              <div className="space-y-0.5">
-                <span className="text-sm font-bold text-foreground/90">Enable Rotation</span>
-                <p className="text-[11px] text-muted-foreground/60 font-medium">
-                  Rotate through presence messages.
-                </p>
-              </div>
-              <ToggleSwitch
-                checked={
-                  draftConfig.botStatus?.rotation?.enabled ??
-                  draftConfig.botStatus?.rotateIntervalMs != null
-                }
-                onChange={(value) => {
-                  updateDraftConfig((prev) => {
-                    const legacyMs = prev.botStatus?.rotateIntervalMs;
-                    const legacyMinutes = legacyMs != null ? legacyMs / 60000 : 5;
-                    return {
-                      ...prev,
-                      botStatus: {
-                        ...prev.botStatus,
-                        rotation: {
-                          ...prev.botStatus?.rotation,
-                          enabled: value,
-                          intervalMinutes: value
-                            ? (prev.botStatus?.rotation?.intervalMinutes ?? legacyMinutes)
-                            : prev.botStatus?.rotation?.intervalMinutes,
-                        },
-                      },
-                    };
-                  });
-                }}
-                disabled={saving}
-                label="Enable bot status rotation"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label
-                htmlFor="bot-status-interval-minutes"
-                className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
-              >
-                Rotation Interval (minutes)
-              </label>
-              <div className="relative md:max-w-xs">
-                <input
-                  id="bot-status-interval-minutes"
-                  type="number"
-                  min={0.5}
-                  step={0.5}
-                  value={
-                    draftConfig.botStatus?.rotation?.intervalMinutes ??
-                    (draftConfig.botStatus?.rotateIntervalMs ?? 300000) / 60000
-                  }
-                  onChange={(event) => {
-                    const num = parseNumberInput(event.target.value, 0.5);
-                    if (num === undefined) return;
-                    updateDraftConfig((prev) => ({
-                      ...prev,
-                      botStatus: {
-                        ...prev.botStatus,
-                        rotation: { ...prev.botStatus?.rotation, intervalMinutes: num },
-                      },
-                    }));
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  disabled={saving}
-                  className={cn(inputClasses, 'pr-12')}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/40">
-                  MIN
-                </span>
-              </div>
             </div>
           </div>
         </div>

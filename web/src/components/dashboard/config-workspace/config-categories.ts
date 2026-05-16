@@ -35,18 +35,9 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
     id: 'community-tools',
     icon: 'bot',
     label: 'Community Tools',
-    description: 'Member-facing utility commands, starboard, and bot presence.',
-    sectionKeys: [
-      'help',
-      'announce',
-      'snippet',
-      'poll',
-      'showcase',
-      'review',
-      'starboard',
-      'botStatus',
-    ],
-    featureIds: ['community-tools', 'starboard', 'bot-status'],
+    description: 'Member-facing utility commands and starboard.',
+    sectionKeys: ['help', 'announce', 'snippet', 'poll', 'showcase', 'review', 'starboard'],
+    featureIds: ['community-tools', 'starboard'],
   },
   {
     id: 'support-integrations',
@@ -78,7 +69,6 @@ export const FEATURE_LABELS: Record<ConfigFeatureId, string> = {
   tickets: 'Tickets',
   'github-feed': 'Github Activity Feed',
   'audit-log': 'Audit Log',
-  'bot-status': 'Bot Presence',
 };
 
 export const CONFIG_SEARCH_ITEMS: ConfigSearchItem[] = [
@@ -413,15 +403,6 @@ export const CONFIG_SEARCH_ITEMS: ConfigSearchItem[] = [
     description: 'Configure how long audit entries are kept before auto-purge.',
     keywords: ['audit', 'retention', 'purge', 'days', 'cleanup'],
     isAdvanced: true,
-  },
-  {
-    id: 'bot-status-enabled',
-    featureId: 'bot-status',
-    categoryId: 'community-tools',
-    label: 'Bot Presence Rotation',
-    description: 'Configure rotating bot status messages and interval.',
-    keywords: ['bot status', 'presence', 'rotation', 'activity'],
-    isAdvanced: false,
   },
 ];
 

@@ -49,10 +49,6 @@ const baseConfig: GuildConfig = {
     selfStarAllowed: false,
     ignoredChannels: [],
   },
-  botStatus: {
-    enabled: true,
-    rotation: { enabled: true, intervalMinutes: 30, messages: [{ text: 'Watching tests' }] },
-  },
   showcase: { enabled: true },
   memory: { enabled: true, maxContextMemories: 10, autoExtract: true },
   engagement: {
@@ -185,7 +181,6 @@ const featureCategoryByTabId: Record<string, string> = {
   'audit-log': 'moderation-safety',
   'community-tools': 'community-tools',
   starboard: 'community-tools',
-  'bot-status': 'community-tools',
   tickets: 'support-integrations',
   'github-feed': 'support-integrations',
 };
@@ -213,7 +208,6 @@ describe('dashboard config coverage smoke tests', () => {
     ['audit-log', ModerationSafetyCategory, 'Audit Log'],
     ['community-tools', CommunityToolsCategory, 'Community Tools'],
     ['starboard', CommunityToolsCategory, 'Starboard'],
-    ['bot-status', CommunityToolsCategory, 'Bot Presence'],
     ['tickets', SupportIntegrationsCategory, 'Tickets'],
     ['github-feed', SupportIntegrationsCategory, 'GitHub'],
   ])('renders %s config category', (activeTabId, Component, expectedText) => {

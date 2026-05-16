@@ -1,5 +1,4 @@
 import {
-  Activity,
   Bot,
   BrainCircuit,
   Handshake,
@@ -146,7 +145,7 @@ export const CONFIG_NAVIGATION: ConfigCategoryNav[] = [
     id: 'community-tools',
     label: 'Community Tools',
     icon: Bot,
-    description: 'Member-facing utility commands, starboard, and bot presence.',
+    description: 'Member-facing utility commands and starboard.',
     tabs: [
       {
         id: 'community-tools',
@@ -159,12 +158,6 @@ export const CONFIG_NAVIGATION: ConfigCategoryNav[] = [
         label: 'Starboard',
         icon: Star,
         desc: 'Pin popular messages to a starboard channel.',
-      },
-      {
-        id: 'bot-status',
-        label: 'Bot Presence',
-        icon: Activity,
-        desc: 'Set bot presence and rotate status messages.',
       },
     ],
   },
