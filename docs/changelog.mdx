@@ -17,7 +17,7 @@ Existing data for these features has been dropped as part of the upgrade. Nothin
 
 ## Fixes
 
-**Starboard config now refuses nonsense values** — The Starboard section was the lone holdout without a validation schema, which meant the API would cheerfully accept a string where a threshold should be, or persist an emoji field long enough to qualify as a novella. All six Starboard fields are now type- and range-checked, and the emoji field is capped at a sane length. See [Starboard](/features/community#starboard).
+**Starboard config now refuses nonsense values** — The Starboard section was the lone holdout without a validation schema. The API would cheerfully accept a string where a threshold should be, or persist an emoji field long enough to qualify as a novella. All six Starboard fields are now type- and range-checked, and the emoji field is capped at a sane length. See [Starboard](/features/community#starboard).
 
 **Starboard emoji wildcard saves correctly on autosave** — Picking **Any** as your reaction emoji could previously persist the Unicode heavy asterisk (✱) instead of the intended wildcard (`*`) if autosave fired before the field lost focus. The normalization now runs on every change, so **Any** means **any** the moment you select it.
 </Update>
