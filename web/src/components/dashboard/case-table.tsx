@@ -229,9 +229,6 @@ export function CaseTable({
               <TableHead>Target</TableHead>
               <TableHead className="hidden md:table-cell">Moderator</TableHead>
               <TableHead className="hidden lg:table-cell">Reason</TableHead>
-              {/* NOTE: Sort toggle only reverses the current page client-side.
-                  The API always returns DESC; a full server-side sort would
-                  require a backend ORDER param — not worth it right now. */}
               <TableHead className="w-36">
                 <button
                   type="button"

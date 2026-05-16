@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import type { CaseListResponse, ModStats } from '@/components/dashboard/moderation-types';
+import type {
+  CaseListResponse,
+  ModStats,
+  UserHistoryResponse,
+} from '@/components/dashboard/moderation-types';
 
 const PAGE_LIMIT = 25;
 
@@ -26,7 +30,7 @@ interface ModerationState {
   userHistoryInput: string;
   lookupUserId: string | null;
   userHistoryPage: number;
-  userHistoryData: CaseListResponse | null;
+  userHistoryData: UserHistoryResponse | null;
   userHistoryLoading: boolean;
   userHistoryError: string | null;
 
@@ -71,7 +75,7 @@ const initialData = {
   stats: null as ModStats | null,
   statsLoading: false,
   statsError: null as string | null,
-  userHistoryData: null as CaseListResponse | null,
+  userHistoryData: null as UserHistoryResponse | null,
   userHistoryLoading: false,
   userHistoryError: null as string | null,
 };
@@ -229,7 +233,7 @@ export const useModerationStore = create<ModerationState>((set, get) => ({
         const msg = extractErrorMessage(payload, 'Failed to fetch user history');
         throw new Error(msg);
       }
-      set({ userHistoryData: payload as CaseListResponse, userHistoryLoading: false });
+      set({ userHistoryData: payload as UserHistoryResponse, userHistoryLoading: false });
       return 'ok';
     } catch (err) {
       if (requestId !== latestUserHistoryRequestId) return 'ok';

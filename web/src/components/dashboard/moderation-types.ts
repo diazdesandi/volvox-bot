@@ -1,7 +1,7 @@
 /** A single moderation case row from the bot database. */
 export interface ModCase {
   id: number;
-  guild_id: string;
+  guild_id?: string;
   case_number: number;
   action: ModAction;
   target_id: string;
@@ -46,7 +46,14 @@ export interface CaseListResponse {
   cases: ModCase[];
   total: number;
   page: number;
+  limit: number;
   pages: number;
+}
+
+/** Paginated response from GET /api/moderation/user/:userId/history. */
+export interface UserHistoryResponse extends CaseListResponse {
+  userId: string;
+  byAction: Partial<Record<ModAction, number>>;
 }
 
 /** Stats summary from GET /api/moderation/stats. */

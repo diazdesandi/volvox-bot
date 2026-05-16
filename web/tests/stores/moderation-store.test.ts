@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useModerationStore } from '@/stores/moderation-store';
-import type { CaseListResponse, ModStats } from '@/components/dashboard/moderation-types';
+import type {
+  CaseListResponse,
+  ModStats,
+  UserHistoryResponse,
+} from '@/components/dashboard/moderation-types';
 
 const fakeStats: ModStats = {
   totalCases: 42,
@@ -14,7 +18,6 @@ const fakeCases: CaseListResponse = {
   cases: [
     {
       id: 1,
-      guild_id: 'guild1',
       case_number: 1,
       action: 'warn',
       target_id: '123',
@@ -29,7 +32,6 @@ const fakeCases: CaseListResponse = {
     },
     {
       id: 2,
-      guild_id: 'guild1',
       case_number: 2,
       action: 'kick',
       target_id: '789',
@@ -45,7 +47,15 @@ const fakeCases: CaseListResponse = {
   ],
   total: 2,
   page: 1,
+  limit: 25,
   pages: 1,
+};
+
+const fakeUserHistory: UserHistoryResponse = {
+  ...fakeCases,
+  cases: fakeCases.cases.map((c) => ({ ...c, target_id: 'user123' })),
+  userId: 'user123',
+  byAction: { warn: 1, kick: 1 },
 };
 
 function mockFetchSuccess(data: unknown, status = 200) {
@@ -135,7 +145,7 @@ describe('useModerationStore', () => {
     useModerationStore.getState().setLookupUserId('123');
     useModerationStore.getState().setUserHistoryInput('123');
     useModerationStore.getState().setUserHistoryPage(3);
-    useModerationStore.setState({ userHistoryData: fakeCases, userHistoryError: 'err' });
+    useModerationStore.setState({ userHistoryData: fakeUserHistory, userHistoryError: 'err' });
 
     useModerationStore.getState().clearUserHistory();
 
@@ -255,7 +265,7 @@ describe('useModerationStore', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ cases: [], total: 0, page: 2, pages: 1 }),
+      json: () => Promise.resolve({ cases: [], total: 0, page: 2, limit: 25, pages: 1 }),
     } as Response);
 
     await useModerationStore.getState().fetchCases('guild1');
@@ -272,7 +282,7 @@ describe('useModerationStore', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ cases: [], total: 0, page: 1, pages: 1 }),
+      json: () => Promise.resolve({ cases: [], total: 0, page: 1, limit: 25, pages: 1 }),
     } as Response);
 
     await useModerationStore.getState().fetchCases('guild1');
@@ -304,12 +314,12 @@ describe('useModerationStore', () => {
   // ─── fetchUserHistory ────────────────────────────────────────────
 
   it('fetchUserHistory sets data on success', async () => {
-    mockFetchSuccess(fakeCases);
+    mockFetchSuccess(fakeUserHistory);
 
     const result = await useModerationStore.getState().fetchUserHistory('guild1', 'user123', 1);
 
     expect(result).toBe('ok');
-    expect(useModerationStore.getState().userHistoryData).toEqual(fakeCases);
+    expect(useModerationStore.getState().userHistoryData).toEqual(fakeUserHistory);
     expect(useModerationStore.getState().userHistoryLoading).toBe(false);
   });
 
@@ -334,7 +344,16 @@ describe('useModerationStore', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ cases: [], total: 0, page: 1, pages: 1 }),
+      json: () =>
+        Promise.resolve({
+          cases: [],
+          total: 0,
+          page: 1,
+          limit: 25,
+          pages: 1,
+          userId: 'user456',
+          byAction: {},
+        }),
     } as Response);
 
     await useModerationStore.getState().fetchUserHistory('guild1', 'user456', 3);
