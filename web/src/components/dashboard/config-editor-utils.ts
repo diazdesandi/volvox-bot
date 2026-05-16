@@ -91,7 +91,6 @@ export function isGuildConfig(data: unknown): data is GuildConfig {
     'engagement',
     'github',
     'review',
-    'challenges',
     'tickets',
     'auditLog',
   ] as const;

@@ -7,7 +7,6 @@
 
 import { Events } from 'discord.js';
 import { error as logError } from '../../logger.js';
-import { handleChallengeButton } from '../handlers/challengeHandler.js';
 import { handlePollButton } from '../handlers/pollHandler.js';
 import { handleReminderButton } from '../handlers/reminderHandler.js';
 import { handleReviewButton } from '../handlers/reviewHandler.js';
@@ -22,7 +21,6 @@ import {
 } from '../handlers/welcomeOnboardingHandler.js';
 
 // Backward-compatible re-exports (deprecated — use handler functions directly)
-export { registerChallengeButtonHandler } from '../handlers/challengeHandler.js';
 export { registerPollButtonHandler } from '../handlers/pollHandler.js';
 export { registerReminderButtonHandler } from '../handlers/reminderHandler.js';
 export { registerReviewClaimHandler } from '../handlers/reviewHandler.js';
@@ -36,7 +34,6 @@ export { registerWelcomeOnboardingHandlers };
 /** @type {Array<(interaction: import('discord.js').Interaction) => Promise<boolean>>} */
 const handlers = [
   handlePollButton,
-  handleChallengeButton,
   handleReviewButton,
   handleTicketOpenButton,
   handleTicketModal,

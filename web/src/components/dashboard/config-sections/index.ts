@@ -1,5 +1,4 @@
 export { AuditLogSection } from './AuditLogSection';
-export { ChallengesSection } from './ChallengesSection';
 export { ChannelModeSection } from './ChannelModeSection';
 export { CommunityFeaturesSection } from './CommunityFeaturesSection';
 export { EngagementSection } from './EngagementSection';

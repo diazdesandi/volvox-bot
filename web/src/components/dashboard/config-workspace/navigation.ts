@@ -69,7 +69,7 @@ export const CONFIG_NAVIGATION: ConfigCategoryNav[] = [
     id: 'onboarding-growth',
     label: 'Onboarding & Growth',
     icon: Users,
-    description: 'Welcome flow, XP systems, challenges, and lightweight automation.',
+    description: 'Welcome flow, XP systems, and lightweight automation.',
     tabs: [
       {
         id: 'welcome',
@@ -100,12 +100,6 @@ export const CONFIG_NAVIGATION: ConfigCategoryNav[] = [
         label: 'TL;DR',
         icon: MessageSquare,
         desc: 'Enable AI summaries and tune summary defaults.',
-      },
-      {
-        id: 'challenges',
-        label: 'Challenges',
-        icon: Swords,
-        desc: 'Auto-post a daily challenge with solve tracking.',
       },
     ],
   },

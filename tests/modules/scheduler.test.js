@@ -43,10 +43,6 @@ vi.mock('../../src/modules/reminderHandler.js', () => ({
   checkReminders: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../src/modules/challengeScheduler.js', () => ({
-  checkDailyChallenge: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../src/modules/reviewHandler.js', () => ({
   expireStaleReviews: vi.fn().mockResolvedValue(undefined),
 }));

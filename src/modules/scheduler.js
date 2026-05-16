@@ -11,7 +11,6 @@ import { getNextCronRun, parseCron } from '../utils/cronParser.js';
 import { runMaintenance } from '../utils/dbMaintenance.js';
 import { fetchChannelCached } from '../utils/discordCache.js';
 import { safeSend } from '../utils/safeSend.js';
-import { checkDailyChallenge } from './challengeScheduler.js';
 import { getConfig } from './config.js';
 import { closeExpiredPolls } from './pollHandler.js';
 import { checkReminders } from './reminderHandler.js';
@@ -95,8 +94,6 @@ async function pollScheduledMessages(client) {
     // Check and fire due reminders
     await checkReminders(client);
 
-    // Check and post daily coding challenges
-    await checkDailyChallenge(client);
     // Expire stale review requests
     await expireStaleReviews(client);
     // Auto-close inactive support tickets (every 5 minutes / 5th tick)

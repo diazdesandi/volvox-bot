@@ -426,13 +426,6 @@ export interface TicketsConfig extends ToggleSectionConfig {
   maxOpenPerUser: number;
 }
 
-/** Daily challenge scheduler settings. */
-export interface ChallengesConfig extends ToggleSectionConfig {
-  channelId: string | null;
-  postTime: string;
-  timezone: string;
-}
-
 /** Full bot config response from GET /api/guilds/:id/config. */
 /** Audit log configuration. */
 export interface AuditLogConfig {
@@ -465,7 +458,6 @@ export interface BotConfig {
   engagement?: EngagementConfig;
   github?: GithubConfig;
   review?: ReviewConfig;
-  challenges?: ChallengesConfig;
   tickets?: TicketsConfig;
   auditLog?: AuditLogConfig;
   botStatus?: BotStatusConfig;
@@ -491,7 +483,6 @@ export type ConfigSection =
   | 'engagement'
   | 'github'
   | 'review'
-  | 'challenges'
   | 'tickets'
   | 'auditLog'
   | 'botStatus';

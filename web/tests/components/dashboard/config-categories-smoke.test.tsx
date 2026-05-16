@@ -56,12 +56,6 @@ const baseConfig: GuildConfig = {
     trackReactions: true,
     activityBadges: [{ days: 7, label: 'Regular' }],
   },
-  challenges: {
-    enabled: true,
-    channelId: 'challenges',
-    postTime: '09:00',
-    timezone: 'America/New_York',
-  },
 };
 
 const updateDraftConfig = vi.fn((updater: (config: GuildConfig) => GuildConfig) => updater(baseConfig));
@@ -153,7 +147,6 @@ import { ConfigLandingContent } from '@/components/dashboard/config-categories/c
 import { ModerationSafetyCategory } from '@/components/dashboard/config-categories/moderation-safety';
 import { SupportIntegrationsCategory } from '@/components/dashboard/config-categories/support-integrations';
 import { AuditLogSection } from '@/components/dashboard/config-sections/AuditLogSection';
-import { ChallengesSection } from '@/components/dashboard/config-sections/ChallengesSection';
 import { CommunityFeaturesSection } from '@/components/dashboard/config-sections/CommunityFeaturesSection';
 import { EngagementSection } from '@/components/dashboard/config-sections/EngagementSection';
 import { GitHubSection } from '@/components/dashboard/config-sections/GitHubSection';
@@ -162,7 +155,9 @@ import { PermissionsSection } from '@/components/dashboard/config-sections/Permi
 import { StarboardSection } from '@/components/dashboard/config-sections/StarboardSection';
 import { TicketsSection } from '@/components/dashboard/config-sections/TicketsSection';
 import { CategoryNavigation } from '@/components/dashboard/config-workspace/category-navigation';
+import { CONFIG_CATEGORIES, CONFIG_SEARCH_ITEMS, FEATURE_LABELS } from '@/components/dashboard/config-workspace/config-categories';
 import { ConfigSearch } from '@/components/dashboard/config-workspace/config-search';
+import { CONFIG_NAVIGATION } from '@/components/dashboard/config-workspace/navigation';
 import { SettingsFeatureCard } from '@/components/dashboard/config-workspace/settings-feature-card';
 
 const dirtyCounts = {
@@ -200,6 +195,24 @@ function setConfigContext(activeTabId: string) {
 }
 
 describe('dashboard config coverage smoke tests', () => {
+  it('does not expose the removed challenges feature in config workspace metadata', () => {
+    const metadata = JSON.stringify({
+      categories: CONFIG_CATEGORIES,
+      searchItems: CONFIG_SEARCH_ITEMS,
+      featureLabels: FEATURE_LABELS,
+      navigation: CONFIG_NAVIGATION.map((category) => ({
+        ...category,
+        icon: category.icon.displayName ?? category.icon.name,
+        tabs: category.tabs.map((tab) => ({
+          ...tab,
+          icon: tab.icon.displayName ?? tab.icon.name,
+        })),
+      })),
+    });
+
+    expect(metadata).not.toMatch(/challenge/i);
+  });
+
   it.each([
     ['ai-automod', ModerationSafetyCategory, 'Detection Model'],
     ['moderation', ModerationSafetyCategory, 'Moderation'],
@@ -271,12 +284,6 @@ describe('dashboard config coverage smoke tests', () => {
           saving={false}
           onEnabledChange={vi.fn()}
           onRetentionDaysChange={vi.fn()}
-        />
-        <ChallengesSection
-          draftConfig={baseConfig}
-          saving={false}
-          onEnabledChange={vi.fn()}
-          onFieldChange={vi.fn()}
         />
         <CommunityFeaturesSection
           draftConfig={baseConfig}

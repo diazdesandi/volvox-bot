@@ -23,7 +23,6 @@ export const SAFE_CONFIG_KEYS = new Set([
   'voice',
   'github',
   'tickets',
-  'challenges',
   'review',
   'auditLog',
   'reminders',

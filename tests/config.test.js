@@ -119,7 +119,7 @@ describe('config.json', () => {
     expect(config.permissions).toHaveProperty('allowedCommands');
   });
 
-  it('should enable engagement and AI summary defaults without AFK config', () => {
+  it('should enable engagement and AI summary defaults without removed feature config', () => {
     expect(config).toHaveProperty('engagement');
     expect(config.engagement.enabled).toBe(true);
     expect(config.engagement.trackMessages).toBe(true);
@@ -127,7 +127,9 @@ describe('config.json', () => {
     expect(config.reputation.enabled).toBe(true);
     expect(config.tldr.enabled).toBe(true);
     expect(config).not.toHaveProperty('afk');
+    expect(config).not.toHaveProperty('challenges');
     expect(SAFE_CONFIG_KEYS.has('afk')).toBe(false);
+    expect(SAFE_CONFIG_KEYS.has('challenges')).toBe(false);
   });
 
   it('should have a logging section', () => {

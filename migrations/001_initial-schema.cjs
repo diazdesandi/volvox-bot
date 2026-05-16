@@ -397,19 +397,6 @@ exports.up = (pgm) => {
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_reviews_guild ON reviews(guild_id)');
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_reviews_status ON reviews(guild_id, status)');
 
-  // ── challenge_solves ──────────────────────────────────────────────
-  pgm.sql(`
-    CREATE TABLE IF NOT EXISTS challenge_solves (
-      guild_id TEXT NOT NULL,
-      challenge_date DATE NOT NULL,
-      challenge_index INTEGER NOT NULL,
-      user_id TEXT NOT NULL,
-      solved_at TIMESTAMPTZ DEFAULT NOW(),
-      PRIMARY KEY (guild_id, challenge_date, user_id)
-    )
-  `);
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_challenge_solves_guild ON challenge_solves(guild_id)');
-
   // ── flagged_messages ──────────────────────────────────────────────
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS flagged_messages (
@@ -622,7 +609,6 @@ exports.down = (pgm) => {
   pgm.sql('DROP TABLE IF EXISTS audit_logs CASCADE');
   pgm.sql('DROP TABLE IF EXISTS tickets CASCADE');
   pgm.sql('DROP TABLE IF EXISTS flagged_messages CASCADE');
-  pgm.sql('DROP TABLE IF EXISTS challenge_solves CASCADE');
   pgm.sql('DROP TABLE IF EXISTS reviews CASCADE');
   pgm.sql('DROP TABLE IF EXISTS showcase_votes CASCADE');
   pgm.sql('DROP TABLE IF EXISTS showcases CASCADE');

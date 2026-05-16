@@ -19,7 +19,6 @@ export type ConfigFeatureId =
   | 'xp-level-actions'
   | 'engagement'
   | 'tldr'
-  | 'challenges'
   | 'moderation'
   | 'starboard'
   | 'permissions'

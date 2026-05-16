@@ -226,7 +226,7 @@ router.get('/:guildId/leaderboard', async (req, res) => {
  *     tags:
  *       - Community
  *     summary: Community statistics
- *     description: Returns aggregate community statistics including member count, messages, challenges, and top contributors. No auth required.
+ *     description: Returns aggregate community statistics including member count, messages, and top contributors. No auth required.
  *     parameters:
  *       - in: path
  *         name: guildId
@@ -246,8 +246,6 @@ router.get('/:guildId/leaderboard', async (req, res) => {
  *                 totalMessagesSent:
  *                   type: integer
  *                   description: All-time cumulative message count across all tracked users in the guild (clamped to Number.MAX_SAFE_INTEGER)
- *                 challengesCompleted:
- *                   type: integer
  *                 topContributors:
  *                   type: array
  *                   items:
@@ -283,7 +281,7 @@ router.get('/:guildId/stats', async (req, res) => {
   try {
     const xpConfig = getXpConfig(guildId);
 
-    const [memberCount, messagesResult, challengesResult, topContributors] = await Promise.all([
+    const [memberCount, messagesResult, topContributors] = await Promise.all([
       pool.query(
         `SELECT COUNT(*)::int AS count
            FROM user_stats
@@ -296,9 +294,6 @@ router.get('/:guildId/stats', async (req, res) => {
            WHERE guild_id = $1`,
         [guildId],
       ),
-      pool.query('SELECT COUNT(*)::int AS count FROM challenge_solves WHERE guild_id = $1', [
-        guildId,
-      ]),
       pool.query(
         `SELECT us.user_id, r.xp, r.level
            FROM user_stats us
@@ -348,7 +343,6 @@ router.get('/:guildId/stats', async (req, res) => {
         Number(messagesResult.rows[0]?.total ?? 0),
         Number.MAX_SAFE_INTEGER,
       ),
-      challengesCompleted: challengesResult.rows[0]?.count ?? 0,
       topContributors: top3,
     });
   } catch (err) {

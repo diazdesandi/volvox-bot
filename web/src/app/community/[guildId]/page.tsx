@@ -24,7 +24,6 @@ interface LeaderboardMember {
 interface CommunityStats {
   memberCount: number;
   totalMessagesSent: number;
-  challengesCompleted: number;
   topContributors: {
     userId: string;
     username: string;
@@ -87,7 +86,7 @@ interface PageProps {
 /**
  * Builds page metadata for the Community Hub, using guild statistics when available.
  *
- * If stats are available the description includes member count and challenges completed;
+ * If stats are available the description includes the public member count;
  * otherwise a generic description is used. The returned metadata also includes Open Graph and Twitter card fields.
  *
  * @param params - Promise resolving to route parameters; expects `guildId` to fetch community stats
@@ -99,7 +98,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const title = 'Community Hub — Leaderboard & Stats';
   const description = stats
-    ? `Join ${stats.memberCount} public members. ${stats.challengesCompleted} challenges completed.`
+    ? `Join ${stats.memberCount} public members and see the top contributors.`
     : 'Explore our community leaderboard and stats.';
 
   return {
@@ -267,17 +266,12 @@ export default async function CommunityPage({ params }: PageProps) {
         {/* Stats Banner */}
         {stats && (
           <section className="mb-10">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <StatCard icon={Users} label="Public Members" value={stats.memberCount} />
               <StatCard
                 icon={MessageSquare}
                 label="Total Messages Sent"
                 value={stats.totalMessagesSent.toLocaleString()}
-              />
-              <StatCard
-                icon={Trophy}
-                label="Challenges Completed"
-                value={stats.challengesCompleted}
               />
             </div>
           </section>

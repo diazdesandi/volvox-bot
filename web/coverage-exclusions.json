@@ -49,7 +49,6 @@
     "src/components/dashboard/config-editor.tsx",
     "src/components/dashboard/config-layout-shell.tsx",
     "src/components/dashboard/config-sections/AuditLogSection.tsx",
-    "src/components/dashboard/config-sections/ChallengesSection.tsx",
     "src/components/dashboard/config-sections/ChannelModeSection.tsx",
     "src/components/dashboard/config-sections/CommunityFeaturesSection.tsx",
     "src/components/dashboard/config-sections/EngagementSection.tsx",

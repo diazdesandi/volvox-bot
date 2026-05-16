@@ -57,11 +57,6 @@ vi.mock('../../src/modules/reviewHandler.js', () => ({
   handleReviewClaim: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../src/modules/challengeScheduler.js', () => ({
-  handleSolveButton: vi.fn().mockResolvedValue(undefined),
-  handleHintButton: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../src/modules/starboard.js', () => ({
   handleReactionAdd: vi.fn().mockResolvedValue(undefined),
   handleReactionRemove: vi.fn().mockResolvedValue(undefined),
@@ -71,14 +66,9 @@ vi.mock('../../src/db.js', () => ({
   getPool: vi.fn(),
 }));
 
-import { warn } from '../../src/logger.js';
-import { handleHintButton, handleSolveButton } from '../../src/modules/challengeScheduler.js';
 import { getConfig } from '../../src/modules/config.js';
 import { registerErrorHandlers } from '../../src/modules/events/errors.js';
-import {
-  registerChallengeButtonHandler,
-  registerReviewClaimHandler,
-} from '../../src/modules/events/interactionCreate.js';
+import { registerReviewClaimHandler } from '../../src/modules/events/interactionCreate.js';
 import { registerMessageCreateHandler } from '../../src/modules/events/messageCreate.js';
 import { registerReactionHandlers } from '../../src/modules/events/reactions.js';
 import { registerReadyHandler } from '../../src/modules/events/ready.js';
@@ -113,7 +103,6 @@ describe('events coverage follow-up', () => {
       ai: { enabled: true, channels: [] },
       review: { enabled: true },
       starboard: { enabled: true },
-      challenges: { enabled: true },
     });
   });
 
@@ -340,42 +329,6 @@ describe('events coverage follow-up', () => {
 
     handleReviewClaim.mockRejectedValueOnce(new Error('boom'));
     const alreadyDone = makeInteraction({ customId: 'review_claim_123', replied: true });
-    await handler(alreadyDone);
-    expect(safeReply).not.toHaveBeenCalledWith(alreadyDone, expect.anything());
-  });
-
-  it('covers challenge button handler branches', async () => {
-    const handlers = new Map();
-    const client = { on: (event, fn) => handlers.set(event, fn) };
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    registerChallengeButtonHandler(client);
-
-    const handler = handlers.get('interactionCreate');
-
-    await handler(makeInteraction({ isButton: () => false }));
-    await handler(makeInteraction({ customId: 'something_else' }));
-
-    await handler(makeInteraction({ customId: 'challenge_solve_not-a-number' }));
-    expect(warn).toHaveBeenCalledWith(
-      'Invalid challenge button customId',
-      expect.objectContaining({ customId: 'challenge_solve_not-a-number' }),
-    );
-
-    const solve = makeInteraction({ customId: 'challenge_solve_3' });
-    await handler(solve);
-    expect(handleSolveButton).toHaveBeenCalledWith(solve, 3);
-
-    const hint = makeInteraction({ customId: 'challenge_hint_2' });
-    await handler(hint);
-    expect(handleHintButton).toHaveBeenCalledWith(hint, 2);
-
-    handleSolveButton.mockRejectedValueOnce(new Error('solve fail'));
-    const failing = makeInteraction({ customId: 'challenge_solve_7' });
-    await handler(failing);
-    expect(safeReply).toHaveBeenCalledWith(failing, expect.objectContaining({ ephemeral: true }));
-
-    handleHintButton.mockRejectedValueOnce(new Error('hint fail'));
-    const alreadyDone = makeInteraction({ customId: 'challenge_hint_9', replied: true });
     await handler(alreadyDone);
     expect(safeReply).not.toHaveBeenCalledWith(alreadyDone, expect.anything());
   });

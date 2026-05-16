@@ -186,7 +186,6 @@ describe('community routes', () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ count: 42 }] }) // memberCount
         .mockResolvedValueOnce({ rows: [{ total: 1337 }] }) // totalMessagesSent (all-time)
-        .mockResolvedValueOnce({ rows: [{ count: 88 }] }) // challengesCompleted
         .mockResolvedValueOnce({
           rows: [{ user_id: PUBLIC_USER, xp: 500, level: 2 }],
         }); // topContributors
@@ -196,8 +195,9 @@ describe('community routes', () => {
       expect(res.body).toMatchObject({
         memberCount: 42,
         totalMessagesSent: 1337,
-        challengesCompleted: 88,
       });
+      expect(res.body).not.toHaveProperty('challengesCompleted');
+      expect(res.body).not.toHaveProperty('activeProjects');
       expect(res.body.topContributors).toHaveLength(1);
       expect(res.body.topContributors[0]).toMatchObject({
         username: 'alice',

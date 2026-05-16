@@ -1,6 +1,6 @@
 /**
  * Additional tests for src/modules/events.js — handler branches not covered by events.test.js.
- * Covers: registerReviewClaimHandler, registerChallengeButtonHandler, plus edge-case branches in existing handlers.
+ * Covers: registerReviewClaimHandler plus edge-case branches in existing handlers.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -47,10 +47,6 @@ vi.mock('../../src/modules/config.js', () => ({
 vi.mock('../../src/modules/reviewHandler.js', () => ({
   handleReviewClaim: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('../../src/modules/challengeScheduler.js', () => ({
-  handleSolveButton: vi.fn().mockResolvedValue(undefined),
-  handleHintButton: vi.fn().mockResolvedValue(undefined),
-}));
 vi.mock('../../src/db.js', () => ({
   getPool: vi.fn().mockReturnValue({ query: vi.fn() }),
 }));
@@ -68,12 +64,10 @@ vi.mock('../../src/modules/reputation.js', () => ({
   handleXpGain: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { handleHintButton, handleSolveButton } from '../../src/modules/challengeScheduler.js';
 import { getConfig } from '../../src/modules/config.js';
 import { registerMessageCreateHandler } from '../../src/modules/events/messageCreate.js';
 import { registerReactionHandlers } from '../../src/modules/events/reactions.js';
 import { registerReadyHandler } from '../../src/modules/events/ready.js';
-import { handleChallengeButton } from '../../src/modules/handlers/challengeHandler.js';
 import { handleReviewButton } from '../../src/modules/handlers/reviewHandler.js';
 import { checkLinks } from '../../src/modules/linkFilter.js';
 import { checkRateLimit } from '../../src/modules/rateLimit.js';
@@ -182,108 +176,6 @@ describe('handleReviewButton', () => {
         reply,
       }),
     ).resolves.toBe(true);
-  });
-});
-
-// ── handleChallengeButton ────────────────────────────────────────────
-
-describe('handleChallengeButton', () => {
-  it('should ignore non-button interactions', async () => {
-    expect(await handleChallengeButton({ isButton: () => false })).toBe(false);
-    expect(handleSolveButton).not.toHaveBeenCalled();
-    expect(handleHintButton).not.toHaveBeenCalled();
-  });
-
-  it('should ignore buttons with unrelated customId', async () => {
-    expect(await handleChallengeButton({ isButton: () => true, customId: 'other_button' })).toBe(
-      false,
-    );
-    expect(handleSolveButton).not.toHaveBeenCalled();
-  });
-
-  it('should call handleSolveButton for challenge_solve_ buttons', async () => {
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    const interaction = {
-      isButton: () => true,
-      customId: 'challenge_solve_5',
-      user: { id: 'u1' },
-      guildId: 'g1',
-    };
-    await handleChallengeButton(interaction);
-    expect(handleSolveButton).toHaveBeenCalledWith(interaction, 5);
-  });
-
-  it('should call handleHintButton for challenge_hint_ buttons', async () => {
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    const interaction = {
-      isButton: () => true,
-      customId: 'challenge_hint_3',
-      user: { id: 'u1' },
-      guildId: 'g1',
-    };
-    await handleChallengeButton(interaction);
-    expect(handleHintButton).toHaveBeenCalledWith(interaction, 3);
-  });
-
-  it('should return true on NaN challenge index', async () => {
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    expect(
-      await handleChallengeButton({
-        isButton: () => true,
-        customId: 'challenge_solve_abc',
-        user: { id: 'u1' },
-        guildId: 'g1',
-      }),
-    ).toBe(true);
-    expect(handleSolveButton).not.toHaveBeenCalled();
-  });
-
-  it('should handle solve error and reply ephemerally', async () => {
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    handleSolveButton.mockRejectedValueOnce(new Error('solve boom'));
-    const reply = vi.fn().mockResolvedValue(undefined);
-    await handleChallengeButton({
-      isButton: () => true,
-      customId: 'challenge_solve_0',
-      user: { id: 'u1' },
-      guildId: 'g1',
-      replied: false,
-      deferred: false,
-      reply,
-    });
-    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
-  });
-
-  it('should handle hint error and reply ephemerally', async () => {
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    handleHintButton.mockRejectedValueOnce(new Error('hint boom'));
-    const reply = vi.fn().mockResolvedValue(undefined);
-    await handleChallengeButton({
-      isButton: () => true,
-      customId: 'challenge_hint_2',
-      user: { id: 'u1' },
-      guildId: 'g1',
-      replied: false,
-      deferred: false,
-      reply,
-    });
-    expect(reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
-  });
-
-  it('should skip error reply when deferred', async () => {
-    getConfig.mockReturnValue({ challenges: { enabled: true } });
-    handleSolveButton.mockRejectedValueOnce(new Error('boom'));
-    const reply = vi.fn();
-    await handleChallengeButton({
-      isButton: () => true,
-      customId: 'challenge_solve_1',
-      user: { id: 'u1' },
-      guildId: 'g1',
-      replied: false,
-      deferred: true,
-      reply,
-    });
-    expect(reply).not.toHaveBeenCalled();
   });
 });
 

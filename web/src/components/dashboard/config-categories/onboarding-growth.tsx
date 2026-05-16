@@ -272,7 +272,7 @@ function showWelcomePublishOutcome(
 /**
  * Renders the Onboarding & Growth configuration category UI that allows editing multiple feature sections based on the active tab.
  *
- * Displays controls for Welcome, Engagement, Reputation, TL;DR, and Challenges features; reads from and updates the editable draft configuration from context, and disables inputs while saving.
+ * Displays controls for Welcome, Engagement, Reputation, and TL;DR features; reads from and updates the editable draft configuration from context, and disables inputs while saving.
  *
  * @returns The configuration UI element for the selected onboarding/growth feature, or `null` if no draft configuration or active tab is available.
  */
@@ -568,13 +568,6 @@ export function OnboardingGrowthCategory() {
       updateDraftConfig((prev) => ({
         ...prev,
         tldr: { ...prev.tldr, enabled: v },
-      }));
-  } else if (activeTab === 'challenges') {
-    isCurrentFeatureEnabled = draftConfig.challenges?.enabled ?? false;
-    handleToggleCurrentFeature = (v) =>
-      updateDraftConfig((prev) => ({
-        ...prev,
-        challenges: { ...prev.challenges, enabled: v },
       }));
   }
 
@@ -1359,80 +1352,6 @@ export function OnboardingGrowthCategory() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Challenges Layout */}
-      {activeTab === 'challenges' && (
-        <div className="space-y-6">
-          <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-              <div className="space-y-2">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1">
-                  Destination Channel
-                </div>
-                <ChannelSelector
-                  guildId={guildId}
-                  selected={
-                    draftConfig.challenges?.channelId ? [draftConfig.challenges.channelId] : []
-                  }
-                  onChange={(s) =>
-                    updateDraftConfig((p) => ({
-                      ...p,
-                      challenges: { ...p.challenges, channelId: s[0] ?? null },
-                    }))
-                  }
-                  maxSelections={1}
-                  filter="text"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label
-                    htmlFor="challenge-post-time"
-                    className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
-                  >
-                    Post Time
-                  </label>
-                  <input
-                    id="challenge-post-time"
-                    type="text"
-                    value={draftConfig.challenges?.postTime ?? '09:00'}
-                    onChange={(e) =>
-                      updateDraftConfig((p) => ({
-                        ...p,
-                        challenges: { ...p.challenges, postTime: e.target.value },
-                      }))
-                    }
-                    onFocus={(e) => e.target.select()}
-                    className={cn(inputClasses, 'text-center')}
-                    placeholder="HH:MM"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label
-                    htmlFor="challenge-timezone"
-                    className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
-                  >
-                    Timezone
-                  </label>
-                  <input
-                    id="challenge-timezone"
-                    type="text"
-                    value={draftConfig.challenges?.timezone ?? 'UTC'}
-                    onChange={(e) =>
-                      updateDraftConfig((p) => ({
-                        ...p,
-                        challenges: { ...p.challenges, timezone: e.target.value },
-                      }))
-                    }
-                    onFocus={(e) => e.target.select()}
-                    className={cn(inputClasses, 'text-xs font-mono')}
-                  />
-                </div>
-              </div>
             </div>
           </div>
         </div>

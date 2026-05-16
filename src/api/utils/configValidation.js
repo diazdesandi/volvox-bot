@@ -315,15 +315,6 @@ export const CONFIG_SCHEMA = {
       maxOpenPerUser: { type: 'number', integer: true, min: 1, max: 20 },
     },
   },
-  challenges: {
-    type: 'object',
-    properties: {
-      enabled: { type: 'boolean' },
-      channelId: { type: 'string', nullable: true },
-      postTime: { type: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' },
-      timezone: TIME_ZONE_VALUE_SCHEMA,
-    },
-  },
   moderation: {
     type: 'object',
     properties: {

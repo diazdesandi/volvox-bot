@@ -296,10 +296,10 @@ describe('previously unexcluded app pages', () => {
   it('renders community hub data and metadata from public API responses', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
-        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, challengesCompleted: 4, topContributors: [] }),
+        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, topContributors: [] }),
       )
       .mockResolvedValueOnce(
-        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, challengesCompleted: 4, topContributors: [] }),
+        jsonResponse({ memberCount: 12, totalMessagesSent: 3456, topContributors: [] }),
       )
       .mockResolvedValueOnce(
         jsonResponse({ members: [{ userId: 'u1', username: 'ada', displayName: 'Ada', avatar: null, xp: 1200, level: 4, badge: 'Helper', rank: 1, currentLevelXp: 1000, nextLevelXp: 1500 }], total: 1 }),
@@ -681,7 +681,6 @@ describe('community public page variants', () => {
       .mockResolvedValueOnce(jsonResponse({
         memberCount: 5,
         totalMessagesSent: 1000,
-        challengesCompleted: 1,
         topContributors: [
           { userId: 'c1', username: 'grace', displayName: undefined, avatar: 'https://cdn.example/grace.png', xp: 3000, level: 6, badge: 'Builder' },
           { userId: 'c2', username: 'linus', displayName: 'Linus', avatar: null, xp: 2500, level: 5, badge: 'Reviewer' },

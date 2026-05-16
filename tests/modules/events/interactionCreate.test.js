@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   logError,
   handlePollButton,
-  handleChallengeButton,
   handleReviewButton,
   handleTicketOpenButton,
   handleTicketModal,
@@ -13,7 +12,6 @@ const {
 } = vi.hoisted(() => ({
   logError: vi.fn(),
   handlePollButton: vi.fn(),
-  handleChallengeButton: vi.fn(),
   handleReviewButton: vi.fn(),
   handleTicketOpenButton: vi.fn(),
   handleTicketModal: vi.fn(),
@@ -27,9 +25,6 @@ vi.mock('../../../src/logger.js', () => ({
 }));
 vi.mock('../../../src/modules/handlers/pollHandler.js', () => ({
   handlePollButton,
-}));
-vi.mock('../../../src/modules/handlers/challengeHandler.js', () => ({
-  handleChallengeButton,
 }));
 vi.mock('../../../src/modules/handlers/reviewHandler.js', () => ({
   handleReviewButton,
@@ -53,7 +48,6 @@ import { registerComponentHandlers } from '../../../src/modules/events/interacti
 beforeEach(() => {
   vi.clearAllMocks();
   handlePollButton.mockResolvedValue(false);
-  handleChallengeButton.mockResolvedValue(false);
   handleReviewButton.mockResolvedValue(false);
   handleTicketOpenButton.mockResolvedValue(false);
   handleTicketModal.mockResolvedValue(false);
@@ -68,7 +62,7 @@ describe('registerComponentHandlers', () => {
     const client = { on: vi.fn((event, fn) => handlers.set(event, fn)) };
     const interaction = { customId: 'abc123' };
 
-    handleChallengeButton.mockResolvedValue(true);
+    handleReviewButton.mockResolvedValue(true);
 
     registerComponentHandlers(client);
 
@@ -77,8 +71,8 @@ describe('registerComponentHandlers', () => {
     await handlers.get(Events.InteractionCreate)(interaction);
 
     expect(handlePollButton).toHaveBeenCalledWith(interaction);
-    expect(handleChallengeButton).toHaveBeenCalledWith(interaction);
-    expect(handleReviewButton).not.toHaveBeenCalled();
+    expect(handleReviewButton).toHaveBeenCalledWith(interaction);
+    expect(handleTicketOpenButton).not.toHaveBeenCalled();
     expect(logError).not.toHaveBeenCalled();
   });
 
@@ -101,6 +95,6 @@ describe('registerComponentHandlers', () => {
         error: 'boom',
       }),
     );
-    expect(handleChallengeButton).not.toHaveBeenCalled();
+    expect(handleReviewButton).not.toHaveBeenCalled();
   });
 });

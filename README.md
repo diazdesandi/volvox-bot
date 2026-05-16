@@ -29,7 +29,6 @@ AI-powered Discord bot and dashboard — built by the [Volvox](https://volvox.de
 - **📊 Reputation / XP System** — Engagement tracking with configurable levels and role rewards.
 - **⭐ Starboard** — Highlight popular messages with star reactions.
 - **🎤 Voice Activity Tracking** — Voice channel metrics and leaderboards.
-- **🏆 Challenges** — Daily coding challenges with submissions and leaderboards.
 - **🎫 Tickets** — Support ticket system with threads.
 - **💬 Polls · ✂️ Snippets · ⏰ Reminders · 👀 Code Review**
 

@@ -10,11 +10,6 @@ vi.mock('../../src/modules/config.js', () => ({
   getConfig: vi.fn(),
 }));
 
-vi.mock('../../src/modules/challengeScheduler.js', () => ({
-  handleSolveButton: vi.fn(),
-  handleHintButton: vi.fn(),
-}));
-
 vi.mock('../../src/modules/engagement.js', () => ({
   trackMessage: vi.fn(),
   trackReaction: vi.fn(),
