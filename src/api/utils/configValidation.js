@@ -443,6 +443,17 @@ export const CONFIG_SCHEMA = {
       retentionDays: { type: 'number', min: 1, max: 365 },
     },
   },
+  starboard: {
+    type: 'object',
+    properties: {
+      enabled: { type: 'boolean' },
+      channelId: { type: 'string', nullable: true },
+      threshold: { type: 'number', integer: true, min: 1, max: 1000 },
+      emoji: { type: 'string', minLength: 1, maxLength: 100 },
+      selfStarAllowed: { type: 'boolean' },
+      ignoredChannels: { type: 'array', items: { type: 'string' } },
+    },
+  },
   botStatus: {
     type: 'object',
     properties: {

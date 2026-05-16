@@ -220,6 +220,7 @@ describe('configValidation', () => {
           'triage',
           'aiAutoMod',
           'auditLog',
+          'starboard',
           'botStatus',
           'xp',
         ]),
@@ -899,6 +900,96 @@ describe('configValidation', () => {
 
     it('should accept a valid triage object that only uses responseCooldownMs', () => {
       expect(validateSingleValue('triage.responseCooldownMs', 10000)).toEqual([]);
+    });
+  });
+
+  describe('starboard schema validation', () => {
+    it('should accept a fully valid starboard config', () => {
+      const errors = validateSingleValue('starboard', {
+        enabled: true,
+        channelId: '123456789',
+        threshold: 5,
+        emoji: '⭐',
+        selfStarAllowed: false,
+        ignoredChannels: ['111', '222'],
+      });
+      expect(errors).toEqual([]);
+    });
+
+    it('should accept the wildcard emoji sentinel', () => {
+      expect(validateSingleValue('starboard.emoji', '*')).toEqual([]);
+    });
+
+    it('should accept null channelId', () => {
+      expect(validateSingleValue('starboard.channelId', null)).toEqual([]);
+    });
+
+    it('should reject non-boolean enabled', () => {
+      const errors = validateSingleValue('starboard.enabled', 'yes');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('expected boolean');
+    });
+
+    it('should reject non-integer threshold', () => {
+      const errors = validateSingleValue('starboard.threshold', 2.5);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('integer');
+    });
+
+    it('should reject threshold below 1', () => {
+      const errors = validateSingleValue('starboard.threshold', 0);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('>= 1');
+    });
+
+    it('should reject threshold above 1000', () => {
+      const errors = validateSingleValue('starboard.threshold', 1001);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('<= 1000');
+    });
+
+    it('should reject non-number threshold', () => {
+      const errors = validateSingleValue('starboard.threshold', 'banana');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('expected finite number');
+    });
+
+    it('should reject empty emoji string', () => {
+      const errors = validateSingleValue('starboard.emoji', '');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('at least 1 characters');
+    });
+
+    it('should reject emoji exceeding maxLength', () => {
+      const errors = validateSingleValue('starboard.emoji', 'a'.repeat(101));
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('max length of 100');
+    });
+
+    it('should reject non-boolean selfStarAllowed', () => {
+      const errors = validateSingleValue('starboard.selfStarAllowed', 'true');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('expected boolean');
+    });
+
+    it('should reject non-array ignoredChannels', () => {
+      const errors = validateSingleValue('starboard.ignoredChannels', 'not-an-array');
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('expected array');
+    });
+
+    it('should reject non-string items in ignoredChannels', () => {
+      const errors = validateSingleValue('starboard.ignoredChannels', [123, 456]);
+      expect(errors).toHaveLength(2);
+      expect(errors[0]).toContain('expected string');
+    });
+
+    it('should accept individual field paths', () => {
+      expect(validateSingleValue('starboard.enabled', true)).toEqual([]);
+      expect(validateSingleValue('starboard.channelId', '999')).toEqual([]);
+      expect(validateSingleValue('starboard.threshold', 3)).toEqual([]);
+      expect(validateSingleValue('starboard.selfStarAllowed', false)).toEqual([]);
+      expect(validateSingleValue('starboard.ignoredChannels', ['111'])).toEqual([]);
     });
   });
 });

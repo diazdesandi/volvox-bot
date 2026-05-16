@@ -181,7 +181,10 @@ export function CommunityToolsCategory() {
                     id="emoji"
                     type="text"
                     value={draftConfig.starboard?.emoji ?? '*'}
-                    onChange={(e) => updateStarboardField('emoji', e.target.value)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      updateStarboardField('emoji', raw === '✱' ? '*' : raw);
+                    }}
                     onBlur={(e) => {
                       const next = e.target.value.trim();
                       updateStarboardField('emoji', next === '✱' || next.length === 0 ? '*' : next);
