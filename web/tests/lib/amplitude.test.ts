@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { mockInit, mockReset, mockSetUserId, mockTrack } = vi.hoisted(() => ({
+const { mockInit, mockReset, mockSetOptOut, mockSetUserId, mockTrack } = vi.hoisted(() => ({
   mockInit: vi.fn(),
   mockReset: vi.fn(),
+  mockSetOptOut: vi.fn(),
   mockSetUserId: vi.fn(),
   mockTrack: vi.fn(),
 }));
@@ -10,6 +11,7 @@ const { mockInit, mockReset, mockSetUserId, mockTrack } = vi.hoisted(() => ({
 vi.mock('@amplitude/analytics-browser', () => ({
   init: mockInit,
   reset: mockReset,
+  setOptOut: mockSetOptOut,
   setUserId: mockSetUserId,
   track: mockTrack,
   Types: {
@@ -22,6 +24,8 @@ vi.mock('@amplitude/analytics-browser', () => ({
 describe('dashboard Amplitude analytics', () => {
   afterEach(() => {
     globalThis.localStorage?.clear();
+    globalThis.sessionStorage?.clear();
+    document.cookie = 'AMP_cookie=; Max-Age=0; path=/';
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.resetModules();
@@ -67,6 +71,7 @@ describe('dashboard Amplitude analytics', () => {
       remoteConfig: {
         fetchRemoteConfig: false,
       },
+      optOut: false,
       serverZone: 'US',
       trackingOptions: {
         ipAddress: false,
@@ -121,6 +126,7 @@ describe('dashboard Amplitude analytics', () => {
       'discord-user-123',
       expect.objectContaining({ autocapture: false }),
     );
+    expect(mockSetOptOut).toHaveBeenCalledWith(false);
     expect(mockSetUserId).toHaveBeenCalledWith('discord-user-456');
     expect(mockReset).toHaveBeenCalledOnce();
   });
@@ -135,11 +141,15 @@ describe('dashboard Amplitude analytics', () => {
     expect(trackDashboardEvent('dashboard_page_viewed', { route: '/dashboard' })).toBe(false);
     expect(mockInit).not.toHaveBeenCalled();
     expect(mockTrack).not.toHaveBeenCalled();
+    expect(mockSetOptOut).toHaveBeenCalledWith(true);
   });
 
-  it('resets identity and blocks future tracking after analytics consent is revoked', async () => {
+  it('opts out, clears identity, and blocks future tracking after analytics consent is revoked', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
     storeAnalyticsConsent();
+    globalThis.localStorage.setItem('AMP_test', 'queued-event');
+    globalThis.sessionStorage.setItem('amplitude_unsent_public-key', 'queued-event');
+    document.cookie = 'AMP_cookie=test; path=/';
 
     const { initDashboardAmplitude, trackDashboardEvent } =
       await import('@/lib/amplitude');
@@ -151,8 +161,14 @@ describe('dashboard Amplitude analytics', () => {
     expect(trackDashboardEvent('dashboard_page_viewed', { route: '/dashboard' })).toBe(false);
 
     expect(mockInit).toHaveBeenCalledOnce();
-    expect(mockReset).toHaveBeenCalledOnce();
+    expect(mockSetOptOut).toHaveBeenCalledWith(false);
+    expect(mockSetOptOut).toHaveBeenCalledWith(true);
+    expect(mockSetUserId).toHaveBeenCalledWith(undefined);
+    expect(mockReset).not.toHaveBeenCalled();
     expect(mockTrack).not.toHaveBeenCalled();
+    expect(globalThis.localStorage.getItem('AMP_test')).toBeNull();
+    expect(globalThis.sessionStorage.getItem('amplitude_unsent_public-key')).toBeNull();
+    expect(document.cookie).not.toContain('AMP_cookie=');
   });
 
   it('exports all required dashboard event name constants', async () => {

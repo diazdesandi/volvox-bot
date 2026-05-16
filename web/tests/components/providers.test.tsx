@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
-const { mockInitDashboardAmplitude, mockTrackDashboardEvent, mockUseSession, mockUseTheme } =
-  vi.hoisted(() => ({
+const {
+  mockInitDashboardAmplitude,
+  mockResetDashboardAmplitude,
+  mockTrackDashboardEvent,
+  mockUseSession,
+  mockUseTheme,
+} = vi.hoisted(() => ({
     mockInitDashboardAmplitude: vi.fn(),
+    mockResetDashboardAmplitude: vi.fn(),
     mockTrackDashboardEvent: vi.fn(),
     mockUseSession: vi.fn(),
     mockUseTheme: vi.fn(),
@@ -19,7 +25,7 @@ vi.mock('@/lib/amplitude', () => ({
   DASHBOARD_GUILD_SELECTED_EVENT: 'dashboard_guild_selected',
   DASHBOARD_PAGE_VIEW_EVENT: 'dashboard_page_viewed',
   initDashboardAmplitude: mockInitDashboardAmplitude,
-  resetDashboardAmplitude: vi.fn(),
+  resetDashboardAmplitude: mockResetDashboardAmplitude,
   trackDashboardEvent: mockTrackDashboardEvent,
 }));
 
@@ -90,6 +96,7 @@ describe('Providers', () => {
       }),
     );
     mockInitDashboardAmplitude.mockClear();
+    mockResetDashboardAmplitude.mockClear();
     mockSetContext.mockClear();
     mockTrackDashboardEvent.mockClear();
     mockUseGuildSelection.mockReturnValue(null);
@@ -276,6 +283,60 @@ describe('Providers', () => {
     );
 
     expect(mockInitDashboardAmplitude).not.toHaveBeenCalled();
+    expect(mockTrackDashboardEvent).not.toHaveBeenCalled();
+    expect(mockResetDashboardAmplitude).toHaveBeenCalledOnce();
+  });
+
+  it('resets Amplitude and stops tracking when analytics consent is revoked', async () => {
+    mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
+    mockUsePathname.mockReturnValue('/dashboard/members/1234567890');
+    mockUseGuildSelection.mockReturnValue('1234567890');
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'discord-user-123' } },
+      status: 'authenticated',
+    });
+
+    render(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    expect(mockInitDashboardAmplitude).toHaveBeenCalledWith('discord-user-123');
+    expect(mockTrackDashboardEvent).toHaveBeenCalledOnce();
+
+    mockResetDashboardAmplitude.mockClear();
+    mockTrackDashboardEvent.mockClear();
+
+    window.localStorage.setItem(
+      'volvox.cookieConsent.v1',
+      JSON.stringify({
+        version: 1,
+        decidedAt: '2026-05-16T00:00:00.000Z',
+        expiresAt: '2099-05-16T00:00:00.000Z',
+        categories: {
+          essential: true,
+          analytics: false,
+        },
+      }),
+    );
+    window.dispatchEvent(
+      new CustomEvent('volvox:cookie-consent-changed', {
+        detail: {
+          version: 1,
+          decidedAt: '2026-05-16T00:00:00.000Z',
+          expiresAt: '2099-05-16T00:00:00.000Z',
+          categories: {
+            essential: true,
+            analytics: false,
+          },
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockResetDashboardAmplitude).toHaveBeenCalledOnce();
+    });
     expect(mockTrackDashboardEvent).not.toHaveBeenCalled();
   });
 

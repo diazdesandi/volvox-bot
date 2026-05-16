@@ -59,6 +59,26 @@ export default function TermsPage() {
       </section>
 
       <section className="flex flex-col gap-3">
+        <h2 className="text-xl font-semibold text-foreground">Cookies &amp; Analytics Choices</h2>
+        <p className="text-muted-foreground">
+          The Service uses essential cookies or local browser storage to support authentication,
+          security, saved dashboard state, and core functionality. Optional analytics, including
+          Amplitude analytics, are used only when you allow the analytics category in Cookie
+          Preferences.
+        </p>
+        <p className="text-muted-foreground">
+          You may accept, reject, update, or revoke optional analytics consent through Cookie
+          Preferences. Changing those choices may affect whether we receive aggregate usage signals
+          from your browser, but essential cookies required to provide the Service remain active.
+          Additional details are described in our{' '}
+          <Link className="text-foreground underline underline-offset-4" href="/privacy">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold text-foreground">
           Responsibilities &amp; Prohibited Conduct
         </h2>

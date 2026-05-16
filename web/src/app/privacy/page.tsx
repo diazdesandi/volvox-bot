@@ -66,6 +66,14 @@ export default function PrivacyPage() {
                 Sentry.
               </p>
             </div>
+            <div className="space-y-2">
+              <h3 className={subheadingClassName}>Cookies and analytics preferences</h3>
+              <p className={bodyClassName}>
+                The website and dashboard use essential cookies or local browser storage for
+                sign-in, security, and saved product state. Optional analytics storage is separate
+                and is used only when you allow the analytics category in Cookie Preferences.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -101,6 +109,15 @@ export default function PrivacyPage() {
                 reliability, evaluate feature adoption, and support customers and server staff.
               </p>
             </div>
+            <div className="space-y-2">
+              <h3 className={subheadingClassName}>Analytics choices</h3>
+              <p className={bodyClassName}>
+                Optional analytics help us understand aggregate dashboard usage, such as page views
+                and feature interaction patterns. Analytics are disabled unless the analytics
+                category is allowed, and rejecting or revoking that category stops analytics
+                collection from that browser.
+              </p>
+            </div>
           </div>
         </section>
 
@@ -112,8 +129,9 @@ export default function PrivacyPage() {
               <p className={bodyClassName}>
                 We share data with third parties only as needed to provide the service. This may
                 include Discord for bot and account functionality, Anthropic and MiniMax for AI
-                processing, Sentry for error monitoring, and guild-configured webhooks or
-                integrations enabled by server administrators.
+                processing, Sentry for error monitoring, Amplitude for optional analytics when you
+                consent to the analytics category, and guild-configured webhooks or integrations
+                enabled by server administrators.
               </p>
             </div>
             <div className="space-y-2">
@@ -160,7 +178,8 @@ export default function PrivacyPage() {
                 Where supported, users can control certain privacy settings directly. For example,
                 memory-related AI opt-outs may be managed through <code>memory_optouts</code>, and
                 public leaderboard visibility may be limited using the <code>public_profile</code>{' '}
-                setting.
+                setting. Cookie Preferences lets you accept, reject, update, or revoke optional
+                analytics consent for the current browser while keeping essential cookies enabled.
               </p>
             </div>
             <div className="space-y-2">

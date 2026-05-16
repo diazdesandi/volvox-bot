@@ -23,6 +23,7 @@ type BrowserAmplitudeOptions = NonNullable<Parameters<typeof amplitude.init>[2]>
 type BrowserAmplitudeProperties = Record<string, unknown>;
 
 const AMPLITUDE_MIN_ID_LENGTH = 5;
+const AMPLITUDE_STORAGE_KEY_PREFIXES = ['AMP_', 'amplitude_', 'amplitude.'] as const;
 
 let hasInitialized = false;
 let activeUserId: string | undefined;
@@ -54,6 +55,83 @@ function parseBoolean(value: string | undefined): boolean {
  */
 function getAmplitudeServerZone(): 'US' {
   return 'US';
+}
+
+function isAmplitudeStorageKey(key: string): boolean {
+  const normalizedKey = key.toLowerCase();
+  return AMPLITUDE_STORAGE_KEY_PREFIXES.some((prefix) =>
+    normalizedKey.startsWith(prefix.toLowerCase()),
+  );
+}
+
+function clearAmplitudeWebStorage(): void {
+  const storages: Storage[] = [];
+
+  for (const storageKey of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const storage = globalThis[storageKey];
+
+      if (typeof storage !== 'undefined') {
+        storages.push(storage);
+      }
+    } catch {
+      // Ignore storage access failures in restricted browser modes.
+    }
+  }
+
+  for (const storage of storages) {
+    try {
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+
+        if (key && isAmplitudeStorageKey(key)) {
+          storage.removeItem(key);
+        }
+      }
+    } catch {
+      // Storage can throw in restricted browser modes; consent revocation should still continue.
+    }
+  }
+}
+
+function getCookieRemovalDomains(hostname: string): string[] {
+  const hostSegments = hostname.split('.').filter(Boolean);
+  const domains = new Set<string>(['']);
+
+  domains.add(hostname);
+
+  if (hostSegments.length > 1 && !/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+    for (let index = 0; index < hostSegments.length - 1; index += 1) {
+      domains.add(`.${hostSegments.slice(index).join('.')}`);
+    }
+  }
+
+  return [...domains];
+}
+
+function clearAmplitudeCookies(): void {
+  if (typeof globalThis.document === 'undefined') {
+    return;
+  }
+
+  try {
+    const cookieNames = globalThis.document.cookie
+      .split(';')
+      .map((cookie) => cookie.trim().split('=')[0])
+      .filter((name) => name && isAmplitudeStorageKey(name));
+
+    const domains = getCookieRemovalDomains(globalThis.location?.hostname ?? '');
+
+    for (const name of cookieNames) {
+      for (const domain of domains) {
+        const domainAttribute = domain ? `; domain=${domain}` : '';
+        // biome-ignore lint/suspicious/noDocumentCookie: Amplitude cleanup must expire legacy browser cookies.
+        globalThis.document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${domainAttribute}; SameSite=Lax`;
+      }
+    }
+  } catch {
+    // Ignore cookie access failures in restricted browser modes.
+  }
 }
 
 /**
@@ -142,6 +220,7 @@ export function getBrowserAmplitudeOptions(): BrowserAmplitudeOptions {
     remoteConfig: {
       fetchRemoteConfig: false,
     },
+    optOut: false,
     serverZone: getAmplitudeServerZone(),
     trackingOptions: {
       ipAddress: false,
@@ -173,6 +252,8 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
   }
 
   try {
+    amplitude.setOptOut(false);
+
     if (!hasInitialized) {
       amplitude.init(apiKey, normalizedUserId, getBrowserAmplitudeOptions());
       hasInitialized = true;
@@ -195,15 +276,27 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
 }
 
 export function resetDashboardAmplitude(): boolean {
-  if (globalThis.window === undefined || !hasInitialized) {
+  if (globalThis.window === undefined) {
     return false;
   }
 
+  const shouldClearAmplitudeUserId = hasInitialized;
+  activeUserId = undefined;
+  hasInitialized = false;
+
   try {
-    amplitude.reset();
-    activeUserId = undefined;
+    amplitude.setOptOut(true);
+
+    if (shouldClearAmplitudeUserId) {
+      amplitude.setUserId(undefined);
+    }
+
+    clearAmplitudeWebStorage();
+    clearAmplitudeCookies();
     return true;
   } catch {
+    clearAmplitudeWebStorage();
+    clearAmplitudeCookies();
     return false;
   }
 }

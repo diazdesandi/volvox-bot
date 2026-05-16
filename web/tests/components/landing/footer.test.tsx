@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetBotInviteUrl } = vi.hoisted(() => ({
+const { mockGetBotInviteUrl, mockOpenCookiePreferences } = vi.hoisted(() => ({
   mockGetBotInviteUrl: vi.fn(),
+  mockOpenCookiePreferences: vi.fn(),
 }));
 
 vi.mock('framer-motion', async () => {
@@ -43,6 +45,10 @@ vi.mock('@/lib/discord', () => ({
   getBotInviteUrl: () => mockGetBotInviteUrl(),
 }));
 
+vi.mock('@/lib/cookie-consent', () => ({
+  openCookiePreferences: mockOpenCookiePreferences,
+}));
+
 // next/image mock
 vi.mock('next/image', () => ({
   default: ({ alt, fill: _fill, ...props }: any) => <img alt={alt} {...props} />,
@@ -55,6 +61,7 @@ const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope
 describe('Footer', () => {
   beforeEach(() => {
     mockGetBotInviteUrl.mockReturnValue(inviteUrl);
+    mockOpenCookiePreferences.mockClear();
   });
 
   it('should render the main CTA heading', () => {
@@ -87,5 +94,15 @@ describe('Footer', () => {
     render(<Footer />);
     expect(screen.getByText(/synthesis of artificial intelligence/i)).toBeInTheDocument();
     expect(screen.getByAltText('Volvox.Bot')).toBeInTheDocument();
+  });
+
+  it('should reopen cookie preferences from the legal links', async () => {
+    const user = userEvent.setup();
+
+    render(<Footer />);
+
+    await user.click(screen.getByRole('button', { name: /cookie preferences/i }));
+
+    expect(mockOpenCookiePreferences).toHaveBeenCalledOnce();
   });
 });

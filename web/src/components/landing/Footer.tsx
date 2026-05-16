@@ -8,6 +8,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { type MouseEvent, useRef } from 'react';
 import { siDiscord, siX } from 'simple-icons';
+import { CookiePreferencesButton } from '@/components/layout/cookie-preferences-button';
 import { SimpleIcon } from '@/components/ui/simple-icon';
 import { WEB_APP_VERSION } from '@/lib/app-version';
 import { getBotInviteUrl } from '@/lib/discord';
@@ -312,6 +313,11 @@ export function Footer() {
                       </Link>
                     </li>
                   ))}
+                  {col.title === 'LEGAL_PROTOCOL' && (
+                    <li>
+                      <CookiePreferencesButton />
+                    </li>
+                  )}
                 </ul>
               </div>
             ))}
