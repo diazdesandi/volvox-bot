@@ -1,6 +1,6 @@
 {
   "name": "volvox-bot-web",
-  "packageManager": "pnpm@11.0.9",
+  "packageManager": "pnpm@11.1.2",
   "version": "0.1.0",
   "private": true,
   "scripts": {

@@ -10,6 +10,13 @@ function readRepoFile(...pathSegments) {
 }
 
 describe('Railway build config', () => {
+  it('keeps the web package manager aligned with the workspace root', () => {
+    const rootPackage = JSON.parse(readRepoFile('package.json'));
+    const webPackage = JSON.parse(readRepoFile('web', 'package.json'));
+
+    expect(webPackage.packageManager).toBe(rootPackage.packageManager);
+  });
+
   it('builds the web service from the workspace lockfile', () => {
     const workspaceConfig = readRepoFile('pnpm-workspace.yaml');
     const webDockerfile = readRepoFile('web', 'Dockerfile');

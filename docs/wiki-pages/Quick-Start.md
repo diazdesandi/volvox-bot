@@ -5,7 +5,7 @@ This page is a minimal path from clone to running bot + dashboard locally.
 ## Prerequisites
 
 - Node.js 22+
-- pnpm `10.33.2` (pinned by the repo `packageManager`; Corepack recommended)
+- pnpm `11.1.2` (pinned by the repo `packageManager`; Corepack recommended)
 - PostgreSQL 17+
 - Redis is optional; session storage falls back to in-memory when `REDIS_URL` is unset
 - Discord application + bot token
