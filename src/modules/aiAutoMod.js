@@ -845,6 +845,11 @@ const DM_ACTION_LABELS = Object.freeze({
   ban: 'ban',
 });
 
+/**
+ * Format an AI AutoMod category key into the title-cased label used in concise case reasons.
+ * @param {string} category - AI AutoMod category key.
+ * @returns {string} Title-cased category label, falling back to the raw key when unknown.
+ */
 function formatCaseCategoryLabel(category) {
   const label = CATEGORY_LABELS[category] ?? category;
   return label.replace(/\b\p{L}/gu, (char) => char.toUpperCase());
@@ -861,6 +866,12 @@ function formatList(values) {
   return `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`;
 }
 
+/**
+ * Build the compact reason stored on AI AutoMod moderation cases and shown in the dashboard.
+ * @param {Object} result - AI AutoMod analysis result with `categories` and `scores`.
+ * @param {string[]} actions - Executable moderation actions included in the case reason.
+ * @returns {string} Concise case reason such as `AI Auto Mod: Harassment 60% / warn`.
+ */
 function buildAiAutoModCaseReason(result, actions) {
   const categoryScores = result.categories.map((category) => {
     const score = Number(result.scores?.[category] ?? 0);
