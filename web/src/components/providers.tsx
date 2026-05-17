@@ -22,6 +22,12 @@ import {
   type StoredCookieConsent,
 } from '@/lib/cookie-consent';
 
+/**
+ * Determines whether a pathname represents an application dashboard route.
+ *
+ * @param pathname - The URL pathname to check; may be `null`.
+ * @returns `true` if `pathname` is exactly `"/dashboard"` or starts with `"/dashboard/"`, `false` otherwise.
+ */
 function isDashboardRoute(pathname: string | null): pathname is string {
   return pathname === '/dashboard' || pathname?.startsWith('/dashboard/') === true;
 }
@@ -73,10 +79,24 @@ function getDashboardTelemetryRoute(pathname: string | null): string {
   return `/${['dashboard', routeSection, routeParameter, ...segments.slice(3)].join('/')}`;
 }
 
+/**
+ * Determine telemetry guild selection scope from a guild identifier.
+ *
+ * @param guildId - The selected guild's id, or `null` when no guild is selected
+ * @returns `"selected"` when `guildId` is provided, `"none"` when `guildId` is `null`
+ */
 function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
   return guildId ? 'selected' : 'none';
 }
 
+/**
+ * Tracks whether the user has consented to analytics and updates in response to consent changes.
+ *
+ * Subscribes to cookie-consent change notifications and keeps a boolean state that reflects whether
+ * analytics are allowed; returns `null` while the initial consent state is unresolved.
+ *
+ * @returns `true` if the user has consented to analytics, `false` if they have not, or `null` while unknown.
+ */
 function useAnalyticsConsent() {
   const [analyticsConsent, setAnalyticsConsent] = useState<boolean | null>(null);
 
@@ -243,10 +263,10 @@ function AmplitudeContextBridge() {
 }
 
 /**
- * Composes application context providers (authentication and theme), mounts telemetry bridges, and renders global UI chrome.
+ * Wraps application UI with authentication and theme providers, mounts telemetry bridges, and renders global UI chrome.
  *
  * @param children - The application UI to render inside the provider tree
- * @returns A React element containing the provider tree that wraps `children`, mounts Sentry and Amplitude context bridges, and renders the themed global Toaster
+ * @returns The provider-wrapped React element
  */
 export function Providers({ children }: { children: ReactNode }) {
   return (

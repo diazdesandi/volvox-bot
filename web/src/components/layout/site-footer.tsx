@@ -24,6 +24,13 @@ const footerLinks = [
   },
 ] as const;
 
+/**
+ * Renders the site footer containing navigational links, a cookie-preferences control, brand text with the current year, and an affiliation disclaimer.
+ *
+ * The navigation shows both internal and external links and includes a cookie preferences button.
+ *
+ * @returns A JSX element representing the complete site footer.
+ */
 export function SiteFooter() {
   return (
     <footer className="w-full border-t border-border/30 bg-background/50">

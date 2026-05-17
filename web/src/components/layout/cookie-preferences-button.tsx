@@ -9,6 +9,13 @@ interface CookiePreferencesButtonProps {
   readonly className?: string;
 }
 
+/**
+ * Renders a button that opens the site's cookie preferences dialog when clicked.
+ *
+ * @param children - Button content; defaults to `"Cookie Preferences"`
+ * @param className - Additional CSS class names to merge with the component's default styles
+ * @returns A button element that triggers opening the cookie preferences UI on click
+ */
 export function CookiePreferencesButton({
   children = 'Cookie Preferences',
   className,

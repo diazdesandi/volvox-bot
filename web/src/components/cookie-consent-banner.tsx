@@ -25,6 +25,12 @@ import { cn } from '@/lib/utils';
 const COOKIE_SAVE_ERROR_MESSAGE =
   'Cookie preferences could not save in this browser. Check storage permissions and try again.';
 
+/**
+ * Determine the initial analytics preference from stored cookie consent.
+ *
+ * @param consent - The persisted cookie consent object or `null`
+ * @returns `true` if stored consent explicitly enables analytics, `false` otherwise
+ */
 function getInitialAnalyticsPreference(consent: StoredCookieConsent | null): boolean {
   const categories = consent?.categories;
 
@@ -33,6 +39,17 @@ function getInitialAnalyticsPreference(consent: StoredCookieConsent | null): boo
     : false;
 }
 
+/**
+ * Renders a cookie consent banner and a preferences dialog for managing essential and analytics cookies.
+ *
+ * The component reads persisted consent on mount, listens for global cookie consent and preferences-open
+ * events to stay in sync, and persists user choices when preferences are saved. It shows a fixed banner
+ * when no consent is stored and the preferences dialog is closed, and exposes controls to accept all,
+ * reject non-essential, or open a customization dialog that includes an analytics toggle. Displays an
+ * inline error message if saving preferences fails.
+ *
+ * @returns The rendered banner and preferences dialog elements, or `null` while initial client-side state is loading.
+ */
 export function CookieConsentBanner() {
   const analyticsSwitchId = useId();
   const [hasMounted, setHasMounted] = useState(false);

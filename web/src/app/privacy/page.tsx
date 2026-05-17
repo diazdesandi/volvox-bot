@@ -11,6 +11,15 @@ const sectionHeadingClassName = 'text-xl font-semibold text-foreground';
 const subheadingClassName = 'text-sm font-medium text-muted-foreground/60';
 const bodyClassName = 'text-sm leading-7 text-muted-foreground';
 
+/**
+ * Render the Privacy Policy page for Volvox.Bot.
+ *
+ * Displays static sections detailing information collection, use, third-party sharing,
+ * data retention, user controls and rights, children's privacy, security measures,
+ * policy changes, and contact information.
+ *
+ * @returns A JSX element containing the complete Privacy Policy page.
+ */
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-background">

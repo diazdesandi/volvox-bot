@@ -49,14 +49,20 @@ function parseBoolean(value: string | undefined): boolean {
 }
 
 /**
- * Return the only supported Amplitude server zone for this deployment.
+ * Gets the Amplitude server zone used by this deployment.
  *
- * @returns `'US'`.
+ * @returns The string `"US"`.
  */
 function getAmplitudeServerZone(): 'US' {
   return 'US';
 }
 
+/**
+ * Determines whether a storage key name belongs to Amplitude by checking it against known prefixes.
+ *
+ * @param key - The storage key name to test
+ * @returns `true` if `key` starts with any configured Amplitude storage prefix (case-insensitive), `false` otherwise
+ */
 function isAmplitudeStorageKey(key: string): boolean {
   const normalizedKey = key.toLowerCase();
   return AMPLITUDE_STORAGE_KEY_PREFIXES.some((prefix) =>
@@ -64,6 +70,14 @@ function isAmplitudeStorageKey(key: string): boolean {
   );
 }
 
+/**
+ * Removes Amplitude-related keys from available browser localStorage and sessionStorage.
+ *
+ * Attempts to access localStorage and sessionStorage (silently skipping any that throw),
+ * then iterates each storage's keys and removes entries whose names match known Amplitude
+ * storage-key prefixes. Failures during access or removal are ignored so cleanup can proceed
+ * in restricted browser modes.
+ */
 function clearAmplitudeWebStorage(): void {
   const storages: Storage[] = [];
 
@@ -94,6 +108,16 @@ function clearAmplitudeWebStorage(): void {
   }
 }
 
+/**
+ * Build a list of cookie domain attribute values to try when removing cookies for a given hostname.
+ *
+ * Includes the empty string and the exact hostname; if the hostname is not an IPv4 address and
+ * contains multiple dot-separated segments, also includes parent domains prefixed with a leading dot
+ * (e.g., `.example.com`, `.sub.example.com`).
+ *
+ * @param hostname - The request hostname (e.g., `sub.example.com` or `127.0.0.1`)
+ * @returns An array of unique domain attribute strings to use when clearing cookies for `hostname`
+ */
 function getCookieRemovalDomains(hostname: string): string[] {
   const hostSegments = hostname.split('.').filter(Boolean);
   const domains = new Set<string>(['']);
@@ -109,6 +133,12 @@ function getCookieRemovalDomains(hostname: string): string[] {
   return [...domains];
 }
 
+/**
+ * Build a set of cookie path variants from a URL pathname.
+ *
+ * @param pathname - The URL pathname (e.g., `/a/b/c`) used to derive path variants
+ * @returns An array containing `'/'` and each cumulative path segment (e.g., `'/a'`, `'/a/b'`, `'/a/b/c'`)
+ */
 function getCookieRemovalPaths(pathname: string): string[] {
   const paths = new Set<string>(['/']);
   const segments = pathname.split('/').filter(Boolean);
@@ -122,6 +152,11 @@ function getCookieRemovalPaths(pathname: string): string[] {
   return [...paths];
 }
 
+/**
+ * Removes (expires) cookies whose names match known Amplitude storage keys across likely domain and path variants.
+ *
+ * Attempts to parse `document.cookie` for Amplitude-related cookie names and sets them to an expired value for each computed domain and path variant. Silently ignores failures (e.g., restricted browser modes) and is a no-op when `document` is unavailable.
+ */
 function clearAmplitudeCookies(): void {
   if (typeof globalThis.document === 'undefined') {
     return;
@@ -291,6 +326,13 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
   }
 }
 
+/**
+ * Disables dashboard analytics for the current page, clears the module's active user state, and removes Amplitude-related web storage and cookies.
+ *
+ * This function sets Amplitude to opt-out mode, clears the stored user id if one was previously initialized, and attempts to remove Amplitude keys from local/session storage and cookies. Cleanup is attempted even if disabling opt-out or clearing the user id throws.
+ *
+ * @returns `true` if opt-out and cleanup completed without error, `false` otherwise (also `false` when not running in a browser).
+ */
 export function resetDashboardAmplitude(): boolean {
   if (globalThis.window === undefined) {
     return false;

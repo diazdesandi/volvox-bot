@@ -63,6 +63,16 @@ function FooterBackground() {
   );
 }
 
+/**
+ * Renders the site's footer including the CTA module, navigation grid, social links, and status/legal row.
+ *
+ * The component initializes GSAP + ScrollTrigger animations with a prefers-reduced-motion fallback, intercepts
+ * in-page hash links to perform landing-section scrolling when applicable, and conditionally renders the
+ * "Initialize Bot" action (when a bot invite URL is available) and the Cookie Preferences entry inside the
+ * legal links column.
+ *
+ * @returns The footer JSX element
+ */
 export function Footer() {
   const containerRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);

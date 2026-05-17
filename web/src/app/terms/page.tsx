@@ -7,6 +7,17 @@ export const metadata: Metadata = {
     'Terms governing use of Volvox.Bot, including its Discord bot, moderation tools, AI features, dashboard, and related services.',
 };
 
+/**
+ * Render the static Terms of Service page for Volvox.Bot.
+ *
+ * The component returns a fully composed page containing the service's terms,
+ * sections for acceptance, service description, account and cookie policies,
+ * responsibilities, AI disclaimer, moderation, IP, third-party services,
+ * liability limitations, indemnification, termination, changes, governing law,
+ * and contact information.
+ *
+ * @returns A React element containing the Terms of Service content and layout.
+ */
 export default function TermsPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-6 px-6 py-24">
