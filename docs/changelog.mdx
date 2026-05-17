@@ -27,6 +27,8 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **GitHub feed feature retired** — The `/github` command, the GitHub feed module, and its **Config → Support & Integrations** panel have been removed. It saw vanishingly little use and the maintenance tax wasn't worth it. If you relied on GitHub-to-Discord notifications, Discord's built-in webhook integration covers the same ground in about thirty seconds of setup. Stored GitHub feed configuration has been dropped as part of the upgrade; nothing else in your config was touched.
 
+**Reminders retired** — The `/remind` command, its scheduler, and the **Reminders** section in **Config** have all been removed. The bot no longer delivers personal or channel reminders, and any pending reminders have been cleared. If you leaned on this for routine pings, Discord's scheduled events or a lightweight webhook-driven cron are the closest replacements. The rest of your configuration is untouched.
+
 ## Fixes
 
 **Direct @mentions no longer trip over themselves** — The lower-latency mention path shipped on 2026-05-11 occasionally raced against the standard triage flow and aborted the very response it was trying to speed up. Direct mentions and replies to the bot now complete reliably instead of silently bailing mid-evaluation. See [Moderation](/features/moderation).
