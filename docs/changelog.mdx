@@ -21,7 +21,7 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Less noisy AI model picker** — Models offered through OpenRouter no longer carry a redundant **(via OpenRouter)** suffix in dashboard model pickers. The provider is already obvious from the section it lives in, and the cleaner labels make scanning the list a lot faster. See [AI automation](/features/ai-conversations).
 
-**Audit log filters and details, expanded** — The **Audit Log** page now groups actions by category (Moderation, AI and triage, Config, Members, Tickets, Temp roles, Notifications) and adds **Target ID** and **Channel ID** filters alongside the existing user and date filters. Each row leads with a plain-language summary — for example, "Mod#0001 banned BadUser#1234" or "AI auto-mod timed out SpamBot#0001" — so you can scan the table without decoding action codes. Expand any entry to see structured panels for moderation cases (case number, action, reason) and AI auto-mod decisions (model, category scores, thresholds, skipped actions, message link), with the raw JSON still available underneath. See [Audit log](/features/audit-log).
+**Audit log filters and details, expanded** — The **Audit Log** page now groups actions by category (Moderation, AI and triage, Config, Members, Tickets, Temp roles) and adds **Target ID** and **Channel ID** filters alongside the existing user and date filters. Each row leads with a plain-language summary — for example, "Mod#0001 banned BadUser#1234" or "AI auto-mod timed out SpamBot#0001" — so you can scan the table without decoding action codes. Expand any entry to see structured panels for moderation cases (case number, action, reason) and AI auto-mod decisions (model, category scores, thresholds, skipped actions, message link), with the raw JSON still available underneath. See [Audit log](/features/audit-log).
 
 ## Removed
 
@@ -32,6 +32,8 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 **Backup and restore retired** — Config backup and restore — including the export and import endpoints and any scheduled automatic backups — have been removed. Usage was minimal and the surface area carried real risk: an accidental restore could clobber a live config in a single click. Your live configuration is unaffected and stays editable from the dashboard or the `/config` command. If you want a snapshot before a big change, copy the relevant settings out of the dashboard manually before editing.
   
 **Memory opt-out subcommand removed** — The `/memory optout` subcommand has been retired. To clear what the bot remembers about you, use `/memory forget`. To turn memory off for everyone, a server admin can disable it under **Config → AI & Automation**. Existing memories stay put and keep following the server's memory settings.
+  
+**Outbound webhook notifications retired** — The **Notifications** panel for managing outbound webhook endpoints, the **Webhook** action under **XP Level-Up Actions** and **Default Moderation Actions**, and the webhook delivery log have all been removed. Volvox.Bot no longer fans events out to third-party URLs, and any stored webhook endpoints, secrets, and delivery history were dropped during the upgrade. If you forwarded events to another service, switch to Discord's native channel webhooks or your own listener built against the dashboard. The **Notifications** category and `notifications.*` action types no longer appear in [Audit log](/features/audit-log) filters.
   
 ## Fixes
 
