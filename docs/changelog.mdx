@@ -31,6 +31,8 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Backup and restore retired** — Config backup and restore — including the export and import endpoints and any scheduled automatic backups — have been removed. Usage was minimal and the surface area carried real risk: an accidental restore could clobber a live config in a single click. Your live configuration is unaffected and stays editable from the dashboard or the `/config` command. If you want a snapshot before a big change, copy the relevant settings out of the dashboard manually before editing.
   
+**Memory opt-out subcommand removed** — The `/memory optout` subcommand has been retired. To clear what the bot remembers about you, use `/memory forget`. To turn memory off for everyone, a server admin can disable it under **Config → AI & Automation**. Existing memories stay put and keep following the server's memory settings.
+  
 ## Fixes
 
 **Direct @mentions no longer trip over themselves** — The lower-latency mention path shipped on 2026-05-11 occasionally raced against the standard triage flow and aborted the very response it was trying to speed up. Direct mentions and replies to the bot now complete reliably instead of silently bailing mid-evaluation. See [Moderation](/features/moderation).
