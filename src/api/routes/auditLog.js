@@ -147,7 +147,7 @@ function buildFilters(guildId, query) {
     paramIndex++;
   }
 
-  const categoryFilter = toFilterString(query.category);
+  const categoryFilter = actionFilter ? null : toFilterString(query.category);
   const actionPatterns = categoryFilter ? CATEGORY_ACTION_PATTERNS[categoryFilter] : null;
   if (actionPatterns) {
     conditions.push(`action LIKE ANY($${paramIndex}::text[])`);

@@ -66,7 +66,9 @@ function getDiscordDisplayName(profile: unknown, user: unknown): string | null {
   const username = getStringField(profile, 'username');
   if (username) {
     const discriminator = getStringField(profile, 'discriminator');
-    return discriminator && discriminator !== '0' ? `${username}#${discriminator}` : username;
+    const displayName =
+      discriminator && discriminator !== '0' ? `${username}#${discriminator}` : username;
+    return displayName.slice(0, DISCORD_DISPLAY_NAME_MAX_LENGTH);
   }
 
   return getStringField(user, 'name');

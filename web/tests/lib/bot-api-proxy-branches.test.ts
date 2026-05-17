@@ -94,6 +94,17 @@ describe('bot-api-proxy branch coverage', () => {
     });
   });
 
+  it('omits unsafe non-ASCII dashboard actor tags from proxy headers', async () => {
+    mockGetToken.mockResolvedValue({ id: '123456789012345678', name: 'Renée 🚀' });
+
+    const headers = await getDashboardActorHeaders(createRequest());
+
+    expect(headers).toEqual({
+      'x-discord-user-id': '123456789012345678',
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('resolves dashboard actor display name from Discord when the session token only has an id', async () => {
     mockGetToken.mockResolvedValue({
       accessToken: 'discord-access-token',
@@ -120,6 +131,29 @@ describe('bot-api-proxy branch coverage', () => {
     expect(headers).toEqual({
       'x-discord-user-id': '123456789012345678',
       'x-discord-user-tag': 'Bill Chirico',
+    });
+  });
+
+  it('falls back to a header-safe Discord username when the global name is unsafe', async () => {
+    mockGetToken.mockResolvedValue({
+      accessToken: 'discord-access-token',
+      id: '123456789012345678',
+    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: '123456789012345678',
+        username: 'rene',
+        global_name: 'Renée',
+        discriminator: '1234',
+      }),
+    });
+
+    const headers = await getDashboardActorHeaders(createRequest());
+
+    expect(headers).toEqual({
+      'x-discord-user-id': '123456789012345678',
+      'x-discord-user-tag': 'rene#1234',
     });
   });
 

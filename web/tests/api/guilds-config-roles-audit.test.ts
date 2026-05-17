@@ -45,7 +45,7 @@ describe('guild config, roles, and audit proxy routes', () => {
     await expectProxiedRoutes(cases);
   });
 
-  it('hydrates current dashboard actor tags on audit log rows when upstream has only the user id', async () => {
+  it('returns proxied audit log rows without loading dashboard actor headers', async () => {
     mockProxyToBotApi.mockResolvedValueOnce(
       NextResponse.json({
         entries: [
@@ -88,7 +88,7 @@ describe('guild config, roles, and audit proxy routes', () => {
         expect.objectContaining({
           id: 1,
           user_id: '123456789012345678',
-          user_tag: 'Owner#0001',
+          user_tag: null,
         }),
         expect.objectContaining({
           id: 2,
@@ -98,6 +98,7 @@ describe('guild config, roles, and audit proxy routes', () => {
       ],
       total: 2,
     });
+    expect(mockGetDashboardActorHeaders).not.toHaveBeenCalled();
   });
 
   it('covers config read and write validation before proxying', async () => {

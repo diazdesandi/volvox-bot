@@ -74,6 +74,37 @@ describe("authOptions", () => {
     expect(result.name).toBe("Bill Chirico");
   });
 
+  it("truncates combined username and discriminator display names", async () => {
+    const { authOptions } = await import("@/lib/auth");
+    const jwtCallback = authOptions.callbacks?.jwt;
+    expect(jwtCallback).toBeDefined();
+    if (!jwtCallback) return;
+
+    const result = await jwtCallback({
+      token: { sub: "123" },
+      account: {
+        access_token: "discord-access-token",
+        refresh_token: "discord-refresh-token",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        provider: "discord",
+        type: "oauth",
+        providerAccountId: "discord-user-123",
+        token_type: "Bearer",
+      },
+      user: { id: "123", name: "Test", email: "test@test.com" },
+      profile: {
+        id: "discord-user-123",
+        username: "a".repeat(127),
+        global_name: null,
+        discriminator: "1234",
+      },
+      trigger: "signIn",
+    } as Parameters<NonNullable<typeof jwtCallback>>[0]);
+
+    expect(result.name).toHaveLength(128);
+    expect(result.name).toBe(`${"a".repeat(127)}#`);
+  });
+
   it("jwt callback returns existing token when no account", async () => {
     const { authOptions } = await import("@/lib/auth");
     const jwtCallback = authOptions.callbacks?.jwt;

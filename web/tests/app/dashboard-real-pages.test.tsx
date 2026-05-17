@@ -317,6 +317,18 @@ beforeEach(() => {
           caseNumber: 43,
         },
       },
+      {
+        id: 4,
+        action: 'triage.budget_exceeded',
+        user_id: 'volvox-bot',
+        user_tag: 'Volvox.Bot',
+        target_id: null,
+        target_tag: null,
+        target_type: null,
+        created_at: '2026-04-28T11:00:00Z',
+        ip_address: null,
+        details: { pct: 0.87 },
+      },
     ],
     total: 60,
     loading: false,
@@ -501,6 +513,8 @@ describe('previously unexcluded app pages', () => {
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
     expect(screen.getByRole('option', { name: /AI auto-mod: Timeout/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Temp roles: Assign \(underscore\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Temp roles: Legacy create/i })).toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
     await userEvent.click(screen.getByText('Mod#0001 banned BadUser#1234').closest('tr') as HTMLElement);
     expect(screen.getAllByText(/cleanup/).length).toBeGreaterThan(0);
@@ -508,6 +522,7 @@ describe('previously unexcluded app pages', () => {
     await userEvent.click(screen.getByText(/AI auto-mod timed out SpamBot#0001/i).closest('tr') as HTMLElement);
     expect(screen.getAllByText(/openrouter:moderation-model/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/toxicity 94%/i)).toBeInTheDocument();
+    expect(screen.getByText(/Triage budget exceeded at 87%/i)).toBeInTheDocument();
     const reasonValue = screen.getByText(/Toxic spam/i);
     expect(reasonValue.className).toContain('[overflow-wrap:anywhere]');
     expect(reasonValue.closest('div')?.className).toContain('min-w-0');

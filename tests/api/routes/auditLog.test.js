@@ -281,6 +281,25 @@ describe('auditLog routes', () => {
       expect(countCall[0]).toContain('created_at >= $4');
     });
 
+    it('should ignore category when an exact action filter is provided', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const res = await authed(
+        request(app).get(
+          '/api/v1/guilds/guild1/audit-log?action=config.update&category=moderation',
+        ),
+      );
+
+      expect(res.status).toBe(200);
+
+      const countCall = mockPool.query.mock.calls[0];
+      expect(countCall[0]).toContain('action = $2');
+      expect(countCall[0]).not.toContain('action LIKE ANY');
+      expect(countCall[1]).toEqual(['guild1', 'config.update']);
+    });
+
     it('should filter by category, target ID, and channel ID', async () => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ total: 1 }] })
@@ -550,10 +569,11 @@ describe('GET /:id/audit-log/export', () => {
 
     const call = mockPool.query.mock.calls[0];
     expect(call[0]).toContain('action = $2');
-    expect(call[0]).toContain('action LIKE ANY($3::text[])');
-    expect(call[0]).toContain('user_id = $4');
-    expect(call[0]).toContain('target_id = $5');
+    expect(call[0]).not.toContain('action LIKE ANY');
+    expect(call[0]).toContain('user_id = $3');
+    expect(call[0]).toContain('target_id = $4');
     expect(call[1]).toContain('config.update');
+    expect(call[1]).not.toContain('moderation');
     expect(call[1]).toContain('user42');
     expect(call[1]).toContain('target99');
   });

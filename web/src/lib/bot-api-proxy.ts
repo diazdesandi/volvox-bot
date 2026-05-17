@@ -22,6 +22,7 @@ type AuthToken = {
   sub?: unknown;
 };
 const DASHBOARD_ACTOR_TAG_MAX_LENGTH = 128;
+const HEADER_SAFE_ACTOR_TAG_PATTERN = /^[\x20-\x7e]+$/;
 
 /**
  * Determines whether a Discord permission bitfield includes the administrator permission.
@@ -85,32 +86,32 @@ function getUserIdFromToken(token: unknown): string {
   return '';
 }
 
-function getActorTagFromToken(token: unknown): string | null {
-  for (const key of ['name', 'username', 'global_name']) {
-    const value = getTokenString(token, key);
-    if (value && !/[\r\n]/.test(value)) {
-      return value.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
-    }
-  }
+function getHeaderSafeActorTag(value: string | null): string | null {
+  if (!value || /[\r\n]/.test(value)) return null;
 
-  return null;
+  const actorTag = value.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+  return HEADER_SAFE_ACTOR_TAG_PATTERN.test(actorTag) ? actorTag : null;
+}
+
+function getActorTagFromToken(token: unknown): string | null {
+  return getHeaderSafeActorTag(getTokenString(token, 'name'));
 }
 
 function getDisplayNameFromDiscordUser(user: unknown): string | null {
-  const globalName = getTokenString(user, 'global_name');
-  if (globalName && !/[\r\n]/.test(globalName)) {
-    return globalName.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+  const globalName = getHeaderSafeActorTag(getTokenString(user, 'global_name'));
+  if (globalName) {
+    return globalName;
   }
 
   const username = getTokenString(user, 'username');
-  if (!username || /[\r\n]/.test(username)) return null;
+  if (!username) return null;
 
   const discriminator = getTokenString(user, 'discriminator');
-  if (discriminator && discriminator !== '0' && !/[\r\n]/.test(discriminator)) {
-    return `${username}#${discriminator}`.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+  if (discriminator && discriminator !== '0') {
+    return getHeaderSafeActorTag(`${username}#${discriminator}`);
   }
 
-  return username.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+  return getHeaderSafeActorTag(username);
 }
 
 async function fetchDiscordActorTag(accessToken: string): Promise<string | null> {

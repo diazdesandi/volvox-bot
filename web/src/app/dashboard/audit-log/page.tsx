@@ -142,8 +142,12 @@ const ACTION_GROUPS = [
     options: [
       { value: 'temp-roles.create', label: 'Temp roles: Assign' },
       { value: 'temp-roles.delete', label: 'Temp roles: Revoke' },
+      { value: 'temp_roles.create', label: 'Temp roles: Assign (underscore)' },
+      { value: 'temp_roles.delete', label: 'Temp roles: Revoke (underscore)' },
       { value: 'tempRoles.create', label: 'Temp roles: Legacy assign' },
       { value: 'tempRoles.delete', label: 'Temp roles: Legacy revoke' },
+      { value: 'temprole.create', label: 'Temp roles: Legacy create' },
+      { value: 'temprole.delete', label: 'Temp roles: Legacy delete' },
     ],
   },
   {
@@ -264,7 +268,8 @@ function getAuditSummary(entry: AuditEntry): string {
 
   if (entry.action === 'triage.budget_exceeded') {
     const pct = getDetailNumber(details, 'pct');
-    return `Triage budget exceeded${pct != null ? ` at ${Math.round(pct)}%` : ''}`;
+    const percent = formatPercent(pct);
+    return `Triage budget exceeded${percent ? ` at ${percent}` : ''}`;
   }
 
   if (entry.action === 'config.update') {
