@@ -93,6 +93,25 @@ The first DM in an incident uses a title like **Moderation actions planned in `<
 
 The bot records every triggered AI auto-moderation response in the audit log, with one entry per action that actually runs. If a message crosses a threshold but no action runs, the bot still records a "no action" entry. You can then audit the decision. Global instant enforcement and the incident report channel can still produce delete or flag actions. This applies even when you haven't selected a category-specific response action.
 
+### AI auto-mod case reason format
+
+Cases opened by Content Safety use a compact, structured reason so case tables stay scannable. Each reason follows this shape:
+
+```text
+AI Auto Mod: <Category> <score>%, <Category> <score>% / <action>, <action>
+```
+
+- **Categories and scores** list every category that crossed its threshold, with the model's confidence as a percentage.
+- **Actions** list every response action that ran for the incident (for example, `delete`, `warn`, `timeout`, `kick`, `ban`), separated by commas.
+
+For example, a message that tripped two categories and led to a delete plus a warning would record:
+
+```text
+AI Auto Mod: Toxicity 82%, Harassment 64% / delete, warn
+```
+
+You don't need to configure anything. New cases adopt this format automatically. Existing cases keep their original reason text so historical context isn't rewritten.
+
 Triage model settings are in **Config → AI & Automation → Triage**. The classifier and response engines use the same supported model dropdown as Content Safety. The dashboard validates `provider:model` strings when you save, so it rejects unsupported or malformed selections up front. If a stored config still contains an invalid value at runtime, the bot logs a warning. It falls back through your configured models in order. When none are supported, it uses the default AI model.
 
 ### Triage latency tuning
