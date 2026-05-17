@@ -482,6 +482,8 @@ describe('previously unexcluded app pages', () => {
     expect(screen.getByText('Total Entries')).toBeInTheDocument();
     expect(screen.getByText('Mod#0001 banned BadUser#1234')).toBeInTheDocument();
     expect(screen.getByText(/AI auto-mod timed out SpamBot#0001/i)).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^ip$/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('127.0.0.1')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText(/filter audit log by user id/i), {
       target: { value: 'user-1234' },
@@ -506,11 +508,54 @@ describe('previously unexcluded app pages', () => {
     await userEvent.click(screen.getByText(/AI auto-mod timed out SpamBot#0001/i).closest('tr') as HTMLElement);
     expect(screen.getAllByText(/openrouter:moderation-model/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/toxicity 94%/i)).toBeInTheDocument();
+    const reasonValue = screen.getByText(/Toxic spam/i);
+    expect(reasonValue.className).toContain('[overflow-wrap:anywhere]');
+    expect(reasonValue.closest('div')?.className).toContain('min-w-0');
+    const messageValue = screen.getByText('https://discord.com/channels/guild-1/chan-1/msg-1');
+    expect(messageValue.className).toContain('[overflow-wrap:anywhere]');
+    expect(messageValue.closest('div')?.className).toContain('min-w-0');
+    const rawDetailsButtons = screen.getAllByRole('button', { name: /show raw details/i });
+    expect(rawDetailsButtons).toHaveLength(2);
+    expect(document.getElementById('audit-raw-details-3')).not.toBeInTheDocument();
+    await userEvent.click(rawDetailsButtons[1]);
+    expect(document.getElementById('audit-raw-details-3')).toHaveTextContent('"model"');
+    expect(screen.getByRole('button', { name: /hide raw details/i })).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: /copy id/i })[0]);
     await userEvent.click(screen.getByRole('button', { name: /next/i }));
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('user-1234');
     expect(mockAuditState.setFilters).toHaveBeenCalledWith({ offset: 25 });
+  });
+
+  it('labels API-secret-only audit actors as internal API activity', () => {
+    Object.assign(mockAuditState, {
+      entries: [
+        {
+          id: 4,
+          action: 'config.update',
+          user_id: 'api-secret',
+          user_tag: null,
+          target_id: null,
+          target_tag: null,
+          target_type: null,
+          created_at: '2026-04-28T11:00:00Z',
+          ip_address: null,
+          details: {
+            configDiff: {
+              before: {},
+              after: { moderation: { enabled: true } },
+            },
+          },
+        },
+      ],
+      total: 1,
+    });
+
+    render(<AuditLogPage />);
+
+    expect(screen.getByText('Internal API')).toBeInTheDocument();
+    expect(screen.queryByText('User cret')).not.toBeInTheDocument();
+    expect(screen.queryByText('API secret')).not.toBeInTheDocument();
   });
 
   it('renders conversation detail success and error navigation states', async () => {
@@ -634,6 +679,7 @@ describe('previously unexcluded app page alternate states', () => {
     await userEvent.click(screen.getByRole('button', { name: /clear search/i }));
     expect(mockAuditState.setFilters).toHaveBeenCalledWith({ userId: '', offset: 0 });
     await userEvent.click(screen.getByText('Updater').closest('tr') as HTMLElement);
+    await userEvent.click(screen.getByRole('button', { name: /show raw details/i }));
     expect(screen.getByText(/changed/)).toBeInTheDocument();
     loaded.unmount();
 

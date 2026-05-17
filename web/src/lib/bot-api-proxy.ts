@@ -12,14 +12,16 @@ const MANAGE_GUILD_PERMISSION = 0x20n;
 const KICK_MEMBERS_PERMISSION = 0x2n;
 const BAN_MEMBERS_PERMISSION = 0x4n;
 const MODERATE_MEMBERS_PERMISSION = 0x10000000000n;
+const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
 
 export type GuildAccessLevel = 'viewer' | 'moderator' | 'admin';
 type RequiredGuildAccess = 'moderator' | 'admin';
 type AuthToken = {
   accessToken: string;
-  id?: string;
-  sub?: string;
+  id?: unknown;
+  sub?: unknown;
 };
+const DASHBOARD_ACTOR_TAG_MAX_LENGTH = 128;
 
 /**
  * Determines whether a Discord permission bitfield includes the administrator permission.
@@ -64,10 +66,88 @@ function getFallbackGuildAccess(guild: { owner?: boolean; permissions: string })
   return 'viewer';
 }
 
-function getUserIdFromToken(token: AuthToken): string {
-  if (typeof token.id === 'string') return token.id;
-  if (typeof token.sub === 'string') return token.sub;
+function getTokenString(token: unknown, key: string): string | null {
+  if (!token || typeof token !== 'object') return null;
+  const value = (token as Record<string, unknown>)[key];
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function getUserIdFromToken(token: unknown): string {
+  const id = getTokenString(token, 'id');
+  if (id) return id;
+
+  const sub = getTokenString(token, 'sub');
+  if (sub) return sub;
+
   return '';
+}
+
+function getActorTagFromToken(token: unknown): string | null {
+  for (const key of ['name', 'username', 'global_name']) {
+    const value = getTokenString(token, key);
+    if (value && !/[\r\n]/.test(value)) {
+      return value.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+    }
+  }
+
+  return null;
+}
+
+function getDisplayNameFromDiscordUser(user: unknown): string | null {
+  const globalName = getTokenString(user, 'global_name');
+  if (globalName && !/[\r\n]/.test(globalName)) {
+    return globalName.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+  }
+
+  const username = getTokenString(user, 'username');
+  if (!username || /[\r\n]/.test(username)) return null;
+
+  const discriminator = getTokenString(user, 'discriminator');
+  if (discriminator && discriminator !== '0' && !/[\r\n]/.test(discriminator)) {
+    return `${username}#${discriminator}`.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+  }
+
+  return username.slice(0, DASHBOARD_ACTOR_TAG_MAX_LENGTH);
+}
+
+async function fetchDiscordActorTag(accessToken: string): Promise<string | null> {
+  try {
+    const response = await fetch('https://discord.com/api/v10/users/@me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) return null;
+
+    return getDisplayNameFromDiscordUser(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+export async function getDashboardActorHeaders(
+  request: NextRequest,
+): Promise<Record<string, string> | NextResponse> {
+  const token = await getToken({ req: request });
+  const userId = getUserIdFromToken(token);
+
+  if (!userId || !DISCORD_SNOWFLAKE_PATTERN.test(userId)) {
+    return NextResponse.json({ error: 'Unable to determine Discord user id' }, { status: 401 });
+  }
+
+  const headers: Record<string, string> = { 'x-discord-user-id': userId };
+  const accessToken = getTokenString(token, 'accessToken');
+  const userTag =
+    getActorTagFromToken(token) ?? (accessToken ? await fetchDiscordActorTag(accessToken) : null);
+  if (userTag) {
+    headers['x-discord-user-tag'] = userTag;
+  }
+
+  return headers;
 }
 
 function allowsPermissionFallbackAccess(guild: {

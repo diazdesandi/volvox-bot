@@ -28,6 +28,9 @@ const CATEGORY_ACTION_PATTERNS = {
   temp_roles: ['temp-roles.%', 'tempRoles.%', 'temp_roles.%', 'temprole.%'],
   notifications: ['notifications.%'],
 };
+const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
+const AUDIT_USER_TAG_MAX_LENGTH = 128;
+const AUDIT_USER_LOOKUP_CONCURRENCY = 5;
 
 /**
  * Helper to get the database pool from app.locals.
@@ -37,6 +40,78 @@ const CATEGORY_ACTION_PATTERNS = {
  */
 function getDbPool(req) {
   return req.app.locals.dbPool || null;
+}
+
+function normalizeDisplayName(value) {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed || /[\r\n]/.test(trimmed)) return null;
+
+  return trimmed.slice(0, AUDIT_USER_TAG_MAX_LENGTH);
+}
+
+function getDiscordUserLabel(user) {
+  if (!user || typeof user !== 'object') return null;
+
+  return (
+    normalizeDisplayName(user.globalName) ||
+    normalizeDisplayName(user.global_name) ||
+    normalizeDisplayName(user.tag) ||
+    normalizeDisplayName(user.username)
+  );
+}
+
+async function resolveDiscordUserLabel(client, userId) {
+  const cachedUser = client?.users?.cache?.get?.(userId);
+  const cachedLabel = getDiscordUserLabel(cachedUser);
+  if (cachedLabel) return cachedLabel;
+
+  if (typeof client?.users?.fetch !== 'function') return null;
+
+  try {
+    return getDiscordUserLabel(await client.users.fetch(userId));
+  } catch {
+    return null;
+  }
+}
+
+async function hydrateMissingUserTags(client, rows) {
+  const userIds = Array.from(
+    new Set(
+      rows
+        .filter(
+          (row) =>
+            !normalizeDisplayName(row.user_tag) && DISCORD_SNOWFLAKE_PATTERN.test(row.user_id),
+        )
+        .map((row) => row.user_id),
+    ),
+  );
+
+  if (userIds.length === 0) return rows;
+
+  const resolvedLabels = new Map();
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < userIds.length) {
+      const userId = userIds[nextIndex];
+      nextIndex++;
+      const label = await resolveDiscordUserLabel(client, userId);
+      if (label) resolvedLabels.set(userId, label);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(AUDIT_USER_LOOKUP_CONCURRENCY, userIds.length) }, worker),
+  );
+
+  if (resolvedLabels.size === 0) return rows;
+
+  return rows.map((row) => {
+    const resolvedLabel = resolvedLabels.get(row.user_id);
+    return resolvedLabel ? { ...row, user_tag: resolvedLabel } : row;
+  });
 }
 
 /**
@@ -211,8 +286,10 @@ router.get('/:id/audit-log', auditRateLimit, requireGuildAdmin, validateGuild, a
       ),
     ]);
 
+    const entries = await hydrateMissingUserTags(req.app.locals.client, entriesResult.rows);
+
     res.json({
-      entries: entriesResult.rows,
+      entries,
       total: countResult.rows[0].total,
       limit,
       offset,

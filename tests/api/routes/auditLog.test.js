@@ -35,6 +35,7 @@ function authed(req) {
 describe('auditLog routes', () => {
   let app;
   let mockPool;
+  let mockUsersFetch;
 
   const mockGuild = {
     id: 'guild1',
@@ -48,6 +49,7 @@ describe('auditLog routes', () => {
 
   beforeEach(() => {
     vi.stubEnv('BOT_API_SECRET', TEST_SECRET);
+    mockUsersFetch = vi.fn();
 
     mockPool = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
@@ -56,6 +58,7 @@ describe('auditLog routes', () => {
 
     const client = {
       guilds: { cache: new Map([['guild1', mockGuild]]) },
+      users: { cache: new Map(), fetch: mockUsersFetch },
       ws: { status: 0, ping: 42 },
       user: { tag: 'Bot#1234' },
     };
@@ -126,6 +129,43 @@ describe('auditLog routes', () => {
       expect(res.body.total).toBe(50);
       expect(res.body.limit).toBe(10);
       expect(res.body.offset).toBe(0);
+    });
+
+    it('should hydrate missing user tags from Discord users', async () => {
+      const userId = '191633014441115648';
+      const mockEntries = [
+        {
+          id: 1,
+          guild_id: 'guild1',
+          user_id: userId,
+          user_tag: null,
+          action: 'config.update',
+          target_type: null,
+          target_id: null,
+          target_tag: null,
+          details: { method: 'PATCH', path: '/api/v1/guilds/guild1/config' },
+          ip_address: '127.0.0.1',
+          created_at: '2026-05-16T23:42:00Z',
+        },
+      ];
+      mockUsersFetch.mockResolvedValue({
+        id: userId,
+        globalName: 'Bill Chirico',
+        username: 'bill',
+        tag: 'bill#0001',
+      });
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({ rows: mockEntries });
+
+      const res = await authed(request(app).get('/api/v1/guilds/guild1/audit-log'));
+
+      expect(res.status).toBe(200);
+      expect(mockUsersFetch).toHaveBeenCalledWith(userId);
+      expect(res.body.entries[0]).toMatchObject({
+        user_id: userId,
+        user_tag: 'Bill Chirico',
+      });
     });
 
     it('should respect limit cap of 100', async () => {

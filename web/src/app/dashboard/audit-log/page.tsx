@@ -192,8 +192,21 @@ function formatPercent(value: unknown): string | null {
   return `${Math.round(normalized)}%`;
 }
 
+const SYSTEM_ACTOR_LABELS: Record<string, string> = {
+  'api-secret': 'Internal API',
+  unknown: 'Unknown actor',
+  'volvox-bot': 'Volvox.Bot',
+};
+
 function getActorLabel(entry: AuditEntry): string {
-  return entry.user_tag || `User ${entry.user_id.slice(-4)}`;
+  const taggedUser = entry.user_tag?.trim();
+  if (taggedUser) return taggedUser;
+
+  const systemActorLabel = SYSTEM_ACTOR_LABELS[entry.user_id];
+  if (systemActorLabel) return systemActorLabel;
+
+  const fallbackIdSuffix = entry.user_id.trim().slice(-4);
+  return fallbackIdSuffix ? `User ${fallbackIdSuffix}` : 'Unknown actor';
 }
 
 function getTargetLabel(entry: AuditEntry): string | null {
@@ -263,15 +276,27 @@ function getAuditSummary(entry: AuditEntry): string {
   return `${actor} ${readableAction}${target ? ` ${target}` : ''}`;
 }
 
-function DetailItem({ label, value }: { label: string; value: string | number | boolean | null }) {
+function DetailItem({
+  label,
+  value,
+  className = '',
+}: {
+  label: string;
+  value: string | number | boolean | null;
+  className?: string;
+}) {
   if (value === null || value === '') return null;
 
   return (
-    <div className="rounded-[12px] border border-border/30 bg-background/40 px-3 py-2">
+    <div
+      className={`min-w-0 overflow-hidden rounded-[12px] border border-border/30 bg-background/40 px-3 py-2 ${className}`}
+    >
       <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
         {label}
       </p>
-      <p className="mt-1 break-words text-xs font-semibold text-foreground/80">{String(value)}</p>
+      <p className="mt-1 whitespace-normal break-words text-xs font-semibold leading-relaxed text-foreground/80 [overflow-wrap:anywhere]">
+        {String(value)}
+      </p>
     </div>
   );
 }
@@ -284,9 +309,9 @@ function ModerationDetails({ entry }: { entry: AuditEntry }) {
   const reason = getDetailString(details, 'reason');
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid min-w-0 gap-3 md:grid-cols-3">
       {caseNumber != null && (
-        <div className="rounded-[12px] border border-border/30 bg-background/40 px-3 py-2">
+        <div className="min-w-0 overflow-hidden rounded-[12px] border border-border/30 bg-background/40 px-3 py-2">
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
             Case
           </p>
@@ -310,9 +335,8 @@ function AiAutoModDetails({ entry }: { entry: AuditEntry }) {
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid min-w-0 gap-3 md:grid-cols-3">
         <DetailItem label="Model" value={getDetailString(details, 'model')} />
-        <DetailItem label="Reason" value={getDetailString(details, 'reason')} />
         <DetailItem label="Channel" value={getDetailString(details, 'channelId')} />
         <DetailItem
           label="Case"
@@ -322,8 +346,21 @@ function AiAutoModDetails({ entry }: { entry: AuditEntry }) {
               : null
           }
         />
-        <DetailItem label="Message" value={getDetailString(details, 'messageUrl')} />
-        <DetailItem label="Skipped" value={skippedActions.join(', ') || null} />
+        <DetailItem
+          label="Reason"
+          value={getDetailString(details, 'reason')}
+          className="md:col-span-3"
+        />
+        <DetailItem
+          label="Message"
+          value={getDetailString(details, 'messageUrl')}
+          className="md:col-span-3"
+        />
+        <DetailItem
+          label="Skipped"
+          value={skippedActions.join(', ') || null}
+          className="md:col-span-3"
+        />
       </div>
 
       {categories.length > 0 && (
@@ -368,6 +405,54 @@ function AiAutoModDetails({ entry }: { entry: AuditEntry }) {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function RawDetailsDisclosure({
+  entry,
+  expanded,
+  onToggle,
+}: {
+  entry: AuditEntry;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const rawDetailsId = `audit-raw-details-${entry.id}`;
+
+  return (
+    <div className="w-full overflow-hidden rounded-[14px] border border-border/30 bg-background/50">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 border-b border-border/20 px-3 py-2 text-left transition-colors hover:bg-muted/30"
+        aria-controls={rawDetailsId}
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Hide raw details' : 'Show raw details'}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle();
+        }}
+      >
+        <span className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
+          Raw details
+        </span>
+        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">
+          {expanded ? 'Hide' : 'Show'}
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
+        </span>
+      </button>
+      {expanded && (
+        <pre
+          id={rawDetailsId}
+          className="max-h-64 w-full overflow-x-auto p-3 text-xs text-foreground/70 scrollbar-thin scrollbar-thumb-border/20"
+        >
+          {JSON.stringify(entry.details, null, 2)}
+        </pre>
       )}
     </div>
   );
@@ -453,9 +538,6 @@ function AuditLogSkeleton() {
             <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
               Date
             </TableHead>
-            <TableHead className="hidden lg:table-cell text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-              IP
-            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -476,9 +558,6 @@ function AuditLogSkeleton() {
               </TableCell>
               <TableCell>
                 <Skeleton className="h-4 w-20" />
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                <Skeleton className="h-4 w-24" />
               </TableCell>
             </TableRow>
           ))}
@@ -502,6 +581,7 @@ export default function AuditLogPage() {
   const router = useRouter();
   const { entries, total, loading, error, filters, setFilters, fetch } = useAuditLogStore();
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [expandedRawDetailsRows, setExpandedRawDetailsRows] = useState<Set<number>>(new Set());
 
   const [userSearch, setUserSearch] = useState(filters.userId);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -510,6 +590,7 @@ export default function AuditLogPage() {
   const onGuildChange = useCallback(() => {
     useAuditLogStore.getState().reset();
     setExpandedRows(new Set());
+    setExpandedRawDetailsRows(new Set());
     setUserSearch('');
     setDebouncedUserSearch('');
   }, []);
@@ -557,6 +638,24 @@ export default function AuditLogPage() {
 
   const toggleRow = useCallback((id: number) => {
     setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        setExpandedRawDetailsRows((rawRows) => {
+          if (!rawRows.has(id)) return rawRows;
+          const nextRawRows = new Set(rawRows);
+          nextRawRows.delete(id);
+          return nextRawRows;
+        });
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleRawDetails = useCallback((id: number) => {
+    setExpandedRawDetailsRows((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -789,14 +888,12 @@ export default function AuditLogPage() {
                       <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
                         Date
                       </TableHead>
-                      <TableHead className="hidden lg:table-cell text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                        IP
-                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {entries.map((entry) => {
                       const isExpanded = expandedRows.has(entry.id);
+                      const isRawDetailsExpanded = expandedRawDetailsRows.has(entry.id);
                       return (
                         <Fragment key={entry.id}>
                           <TableRow
@@ -829,9 +926,7 @@ export default function AuditLogPage() {
                             </TableCell>
                             <TableCell className="text-sm text-foreground/80">
                               <div className="flex flex-col">
-                                <span className="font-semibold">
-                                  {entry.user_tag || `User ${entry.user_id.slice(-4)}`}
-                                </span>
+                                <span className="font-semibold">{getActorLabel(entry)}</span>
                                 <div className="flex items-center text-[10px] font-mono text-muted-foreground/50">
                                   {entry.user_id}
                                   <CopyButton value={entry.user_id} />
@@ -860,24 +955,18 @@ export default function AuditLogPage() {
                             <TableCell className="text-sm text-muted-foreground/60">
                               {formatDate(entry.created_at)}
                             </TableCell>
-                            <TableCell className="hidden text-sm text-muted-foreground/60 lg:table-cell">
-                              {entry.ip_address || '—'}
-                            </TableCell>
                           </TableRow>
                           {isExpanded && entry.details && (
                             <TableRow key={`${entry.id}-details`} className="border-border/10">
-                              <TableCell colSpan={6} className="max-w-0 bg-background/20 p-4">
+                              <TableCell colSpan={5} className="max-w-0 bg-background/20 p-4">
                                 <div className="space-y-4">
                                   <ModerationDetails entry={entry} />
                                   <AiAutoModDetails entry={entry} />
-                                  <div className="w-full overflow-hidden rounded-[14px] border border-border/30 bg-background/50">
-                                    <div className="border-b border-border/20 px-3 py-2 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
-                                      Raw details
-                                    </div>
-                                    <pre className="max-h-64 w-full overflow-x-auto p-3 text-xs text-foreground/70 scrollbar-thin scrollbar-thumb-border/20">
-                                      {JSON.stringify(entry.details, null, 2)}
-                                    </pre>
-                                  </div>
+                                  <RawDetailsDisclosure
+                                    entry={entry}
+                                    expanded={isRawDetailsExpanded}
+                                    onToggle={() => toggleRawDetails(entry.id)}
+                                  />
                                 </div>
                               </TableCell>
                             </TableRow>

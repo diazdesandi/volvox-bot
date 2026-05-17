@@ -8,6 +8,16 @@ import { warn } from '../../logger.js';
 import { handleOAuthJwt } from './oauthJwt.js';
 
 const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
+const TRUSTED_ACTOR_TAG_MAX_LENGTH = 128;
+
+function normalizeTrustedActorTag(value) {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed || /[\r\n]/.test(trimmed)) return null;
+
+  return trimmed.slice(0, TRUSTED_ACTOR_TAG_MAX_LENGTH);
+}
 
 /**
  * Performs a constant-time comparison of the given secret against BOT_API_SECRET.
@@ -55,7 +65,10 @@ export function requireAuth() {
             ? req.headers['x-discord-user-id'].trim()
             : '';
         if (trustedUserId && DISCORD_SNOWFLAKE_PATTERN.test(trustedUserId)) {
-          req.user = { userId: trustedUserId };
+          const trustedUserTag = normalizeTrustedActorTag(req.headers['x-discord-user-tag']);
+          req.user = trustedUserTag
+            ? { userId: trustedUserId, tag: trustedUserTag }
+            : { userId: trustedUserId };
         }
         return next();
       } else {
