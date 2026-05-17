@@ -4,7 +4,7 @@ sidebarTitle: Changelog
 description: 'Release notes for Volvox.Bot covering new features, dashboard improvements, AI moderation updates, and bug fixes for the Discord bot platform.'
 ---
 
-<Update label="2026-05-17" description="May 2026" tags={["New", "Improved"]}>
+<Update label="2026-05-17" description="May 2026" tags={["New", "Improved", "Removed", "Fixes"]}>
 ## New
 
 **Full moderation history on member profiles** — The member profile in the dashboard now shows the complete case history for that member instead of just recent warnings. Cases are paginated 10 per page, and a quick breakdown at the top tallies warnings, timeouts, kicks, and bans so you can size up a member at a glance. Select **View full history** to jump to the Moderation page with that member's user ID preloaded — handy when you need filters, search, or the wider tools on that page. You can also share the preloaded view directly: `https://volvox.bot/dashboard/moderation?userId=<discord-user-id>`. See [Moderation](/features/moderation#review-a-members-moderation-history).
@@ -16,6 +16,18 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 **Cookie preferences are now yours to decide** — First-time visitors to the website and dashboard get a consent banner that sorts cookies into two honest buckets. **Essential** stays on so sign-in and saved state actually work. **Analytics** (Amplitude) stays off until you opt in. Pick **Accept all**, **Reject non-essential**, or **Customize** to flip analytics on its own. Changed your mind? The **Cookie Preferences** link in the footer is there for exactly that, and switching analytics off clears the Amplitude identifiers and cookies stored while you were opted in. Your choice sticks for 365 days per browser. See [Cookie preferences](/security#cookie-preferences).
 
 **Add to Server lands you on the dashboard** — Selecting **Add to Server** on the landing page used to pop Discord open in a new tab and leave you to find your own way back. The flow now starts the invite in the same window and returns you straight to the dashboard after you approve, so onboarding is one continuous trip instead of a tab-juggling exercise. The dashboard's **Add Bot** button already worked this way; the landing page now matches it. See [Getting started](/getting-started#add-volvox-bot-to-your-server).
+
+**Tidier AI auto-mod case reasons** — Case reasons from [AI auto-moderation](/features/moderation) used to read like a model's stream-of-consciousness, occasionally truncating into the void. They now follow a compact format: `AI Auto Mod: Toxicity 82%, Harassment 64% / delete and warn`. Categories appear with their confidence scores, the actions taken are listed plainly, and case tables stop wrapping into wall-of-text territory. Existing cases keep their original reasons; new cases adopt the new format automatically.
+
+**Less noisy AI model picker** — Models offered through OpenRouter no longer carry a redundant **(via OpenRouter)** suffix in dashboard model pickers. The provider is already obvious from the section it lives in, and the cleaner labels make scanning the list a lot faster. See [AI automation](/features/ai-conversations).
+
+## Removed
+
+**GitHub feed feature retired** — The `/github` command, the GitHub feed module, and its **Config → Support & Integrations** panel have been removed. It saw vanishingly little use and the maintenance tax wasn't worth it. If you relied on GitHub-to-Discord notifications, Discord's built-in webhook integration covers the same ground in about thirty seconds of setup. Stored GitHub feed configuration has been dropped as part of the upgrade; nothing else in your config was touched.
+
+## Fixes
+
+**Direct @mentions no longer trip over themselves** — The lower-latency mention path shipped on 2026-05-11 occasionally raced against the standard triage flow and aborted the very response it was trying to speed up. Direct mentions and replies to the bot now complete reliably instead of silently bailing mid-evaluation. See [Moderation](/features/moderation).
 </Update>
 
 <Update label="2026-05-16" description="May 2026" tags={["Fixes", "Removed"]}>
