@@ -20,6 +20,15 @@ const baseCase: ModCase = {
 };
 
 describe('CaseDetail', () => {
+  it('renders a Discord log message link when guild, channel, and message ids are available', () => {
+    render(<CaseDetail modCase={{ ...baseCase, channel_id: 'channel-1' }} />);
+
+    expect(screen.getByRole('link', { name: 'log-message-123' })).toHaveAttribute(
+      'href',
+      'https://discord.com/channels/guild-1/channel-1/log-message-123',
+    );
+  });
+
   it('renders log_message_id as fallback text when no channel id is available for a deep link', () => {
     render(<CaseDetail modCase={baseCase} />);
 

@@ -11,6 +11,7 @@ export interface ModCase {
   reason: string | null;
   duration: string | null;
   expires_at: string | null;
+  channel_id?: string | null;
   log_message_id: string | null;
   created_at: string;
   scheduledActions?: ScheduledAction[];

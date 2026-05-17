@@ -33,6 +33,10 @@ interface CaseDetailProps {
 export function CaseDetail({ modCase }: CaseDetailProps) {
   const pendingScheduled = modCase.scheduledActions?.filter((a) => !a.executed) ?? [];
   const executedScheduled = modCase.scheduledActions?.filter((a) => a.executed) ?? [];
+  const logMessageUrl =
+    modCase.guild_id && modCase.channel_id && modCase.log_message_id
+      ? `https://discord.com/channels/${modCase.guild_id}/${modCase.channel_id}/${modCase.log_message_id}`
+      : null;
 
   return (
     <Card
@@ -90,9 +94,20 @@ export function CaseDetail({ modCase }: CaseDetailProps) {
             icon={<MessageSquare className="h-4 w-4" />}
             label="Log Message"
             value={
-              <span className="font-mono text-sm text-muted-foreground">
-                {modCase.log_message_id}
-              </span>
+              logMessageUrl ? (
+                <a
+                  href={logMessageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-sm text-muted-foreground underline-offset-4 hover:underline"
+                >
+                  {modCase.log_message_id}
+                </a>
+              ) : (
+                <span className="font-mono text-sm text-muted-foreground">
+                  {modCase.log_message_id}
+                </span>
+              )
             }
           />
         )}

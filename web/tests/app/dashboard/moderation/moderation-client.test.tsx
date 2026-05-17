@@ -171,4 +171,40 @@ describe('ModerationClient', () => {
       expect(mockModerationState.setUserHistoryPage).toHaveBeenCalledWith(1);
     });
   });
+
+  it('does not fetch stale user history before the userId query param is applied', async () => {
+    mockModerationState.userHistoryInput = 'user-1';
+    mockModerationState.lookupUserId = 'user-1';
+    mockSearchParamsState.value = new URLSearchParams('userId=user-42');
+
+    render(<ModerationClient />);
+
+    await waitFor(() => {
+      expect(mockModerationState.setLookupUserId).toHaveBeenCalledWith('user-42');
+    });
+    expect(mockModerationState.fetchUserHistory).not.toHaveBeenCalled();
+  });
+
+  it('applies the userId query param only once when the selected guild changes', async () => {
+    mockModerationState.userHistoryInput = '';
+    mockModerationState.lookupUserId = null;
+    mockSearchParamsState.value = new URLSearchParams('userId=user-42');
+
+    const { rerender } = render(<ModerationClient />);
+
+    await waitFor(() => {
+      expect(mockModerationState.setLookupUserId).toHaveBeenCalledWith('user-42');
+    });
+
+    (mockModerationState.setUserHistoryInput as ReturnType<typeof vi.fn>).mockClear();
+    (mockModerationState.setLookupUserId as ReturnType<typeof vi.fn>).mockClear();
+    (mockModerationState.setUserHistoryPage as ReturnType<typeof vi.fn>).mockClear();
+    mockGuildSelection.mockReturnValue('guild-2');
+
+    rerender(<ModerationClient />);
+
+    expect(mockModerationState.setUserHistoryInput).not.toHaveBeenCalled();
+    expect(mockModerationState.setLookupUserId).not.toHaveBeenCalled();
+    expect(mockModerationState.setUserHistoryPage).not.toHaveBeenCalled();
+  });
 });

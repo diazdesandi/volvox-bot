@@ -2,7 +2,7 @@
 
 import { RefreshCw, Search, Shield, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { CaseTable } from '@/components/dashboard/case-table';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { ModerationStats } from '@/components/dashboard/moderation-stats';
@@ -16,6 +16,8 @@ export default function ModerationClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preloadedUserId = searchParams.get('userId')?.trim() ?? '';
+  const appliedPreloadedUserIdRef = useRef<string | null>(null);
+  const pendingPreloadedLookupRef = useRef<string | null>(null);
 
   const {
     page,
@@ -58,11 +60,29 @@ export default function ModerationClient() {
   const onUnauthorized = useCallback(() => router.replace('/login'), [router]);
 
   useEffect(() => {
-    if (!guildId || !preloadedUserId) return;
+    if (!preloadedUserId) {
+      appliedPreloadedUserIdRef.current = null;
+      pendingPreloadedLookupRef.current = null;
+      return;
+    }
+    if (!guildId || appliedPreloadedUserIdRef.current === preloadedUserId) return;
+
+    appliedPreloadedUserIdRef.current = preloadedUserId;
+    if (lookupUserId !== preloadedUserId || userHistoryPage !== 1) {
+      pendingPreloadedLookupRef.current = preloadedUserId;
+    }
     setUserHistoryInput(preloadedUserId);
     setLookupUserId(preloadedUserId);
     setUserHistoryPage(1);
-  }, [guildId, preloadedUserId, setUserHistoryInput, setLookupUserId, setUserHistoryPage]);
+  }, [
+    guildId,
+    preloadedUserId,
+    lookupUserId,
+    userHistoryPage,
+    setUserHistoryInput,
+    setLookupUserId,
+    setUserHistoryPage,
+  ]);
 
   useEffect(() => {
     if (!guildId) return;
@@ -89,6 +109,11 @@ export default function ModerationClient() {
 
   useEffect(() => {
     if (!guildId || !lookupUserId) return;
+    const pendingPreloadedLookup = pendingPreloadedLookupRef.current;
+    if (pendingPreloadedLookup) {
+      if (lookupUserId !== pendingPreloadedLookup || userHistoryPage !== 1) return;
+      pendingPreloadedLookupRef.current = null;
+    }
     const controller = new AbortController();
     void (async () => {
       const result = await fetchUserHistory(guildId, lookupUserId, userHistoryPage, {
