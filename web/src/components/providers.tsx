@@ -78,7 +78,7 @@ function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
 }
 
 function useAnalyticsConsent() {
-  const [analyticsConsent, setAnalyticsConsent] = useState(false);
+  const [analyticsConsent, setAnalyticsConsent] = useState<boolean | null>(null);
 
   useEffect(() => {
     setAnalyticsConsent(hasAnalyticsConsent());
@@ -168,6 +168,10 @@ function AmplitudeContextBridge() {
   const isAuthenticatedDashboardRoute = status === 'authenticated' && isDashboardRoute(pathname);
 
   useEffect(() => {
+    if (hasConsentedToAnalytics === null) {
+      return;
+    }
+
     if (!hasConsentedToAnalytics) {
       resetDashboardAmplitude();
       return;
@@ -177,6 +181,10 @@ function AmplitudeContextBridge() {
   }, [hasConsentedToAnalytics, userId]);
 
   useEffect(() => {
+    if (hasConsentedToAnalytics === null) {
+      return;
+    }
+
     if (!hasConsentedToAnalytics) {
       lastTrackedRouteRef.current = null;
       return;
@@ -204,6 +212,10 @@ function AmplitudeContextBridge() {
   }, [guildId, hasConsentedToAnalytics, pathname, status, telemetryRoute]);
 
   useEffect(() => {
+    if (hasConsentedToAnalytics === null) {
+      return;
+    }
+
     if (!hasConsentedToAnalytics) {
       lastTrackedGuildIdRef.current = undefined;
       return;

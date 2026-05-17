@@ -258,6 +258,7 @@ describe('Providers', () => {
     );
 
     expect(mockInitDashboardAmplitude).toHaveBeenCalledWith('discord-user-123');
+    expect(mockResetDashboardAmplitude).not.toHaveBeenCalled();
     expect(mockTrackDashboardEvent).toHaveBeenCalledWith('dashboard_page_viewed', {
       authStatus: 'authenticated',
       guildSelection: 'selected',
