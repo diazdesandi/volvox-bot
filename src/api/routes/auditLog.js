@@ -19,6 +19,16 @@ const auditRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30 });
 /** Rate limiter for export endpoints — 10 req/min per IP (exports are heavier). */
 const exportRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });
 
+const CATEGORY_ACTION_PATTERNS = {
+  moderation: ['mod.%', 'moderation.%'],
+  ai: ['ai_automod.%', 'triage.%'],
+  config: ['config.%', 'guild.%'],
+  members: ['members.%'],
+  tickets: ['tickets.%'],
+  temp_roles: ['temp-roles.%', 'tempRoles.%', 'temp_roles.%', 'temprole.%'],
+  notifications: ['notifications.%'],
+};
+
 /**
  * Helper to get the database pool from app.locals.
  *
@@ -62,10 +72,36 @@ function buildFilters(guildId, query) {
     paramIndex++;
   }
 
+  const categoryFilter = toFilterString(query.category);
+  const actionPatterns = categoryFilter ? CATEGORY_ACTION_PATTERNS[categoryFilter] : null;
+  if (actionPatterns) {
+    conditions.push(`action LIKE ANY($${paramIndex}::text[])`);
+    params.push(actionPatterns);
+    paramIndex++;
+  }
+
   const userIdFilter = toFilterString(query.userId);
   if (userIdFilter) {
     conditions.push(`user_id = $${paramIndex}`);
     params.push(userIdFilter);
+    paramIndex++;
+  }
+
+  const targetIdFilter = toFilterString(query.targetId);
+  if (targetIdFilter) {
+    conditions.push(`target_id = $${paramIndex}`);
+    params.push(targetIdFilter);
+    paramIndex++;
+  }
+
+  const channelIdFilter = toFilterString(query.channelId);
+  if (channelIdFilter) {
+    conditions.push(`(
+      details->>'channelId' = $${paramIndex}
+      OR details->>'sourceChannelId' = $${paramIndex}
+      OR details->>'logChannelId' = $${paramIndex}
+    )`);
+    params.push(channelIdFilter);
     paramIndex++;
   }
 

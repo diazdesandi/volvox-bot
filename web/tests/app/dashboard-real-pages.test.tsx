@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const NativeURL = globalThis.URL;
 const nativeClipboardDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, 'clipboard');
+const nativeHasPointerCapture = HTMLElement.prototype.hasPointerCapture;
+const nativeReleasePointerCapture = HTMLElement.prototype.releasePointerCapture;
+const nativeSetPointerCapture = HTMLElement.prototype.setPointerCapture;
 
 function createTestURL() {
   class TestURL extends NativeURL {}
@@ -37,6 +40,50 @@ function restoreClipboard() {
 
   Reflect.deleteProperty(globalThis.navigator, 'clipboard');
 }
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
+    configurable: true,
+    value: () => false,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
+
+afterAll(() => {
+  if (nativeHasPointerCapture) {
+    Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
+      configurable: true,
+      value: nativeHasPointerCapture,
+    });
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'hasPointerCapture');
+  }
+
+  if (nativeReleasePointerCapture) {
+    Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', {
+      configurable: true,
+      value: nativeReleasePointerCapture,
+    });
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'releasePointerCapture');
+  }
+
+  if (nativeSetPointerCapture) {
+    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+      configurable: true,
+      value: nativeSetPointerCapture,
+    });
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture');
+  }
+});
 
 const {
   mockBack,
@@ -220,15 +267,15 @@ beforeEach(() => {
     entries: [
       {
         id: 1,
-        action: 'moderation.delete',
+        action: 'mod.ban',
         user_id: 'user-1234',
-        user_tag: '',
+        user_tag: 'Mod#0001',
         target_id: 'target-9999',
-        target_tag: '',
+        target_tag: 'BadUser#1234',
         target_type: 'member',
         created_at: '2026-04-28T08:00:00Z',
         ip_address: '127.0.0.1',
-        details: { reason: 'cleanup' },
+        details: { caseNumber: 42, reason: 'cleanup' },
       },
       {
         id: 2,
@@ -240,13 +287,50 @@ beforeEach(() => {
         target_type: null,
         created_at: '2026-04-28T09:00:00Z',
         ip_address: null,
-        details: null,
+        details: {
+          configDiff: {
+            before: { auditLog: { retentionDays: 90 } },
+            after: { auditLog: { retentionDays: 120 } },
+          },
+        },
+      },
+      {
+        id: 3,
+        action: 'ai_automod.timeout',
+        user_id: 'volvox-bot',
+        user_tag: 'Volvox.Bot',
+        target_id: 'target-8888',
+        target_tag: 'SpamBot#0001',
+        target_type: 'member',
+        created_at: '2026-04-28T10:00:00Z',
+        ip_address: null,
+        details: {
+          action: 'timeout',
+          model: 'openrouter:moderation-model',
+          categories: ['toxicity', 'spam'],
+          scores: { toxicity: 0.94, spam: 0.87 },
+          thresholds: { toxicity: 0.8, spam: 0.75 },
+          skippedActions: ['flag'],
+          channelId: 'chan-1',
+          messageUrl: 'https://discord.com/channels/guild-1/chan-1/msg-1',
+          reason: 'Toxic spam',
+          caseNumber: 43,
+        },
       },
     ],
     total: 60,
     loading: false,
     error: null,
-    filters: { action: '', userId: '', startDate: '', endDate: '', offset: 0 },
+    filters: {
+      action: '',
+      category: '',
+      userId: '',
+      targetId: '',
+      channelId: '',
+      startDate: '',
+      endDate: '',
+      offset: 0,
+    },
     setFilters: vi.fn(),
     fetch: vi.fn().mockResolvedValue('ok'),
   });
@@ -396,13 +480,32 @@ describe('previously unexcluded app pages', () => {
 
     await waitFor(() => expect(mockAuditState.fetch).toHaveBeenCalled());
     expect(screen.getByText('Total Entries')).toBeInTheDocument();
-    expect(screen.getByText('User 1234')).toBeInTheDocument();
+    expect(screen.getByText('Mod#0001 banned BadUser#1234')).toBeInTheDocument();
+    expect(screen.getByText(/AI auto-mod timed out SpamBot#0001/i)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/filter audit log/i), { target: { value: 'user-1234' } });
+    fireEvent.change(screen.getByLabelText(/filter audit log by user id/i), {
+      target: { value: 'user-1234' },
+    });
+    fireEvent.change(screen.getByLabelText(/filter audit log by target id/i), {
+      target: { value: 'target-9999' },
+    });
+    fireEvent.change(screen.getByLabelText(/filter audit log by channel id/i), {
+      target: { value: 'chan-1' },
+    });
     fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-04-01' } });
     fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2026-04-30' } });
-    await userEvent.click(screen.getByText('User 1234').closest('tr') as HTMLElement);
-    expect(screen.getByText(/cleanup/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('combobox', { name: /audit category filter/i }));
+    expect(screen.getByRole('option', { name: /ai and triage/i })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
+    expect(screen.getByRole('option', { name: /AI auto-mod: Timeout/i })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByText('Mod#0001 banned BadUser#1234').closest('tr') as HTMLElement);
+    expect(screen.getAllByText(/cleanup/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Case #42/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/AI auto-mod timed out SpamBot#0001/i).closest('tr') as HTMLElement);
+    expect(screen.getAllByText(/openrouter:moderation-model/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/toxicity 94%/i)).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: /copy id/i })[0]);
     await userEvent.click(screen.getByRole('button', { name: /next/i }));
 
@@ -515,7 +618,16 @@ describe('previously unexcluded app page alternate states', () => {
       ],
       total: 3,
       error: 'Audit failed',
-      filters: { action: 'config.update', userId: 'user-1', startDate: '', endDate: '', offset: 25 },
+      filters: {
+        action: 'config.update',
+        category: '',
+        userId: 'user-1',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 25,
+      },
     });
     const loaded = render(<AuditLogPage />);
     expect(screen.getByRole('alert')).toHaveTextContent('Audit failed');
@@ -530,15 +642,33 @@ describe('previously unexcluded app page alternate states', () => {
       total: 0,
       loading: true,
       error: null,
-      filters: { action: '', userId: '', startDate: '', endDate: '', offset: 0 },
+      filters: {
+        action: '',
+        category: '',
+        userId: '',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 0,
+      },
     });
     const loading = render(<AuditLogPage />);
-    expect(screen.getByText('Action')).toBeInTheDocument();
+    expect(screen.getByText('Event')).toBeInTheDocument();
     loading.unmount();
 
     Object.assign(mockAuditState, {
       loading: false,
-      filters: { action: 'moderation.delete', userId: '', startDate: '', endDate: '', offset: 0 },
+      filters: {
+        action: 'moderation.delete',
+        category: '',
+        userId: '',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 0,
+      },
     });
     render(<AuditLogPage />);
     expect(screen.getByText('No matching entries')).toBeInTheDocument();

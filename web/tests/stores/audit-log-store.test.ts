@@ -3,7 +3,10 @@ import { useAuditLogStore } from '@/stores/audit-log-store';
 
 const defaultFilters = {
   action: '',
+  category: '',
   userId: '',
+  targetId: '',
+  channelId: '',
   startDate: '',
   endDate: '',
   offset: 0,
@@ -124,7 +127,10 @@ describe('useAuditLogStore', () => {
 
     useAuditLogStore.getState().setFilters({
       action: 'ban',
+      category: 'moderation',
       userId: 'user-1',
+      targetId: 'target-1',
+      channelId: 'channel-1',
       startDate: '2026-04-01',
       endDate: '2026-04-30',
       offset: 50,
@@ -137,7 +143,10 @@ describe('useAuditLogStore', () => {
     expect(requestUrl).toContain('limit=25');
     expect(requestUrl).toContain('offset=50');
     expect(requestUrl).toContain('action=ban');
+    expect(requestUrl).toContain('category=moderation');
     expect(requestUrl).toContain('userId=user-1');
+    expect(requestUrl).toContain('targetId=target-1');
+    expect(requestUrl).toContain('channelId=channel-1');
     expect(requestUrl).toContain('startDate=2026-04-01');
     expect(requestUrl).toContain('endDate=2026-04-30');
     expect(useAuditLogStore.getState().entries).toEqual([entry(3, 'ban')]);

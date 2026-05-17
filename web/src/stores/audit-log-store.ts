@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { isAbortError } from '@/lib/api-utils';
 
-interface AuditEntry {
+export interface AuditEntry {
   id: number;
   guild_id: string;
   user_id: string;
@@ -15,9 +15,12 @@ interface AuditEntry {
   created_at: string;
 }
 
-interface AuditLogFilters {
+export interface AuditLogFilters {
   action: string;
+  category: string;
   userId: string;
+  targetId: string;
+  channelId: string;
   startDate: string;
   endDate: string;
   offset: number;
@@ -53,7 +56,16 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
   total: 0,
   loading: false,
   error: null,
-  filters: { action: '', userId: '', startDate: '', endDate: '', offset: 0 },
+  filters: {
+    action: '',
+    category: '',
+    userId: '',
+    targetId: '',
+    channelId: '',
+    startDate: '',
+    endDate: '',
+    offset: 0,
+  },
 
   setFilters: (partial) => set((s) => ({ filters: { ...s.filters, ...partial } })),
 
@@ -69,7 +81,10 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
       params.set('limit', String(PAGE_SIZE));
       params.set('offset', String(filters.offset));
       if (filters.action) params.set('action', filters.action);
+      if (filters.category) params.set('category', filters.category);
       if (filters.userId) params.set('userId', filters.userId);
+      if (filters.targetId) params.set('targetId', filters.targetId);
+      if (filters.channelId) params.set('channelId', filters.channelId);
       if (filters.startDate) params.set('startDate', filters.startDate);
       if (filters.endDate) params.set('endDate', filters.endDate);
 
@@ -117,7 +132,16 @@ export const useAuditLogStore = create<AuditLogState>((set, get) => ({
       entries: [],
       total: 0,
       error: null,
-      filters: { action: '', userId: '', startDate: '', endDate: '', offset: 0 },
+      filters: {
+        action: '',
+        category: '',
+        userId: '',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 0,
+      },
     });
   },
 }));

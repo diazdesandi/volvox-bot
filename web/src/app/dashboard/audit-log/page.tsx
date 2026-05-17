@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ClipboardList,
   Copy,
+  Hash,
   Search,
   X,
 } from 'lucide-react';
@@ -21,7 +22,10 @@ import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -35,6 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useGuildSelection } from '@/hooks/use-guild-selection';
+import type { AuditEntry } from '@/stores/audit-log-store';
 import { useAuditLogStore } from '@/stores/audit-log-store';
 
 function formatDate(iso: string): string {
@@ -50,13 +55,322 @@ function formatDate(iso: string): string {
  * Selects a UI variant name based on keywords present in an audit action string.
  *
  * @param action - The audit action identifier to inspect; substring matches are case-sensitive.
- * @returns `destructive` if `action` includes "delete", `default` if it includes "create", `secondary` if it includes "update", `outline` otherwise.
+ * @returns Badge variant for destructive moderation actions, creates, updates, AI/triage events, or generic entries.
  */
 function actionVariant(action: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (action.includes('delete')) return 'destructive';
+  if (action.includes('ban') || action.includes('kick') || action.includes('timeout')) {
+    return 'destructive';
+  }
   if (action.includes('create')) return 'default';
   if (action.includes('update')) return 'secondary';
+  if (action.includes('triage') || action.includes('ai_automod')) return 'secondary';
   return 'outline';
+}
+
+const ACTION_CATEGORY_OPTIONS = [
+  { value: 'all', label: 'All categories' },
+  { value: 'moderation', label: 'Moderation' },
+  { value: 'ai', label: 'AI and triage' },
+  { value: 'config', label: 'Config' },
+  { value: 'members', label: 'Members' },
+  { value: 'tickets', label: 'Tickets' },
+  { value: 'temp_roles', label: 'Temp roles' },
+  { value: 'notifications', label: 'Notifications' },
+] as const;
+
+const ACTION_GROUPS = [
+  {
+    label: 'Moderation',
+    category: 'moderation',
+    options: [
+      { value: 'mod.warn', label: 'Moderation: Warn' },
+      { value: 'mod.timeout', label: 'Moderation: Timeout' },
+      { value: 'mod.untimeout', label: 'Moderation: Remove timeout' },
+      { value: 'mod.kick', label: 'Moderation: Kick' },
+      { value: 'mod.ban', label: 'Moderation: Ban' },
+      { value: 'mod.unban', label: 'Moderation: Unban' },
+      { value: 'mod.tempban', label: 'Moderation: Temp ban' },
+      { value: 'mod.softban', label: 'Moderation: Soft ban' },
+      { value: 'moderation.create', label: 'Moderation: API create' },
+      { value: 'moderation.delete', label: 'Moderation: API delete' },
+    ],
+  },
+  {
+    label: 'AI and triage',
+    category: 'ai',
+    options: [
+      { value: 'ai_automod.flag', label: 'AI auto-mod: Flag' },
+      { value: 'ai_automod.warn', label: 'AI auto-mod: Warn' },
+      { value: 'ai_automod.delete', label: 'AI auto-mod: Delete' },
+      { value: 'ai_automod.timeout', label: 'AI auto-mod: Timeout' },
+      { value: 'ai_automod.kick', label: 'AI auto-mod: Kick' },
+      { value: 'ai_automod.ban', label: 'AI auto-mod: Ban' },
+      { value: 'ai_automod.none', label: 'AI auto-mod: No action' },
+      { value: 'triage.moderation_flag', label: 'Triage: Moderation flag' },
+      { value: 'triage.budget_exceeded', label: 'Triage: Budget exceeded' },
+    ],
+  },
+  {
+    label: 'Config and dashboard',
+    category: 'config',
+    options: [
+      { value: 'config.update', label: 'Config: Update' },
+      { value: 'guild.update', label: 'Guild: Update' },
+    ],
+  },
+  {
+    label: 'Members',
+    category: 'members',
+    options: [
+      { value: 'members.update', label: 'Members: Update' },
+      { value: 'members.xp_update', label: 'Members: XP update' },
+    ],
+  },
+  {
+    label: 'Tickets',
+    category: 'tickets',
+    options: [
+      { value: 'tickets.create', label: 'Tickets: Create' },
+      { value: 'tickets.update', label: 'Tickets: Update' },
+      { value: 'tickets.delete', label: 'Tickets: Delete' },
+    ],
+  },
+  {
+    label: 'Temp roles',
+    category: 'temp_roles',
+    options: [
+      { value: 'temp-roles.create', label: 'Temp roles: Assign' },
+      { value: 'temp-roles.delete', label: 'Temp roles: Revoke' },
+      { value: 'tempRoles.create', label: 'Temp roles: Legacy assign' },
+      { value: 'tempRoles.delete', label: 'Temp roles: Legacy revoke' },
+    ],
+  },
+  {
+    label: 'Notifications',
+    category: 'notifications',
+    options: [
+      { value: 'notifications.webhooks_create', label: 'Notifications: Add webhook' },
+      { value: 'notifications.webhooks_delete', label: 'Notifications: Delete webhook' },
+      { value: 'notifications.test_create', label: 'Notifications: Test webhook' },
+    ],
+  },
+] as const;
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function getDetailString(details: Record<string, unknown> | null, key: string): string | null {
+  const value = details?.[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function getDetailNumber(details: Record<string, unknown> | null, key: string): number | null {
+  const value = details?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function getDetailStringArray(details: Record<string, unknown> | null, key: string): string[] {
+  const value = details?.[key];
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+}
+
+function humanizeKey(value: string): string {
+  return value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function formatPercent(value: unknown): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const normalized = value <= 1 ? value * 100 : value;
+  return `${Math.round(normalized)}%`;
+}
+
+function getActorLabel(entry: AuditEntry): string {
+  return entry.user_tag || `User ${entry.user_id.slice(-4)}`;
+}
+
+function getTargetLabel(entry: AuditEntry): string | null {
+  if (!entry.target_id) return null;
+  return entry.target_tag || `Target ${entry.target_id.slice(-4)}`;
+}
+
+function getModerationVerb(action: string): string {
+  const verb = action.replace(/^mod\./, '').replace(/^ai_automod\./, '');
+  const verbs: Record<string, string> = {
+    ban: 'banned',
+    delete: 'deleted',
+    flag: 'flagged',
+    kick: 'kicked',
+    none: 'took no action on',
+    softban: 'soft-banned',
+    tempban: 'temporarily banned',
+    timeout: 'timed out',
+    unban: 'unbanned',
+    untimeout: 'removed timeout from',
+    warn: 'warned',
+  };
+  return verbs[verb] ?? humanizeKey(verb);
+}
+
+function getConfigChangedKeys(details: Record<string, unknown> | null): string[] {
+  const diff = asRecord(details?.configDiff);
+  const before = asRecord(diff?.before);
+  const after = asRecord(diff?.after);
+  return Array.from(new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})]));
+}
+
+function getAuditSummary(entry: AuditEntry): string {
+  const details = entry.details;
+  const actor = getActorLabel(entry);
+  const target = getTargetLabel(entry);
+
+  if (entry.action.startsWith('mod.')) {
+    return `${actor} ${getModerationVerb(entry.action)} ${target ?? 'a member'}`;
+  }
+
+  if (entry.action.startsWith('ai_automod.')) {
+    return `AI auto-mod ${getModerationVerb(entry.action)} ${target ?? 'a message'}`;
+  }
+
+  if (entry.action === 'triage.moderation_flag') {
+    const targetMessageCount = getDetailStringArray(details, 'targetMessageIds').length;
+    const recommendedAction = getDetailString(details, 'recommendedAction') ?? 'review';
+    const countLabel =
+      targetMessageCount > 0
+        ? `${targetMessageCount} message${targetMessageCount === 1 ? '' : 's'}`
+        : 'message';
+    return `Triage flagged ${countLabel} for ${recommendedAction}`;
+  }
+
+  if (entry.action === 'triage.budget_exceeded') {
+    const pct = getDetailNumber(details, 'pct');
+    return `Triage budget exceeded${pct != null ? ` at ${Math.round(pct)}%` : ''}`;
+  }
+
+  if (entry.action === 'config.update') {
+    const changedKeys = getConfigChangedKeys(details);
+    return `${actor} updated config${changedKeys.length ? `: ${changedKeys.join(', ')}` : ''}`;
+  }
+
+  const readableAction = humanizeKey(entry.action.replace(/\./g, ' '));
+  return `${actor} ${readableAction}${target ? ` ${target}` : ''}`;
+}
+
+function DetailItem({ label, value }: { label: string; value: string | number | boolean | null }) {
+  if (value === null || value === '') return null;
+
+  return (
+    <div className="rounded-[12px] border border-border/30 bg-background/40 px-3 py-2">
+      <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-xs font-semibold text-foreground/80">{String(value)}</p>
+    </div>
+  );
+}
+
+function ModerationDetails({ entry }: { entry: AuditEntry }) {
+  const details = entry.details;
+  if (!entry.action.startsWith('mod.')) return null;
+
+  const caseNumber = getDetailNumber(details, 'caseNumber');
+  const reason = getDetailString(details, 'reason');
+
+  return (
+    <div className="grid gap-3 md:grid-cols-3">
+      {caseNumber != null && (
+        <div className="rounded-[12px] border border-border/30 bg-background/40 px-3 py-2">
+          <p className="text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
+            Case
+          </p>
+          <p className="mt-1 text-xs font-semibold text-foreground/80">Case #{caseNumber}</p>
+        </div>
+      )}
+      <DetailItem label="Action" value={getModerationVerb(entry.action)} />
+      <DetailItem label="Reason" value={reason} />
+    </div>
+  );
+}
+
+function AiAutoModDetails({ entry }: { entry: AuditEntry }) {
+  const details = entry.details;
+  if (!entry.action.startsWith('ai_automod.')) return null;
+
+  const scores = asRecord(details?.scores);
+  const thresholds = asRecord(details?.thresholds);
+  const categories = getDetailStringArray(details, 'categories');
+  const skippedActions = getDetailStringArray(details, 'skippedActions');
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <DetailItem label="Model" value={getDetailString(details, 'model')} />
+        <DetailItem label="Reason" value={getDetailString(details, 'reason')} />
+        <DetailItem label="Channel" value={getDetailString(details, 'channelId')} />
+        <DetailItem
+          label="Case"
+          value={
+            getDetailNumber(details, 'caseNumber') != null
+              ? `Case #${getDetailNumber(details, 'caseNumber')}`
+              : null
+          }
+        />
+        <DetailItem label="Message" value={getDetailString(details, 'messageUrl')} />
+        <DetailItem label="Skipped" value={skippedActions.join(', ') || null} />
+      </div>
+
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {categories.map((category) => (
+            <Badge key={category} variant="outline" className="text-[10px] uppercase">
+              {humanizeKey(category)}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {scores && (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(scores).map(([key, value]) => {
+            const percent = formatPercent(value);
+            if (!percent) return null;
+            return (
+              <span
+                key={key}
+                className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-bold text-primary"
+              >
+                {humanizeKey(key)} {percent}
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {thresholds && (
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(thresholds).map(([key, value]) => {
+            const percent = formatPercent(value);
+            if (!percent) return null;
+            return (
+              <span
+                key={key}
+                className="rounded-full border border-border/40 bg-background/40 px-3 py-1 text-[10px] font-bold text-muted-foreground"
+              >
+                {humanizeKey(key)} threshold {percent}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -128,7 +442,7 @@ function AuditLogSkeleton() {
           <TableRow className="border-border/20">
             <TableHead className="w-10 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50" />
             <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-              Action
+              Event
             </TableHead>
             <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
               User
@@ -174,14 +488,6 @@ function AuditLogSkeleton() {
   );
 }
 
-const ACTION_OPTIONS = [
-  'config.update',
-  'members.update',
-  'moderation.create',
-  'moderation.delete',
-  'tickets.update',
-];
-
 /**
  * Render the audit log page for the currently selected guild, showing stats, filter controls,
  * a paginated table of audit entries with expandable details, and error/empty states.
@@ -222,7 +528,10 @@ export default function AuditLogPage() {
     if (!guildId) return;
     void fetch(guildId, {
       action: filters.action,
+      category: filters.category,
       userId: debouncedUserSearch,
+      targetId: filters.targetId,
+      channelId: filters.channelId,
       startDate: filters.startDate,
       endDate: filters.endDate,
       offset: filters.offset,
@@ -236,6 +545,9 @@ export default function AuditLogPage() {
     guildId,
     debouncedUserSearch,
     filters.action,
+    filters.category,
+    filters.targetId,
+    filters.channelId,
     filters.startDate,
     filters.endDate,
     filters.offset,
@@ -254,6 +566,9 @@ export default function AuditLogPage() {
 
   const currentPage = Math.floor(filters.offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const visibleActionGroups = filters.category
+    ? ACTION_GROUPS.filter((group) => group.category === filters.category)
+    : ACTION_GROUPS;
 
   return (
     <ErrorBoundary title="Audit log failed to load">
@@ -275,9 +590,15 @@ export default function AuditLogPage() {
               </p>
               <p className="mt-3 text-3xl font-bold tabular-nums md:text-4xl">
                 {
-                  [filters.action, debouncedUserSearch, filters.startDate, filters.endDate].filter(
-                    Boolean,
-                  ).length
+                  [
+                    filters.action,
+                    filters.category,
+                    debouncedUserSearch,
+                    filters.targetId,
+                    filters.channelId,
+                    filters.startDate,
+                    filters.endDate,
+                  ].filter(Boolean).length
                 }
               </p>
             </div>
@@ -306,10 +627,10 @@ export default function AuditLogPage() {
           <>
             {/* Compact filter strip */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-[240px] max-w-sm">
+              <div className="relative min-w-[220px] flex-1 max-w-xs">
                 <Input
                   className="pl-10 pr-10"
-                  placeholder="Filter by user ID..."
+                  placeholder="User ID"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   aria-label="Filter audit log by user ID"
@@ -331,19 +652,77 @@ export default function AuditLogPage() {
                 )}
               </div>
 
+              <div className="relative min-w-[200px] flex-1 max-w-xs">
+                <Input
+                  className="pl-10"
+                  placeholder="Target ID"
+                  value={filters.targetId}
+                  onChange={(e) => setFilters({ targetId: e.target.value, offset: 0 })}
+                  aria-label="Filter audit log by target ID"
+                />
+                <Hash className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50 pointer-events-none z-10" />
+              </div>
+
+              <div className="relative min-w-[200px] flex-1 max-w-xs">
+                <Input
+                  className="pl-10"
+                  placeholder="Channel ID"
+                  value={filters.channelId}
+                  onChange={(e) => setFilters({ channelId: e.target.value, offset: 0 })}
+                  aria-label="Filter audit log by channel ID"
+                />
+                <Hash className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50 pointer-events-none z-10" />
+              </div>
+
               <Select
-                value={filters.action}
+                value={filters.category || 'all'}
+                onValueChange={(val) =>
+                  setFilters({
+                    category: val === 'all' ? '' : val,
+                    action: '',
+                    offset: 0,
+                  })
+                }
+              >
+                <SelectTrigger
+                  aria-label="Audit category filter"
+                  className="w-[190px] text-[10px] font-black uppercase tracking-[0.2em] data-[placeholder]:text-muted-foreground/40"
+                >
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTION_CATEGORY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={filters.action || 'all'}
                 onValueChange={(val) => setFilters({ action: val === 'all' ? '' : val, offset: 0 })}
               >
-                <SelectTrigger className="w-[200px] text-[10px] font-black uppercase tracking-[0.2em] data-[placeholder]:text-muted-foreground/40">
+                <SelectTrigger
+                  aria-label="Audit action filter"
+                  className="w-[240px] text-[10px] font-black uppercase tracking-[0.2em] data-[placeholder]:text-muted-foreground/40"
+                >
                   <SelectValue placeholder="All actions" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All actions</SelectItem>
-                  {ACTION_OPTIONS.map((a) => (
-                    <SelectItem key={a} value={a}>
-                      {a}
-                    </SelectItem>
+                  {visibleActionGroups.map((group, index) => (
+                    <Fragment key={group.label}>
+                      {index > 0 && <SelectSeparator />}
+                      <SelectGroup>
+                        <SelectLabel>{group.label}</SelectLabel>
+                        {group.options.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </Fragment>
                   ))}
                 </SelectContent>
               </Select>
@@ -399,7 +778,7 @@ export default function AuditLogPage() {
                     <TableRow className="border-border/20 hover:bg-transparent">
                       <TableHead className="w-10 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50" />
                       <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                        Action
+                        Event
                       </TableHead>
                       <TableHead className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
                         User
@@ -439,7 +818,14 @@ export default function AuditLogPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                              <Badge variant={actionVariant(entry.action)}>{entry.action}</Badge>
+                              <div className="flex max-w-[420px] flex-col gap-1.5">
+                                <Badge variant={actionVariant(entry.action)} className="w-fit">
+                                  {entry.action}
+                                </Badge>
+                                <span className="text-sm font-semibold leading-snug text-foreground/85">
+                                  {getAuditSummary(entry)}
+                                </span>
+                              </div>
                             </TableCell>
                             <TableCell className="text-sm text-foreground/80">
                               <div className="flex flex-col">
@@ -481,10 +867,17 @@ export default function AuditLogPage() {
                           {isExpanded && entry.details && (
                             <TableRow key={`${entry.id}-details`} className="border-border/10">
                               <TableCell colSpan={6} className="max-w-0 bg-background/20 p-4">
-                                <div className="w-full overflow-hidden rounded-[14px] border border-border/30 bg-background/50">
-                                  <pre className="max-h-64 w-full overflow-x-auto p-3 text-xs text-foreground/70 scrollbar-thin scrollbar-thumb-border/20">
-                                    {JSON.stringify(entry.details, null, 2)}
-                                  </pre>
+                                <div className="space-y-4">
+                                  <ModerationDetails entry={entry} />
+                                  <AiAutoModDetails entry={entry} />
+                                  <div className="w-full overflow-hidden rounded-[14px] border border-border/30 bg-background/50">
+                                    <div className="border-b border-border/20 px-3 py-2 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground/50">
+                                      Raw details
+                                    </div>
+                                    <pre className="max-h-64 w-full overflow-x-auto p-3 text-xs text-foreground/70 scrollbar-thin scrollbar-thumb-border/20">
+                                      {JSON.stringify(entry.details, null, 2)}
+                                    </pre>
+                                  </div>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -499,12 +892,24 @@ export default function AuditLogPage() {
               <EmptyState
                 icon={ClipboardList}
                 title={
-                  filters.action || debouncedUserSearch || filters.startDate || filters.endDate
+                  filters.action ||
+                  filters.category ||
+                  debouncedUserSearch ||
+                  filters.targetId ||
+                  filters.channelId ||
+                  filters.startDate ||
+                  filters.endDate
                     ? 'No matching entries'
                     : 'No audit entries'
                 }
                 description={
-                  filters.action || debouncedUserSearch || filters.startDate || filters.endDate
+                  filters.action ||
+                  filters.category ||
+                  debouncedUserSearch ||
+                  filters.targetId ||
+                  filters.channelId ||
+                  filters.startDate ||
+                  filters.endDate
                     ? 'Try adjusting your filters.'
                     : 'Actions will appear here as your team uses the dashboard.'
                 }
