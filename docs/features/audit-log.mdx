@@ -19,7 +19,7 @@ Volvox.Bot records important bot and dashboard actions in the audit log. Use it 
 ## How to use
 
 1. Open the dashboard → **Audit Log** for your server
-2. Filter by category, action, actor, target, channel, or date range
+2. Filter by category, action, user, target, channel, or date range
 3. Select any entry for human-readable details and raw JSON
 
 <Callout type="info">
@@ -36,3 +36,15 @@ Volvox.Bot retains audit logs for 90 days. Contact support if you need longer re
 | Target | Filter by who or what the action targeted |
 | Channel | Filter AI auto-mod and triage entries by channel |
 | Date range | Focus on a specific time period |
+
+Selecting a **Category** narrows the **Action** dropdown to just the actions in that category, so you can drill from "AI and triage" down to `ai_automod.timeout` without scrolling the full list.
+
+## Reading an entry
+
+Each row leads with a plain-language summary so you can scan the table without decoding action codes — for example, `Mod#0001 banned BadUser#1234` or `AI auto-mod timed out SpamBot#0001`. Expand a row to see structured panels tailored to the action type:
+
+- **Moderation entries** show the case number, the action taken, and the reason.
+- **AI auto-mod entries** show the model used, the categories that flagged the message with their scores, the configured thresholds, any skipped actions, a link to the original Discord message, and the case number.
+- **Config changes** list the keys that changed in the summary line, so you can spot which setting moved without opening the row.
+
+The raw JSON for the entry is always available underneath the structured panels if you need the full payload.

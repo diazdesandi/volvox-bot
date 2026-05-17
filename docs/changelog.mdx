@@ -21,6 +21,8 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Less noisy AI model picker** — Models offered through OpenRouter no longer carry a redundant **(via OpenRouter)** suffix in dashboard model pickers. The provider is already obvious from the section it lives in, and the cleaner labels make scanning the list a lot faster. See [AI automation](/features/ai-conversations).
 
+**Audit log filters and details, expanded** — The **Audit Log** page now groups actions by category (Moderation, AI and triage, Config, Members, Tickets, Temp roles, Notifications) and adds **Target ID** and **Channel ID** filters alongside the existing user and date filters. Each row leads with a plain-language summary — for example, "Mod#0001 banned BadUser#1234" or "AI auto-mod timed out SpamBot#0001" — so you can scan the table without decoding action codes. Expand any entry to see structured panels for moderation cases (case number, action, reason) and AI auto-mod decisions (model, category scores, thresholds, skipped actions, message link), with the raw JSON still available underneath. See [Audit log](/features/audit-log).
+
 ## Removed
 
 **GitHub feed feature retired** — The `/github` command, the GitHub feed module, and its **Config → Support & Integrations** panel have been removed. It saw vanishingly little use and the maintenance tax wasn't worth it. If you relied on GitHub-to-Discord notifications, Discord's built-in webhook integration covers the same ground in about thirty seconds of setup. Stored GitHub feed configuration has been dropped as part of the upgrade; nothing else in your config was touched.
