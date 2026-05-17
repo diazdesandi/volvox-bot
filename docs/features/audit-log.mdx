@@ -1,27 +1,26 @@
 ---
 title: Discord Bot Actions and Config Changes Audit Log
 sidebarTitle: Audit Log
-description: 'Volvox.Bot audit log records every moderation action, config change, ticket event, AI conversation, and role change with filters and 90-day retention.'
+description: 'Volvox.Bot audit log records dashboard changes, moderation actions, AI auto-mod decisions, and triage alerts with filters and 90-day retention.'
 ---
 
 # Audit log
 
-Volvox.Bot records every action it takes in the audit log. Use it to review what happened and when.
+Volvox.Bot records important bot and dashboard actions in the audit log. Use it to review what happened, who triggered it, and what was affected.
 
 ## What it logs
 
-- **Moderation actions** — Warns, bans, kicks, timeouts
-- **Config changes** — Who changed what setting and when
-- **Ticket events** — Created, claimed, closed, deleted
-- **AI conversations** — Started, flagged, deleted
-- **Role changes** — Temp roles assigned and expired
-- **Bot events** — Joins, leaves, errors
+- **Moderation actions** — Warns, bans, kicks, timeouts, unbans, temp bans, and soft bans
+- **Config changes** — Who changed what setting, with before/after config details when available
+- **AI auto-mod decisions** — Action taken, model, scores, thresholds, skipped actions, message link, and case number
+- **Triage alerts** — Moderation flags and budget-limit alerts
+- **Dashboard/API mutations** — Successful mutating dashboard requests with masked request details
 
 ## How to use
 
 1. Open the dashboard → **Audit Log** for your server
-2. Filter by action type, member, or date range
-3. Select any entry for full details
+2. Filter by category, action, actor, target, channel, or date range
+3. Select any entry for human-readable details and raw JSON
 
 <Callout type="info">
 Volvox.Bot retains audit logs for 90 days. Contact support if you need longer retention.
@@ -31,7 +30,9 @@ Volvox.Bot retains audit logs for 90 days. Contact support if you need longer re
 
 | Filter | Description |
 |--------|-------------|
-| Action type | Moderation, config, tickets, etc. |
-| Member | Filter by who performed the action |
+| Category | Moderation, AI and triage, config, members, tickets, temp roles, or notifications |
+| Action type | Exact actions such as `mod.ban`, `ai_automod.timeout`, or `config.update` |
+| User | Filter by who performed the action |
+| Target | Filter by who or what the action targeted |
+| Channel | Filter AI auto-mod and triage entries by channel |
 | Date range | Focus on a specific time period |
-| Target | Filter by who the action targeted |

@@ -39,6 +39,7 @@ import {
   authorizeGuildModerator,
   buildUpstreamUrl,
   getBotApiConfig,
+  getDashboardActorHeaders,
   hasAdministratorPermission,
   hasModeratorPermission,
   proxyToBotApi,
@@ -80,6 +81,98 @@ describe('bot-api-proxy branch coverage', () => {
     expect(hasModeratorPermission('4')).toBe(true);
     expect(hasModeratorPermission('0')).toBe(false);
     expect(hasModeratorPermission('garbage')).toBe(false);
+  });
+
+  it('builds trusted dashboard actor headers from the server session token', async () => {
+    mockGetToken.mockResolvedValue({ id: '123456789012345678', name: 'Ada#0001' });
+
+    const headers = await getDashboardActorHeaders(createRequest());
+
+    expect(headers).toEqual({
+      'x-discord-user-id': '123456789012345678',
+      'x-discord-user-tag': 'Ada#0001',
+    });
+  });
+
+  it('omits unsafe non-ASCII dashboard actor tags from proxy headers', async () => {
+    mockGetToken.mockResolvedValue({ id: '123456789012345678', name: 'Renée 🚀' });
+
+    const headers = await getDashboardActorHeaders(createRequest());
+
+    expect(headers).toEqual({
+      'x-discord-user-id': '123456789012345678',
+    });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('resolves dashboard actor display name from Discord when the session token only has an id', async () => {
+    mockGetToken.mockResolvedValue({
+      accessToken: 'discord-access-token',
+      id: '123456789012345678',
+    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: '123456789012345678',
+        username: 'bill',
+        global_name: 'Bill Chirico',
+        discriminator: '0',
+      }),
+    });
+
+    const headers = await getDashboardActorHeaders(createRequest());
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://discord.com/api/v10/users/@me',
+      expect.objectContaining({
+        headers: { Authorization: 'Bearer discord-access-token' },
+      }),
+    );
+    expect(headers).toEqual({
+      'x-discord-user-id': '123456789012345678',
+      'x-discord-user-tag': 'Bill Chirico',
+    });
+  });
+
+  it('falls back to a header-safe Discord username when the global name is unsafe', async () => {
+    mockGetToken.mockResolvedValue({
+      accessToken: 'discord-access-token',
+      id: '123456789012345678',
+    });
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: '123456789012345678',
+        username: 'rene',
+        global_name: 'Renée',
+        discriminator: '1234',
+      }),
+    });
+
+    const headers = await getDashboardActorHeaders(createRequest());
+
+    expect(headers).toEqual({
+      'x-discord-user-id': '123456789012345678',
+      'x-discord-user-tag': 'rene#1234',
+    });
+  });
+
+  it('returns 401 when dashboard actor identity cannot be resolved', async () => {
+    mockGetToken.mockResolvedValue({ accessToken: 'access-token' });
+
+    const response = await getDashboardActorHeaders(createRequest());
+
+    expect(response).toBeInstanceOf(NextResponse);
+    expect((response as NextResponse).status).toBe(401);
+  });
+
+  it('returns 401 when dashboard actor identity is not a Discord snowflake', async () => {
+    mockGetToken.mockResolvedValue({ id: 'owner-1', name: 'Owner#0001' });
+
+    const response = await getDashboardActorHeaders(createRequest());
+
+    expect(response).toBeInstanceOf(NextResponse);
+    expect((response as NextResponse).status).toBe(401);
   });
 
   it('returns 401 when the session token is missing', async () => {

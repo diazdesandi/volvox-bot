@@ -1,9 +1,21 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const NativeURL = globalThis.URL;
 const nativeClipboardDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, 'clipboard');
+const nativeHasPointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'hasPointerCapture',
+);
+const nativeReleasePointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'releasePointerCapture',
+);
+const nativeSetPointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'setPointerCapture',
+);
 
 function createTestURL() {
   class TestURL extends NativeURL {}
@@ -37,6 +49,39 @@ function restoreClipboard() {
 
   Reflect.deleteProperty(globalThis.navigator, 'clipboard');
 }
+
+function restorePointerCaptureMethod(
+  method: 'hasPointerCapture' | 'releasePointerCapture' | 'setPointerCapture',
+  descriptor: PropertyDescriptor | undefined,
+) {
+  if (descriptor) {
+    Object.defineProperty(HTMLElement.prototype, method, descriptor);
+    return;
+  }
+
+  Reflect.deleteProperty(HTMLElement.prototype, method);
+}
+
+beforeAll(() => {
+  Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
+    configurable: true,
+    value: () => false,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+  Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+    configurable: true,
+    value: vi.fn(),
+  });
+});
+
+afterAll(() => {
+  restorePointerCaptureMethod('hasPointerCapture', nativeHasPointerCaptureDescriptor);
+  restorePointerCaptureMethod('releasePointerCapture', nativeReleasePointerCaptureDescriptor);
+  restorePointerCaptureMethod('setPointerCapture', nativeSetPointerCaptureDescriptor);
+});
 
 const {
   mockBack,
@@ -220,15 +265,15 @@ beforeEach(() => {
     entries: [
       {
         id: 1,
-        action: 'moderation.delete',
+        action: 'mod.ban',
         user_id: 'user-1234',
-        user_tag: '',
+        user_tag: 'Mod#0001',
         target_id: 'target-9999',
-        target_tag: '',
+        target_tag: 'BadUser#1234',
         target_type: 'member',
         created_at: '2026-04-28T08:00:00Z',
         ip_address: '127.0.0.1',
-        details: { reason: 'cleanup' },
+        details: { caseNumber: 42, reason: 'cleanup' },
       },
       {
         id: 2,
@@ -240,13 +285,62 @@ beforeEach(() => {
         target_type: null,
         created_at: '2026-04-28T09:00:00Z',
         ip_address: null,
-        details: null,
+        details: {
+          configDiff: {
+            before: { auditLog: { retentionDays: 90 } },
+            after: { auditLog: { retentionDays: 120 } },
+          },
+        },
+      },
+      {
+        id: 3,
+        action: 'ai_automod.timeout',
+        user_id: 'volvox-bot',
+        user_tag: 'Volvox.Bot',
+        target_id: 'target-8888',
+        target_tag: 'SpamBot#0001',
+        target_type: 'member',
+        created_at: '2026-04-28T10:00:00Z',
+        ip_address: null,
+        details: {
+          action: 'timeout',
+          model: 'openrouter:moderation-model',
+          categories: ['toxicity', 'spam'],
+          scores: { toxicity: 0.94, spam: 0.87 },
+          thresholds: { toxicity: 0.8, spam: 0.75 },
+          skippedActions: ['flag'],
+          channelId: 'chan-1',
+          messageUrl: 'https://discord.com/channels/guild-1/chan-1/msg-1',
+          reason: 'Toxic spam',
+          caseNumber: 43,
+        },
+      },
+      {
+        id: 4,
+        action: 'triage.budget_exceeded',
+        user_id: 'volvox-bot',
+        user_tag: 'Volvox.Bot',
+        target_id: null,
+        target_tag: null,
+        target_type: null,
+        created_at: '2026-04-28T11:00:00Z',
+        ip_address: null,
+        details: { pct: 0.87 },
       },
     ],
     total: 60,
     loading: false,
     error: null,
-    filters: { action: '', userId: '', startDate: '', endDate: '', offset: 0 },
+    filters: {
+      action: '',
+      category: '',
+      userId: '',
+      targetId: '',
+      channelId: '',
+      startDate: '',
+      endDate: '',
+      offset: 0,
+    },
     setFilters: vi.fn(),
     fetch: vi.fn().mockResolvedValue('ok'),
   });
@@ -396,18 +490,159 @@ describe('previously unexcluded app pages', () => {
 
     await waitFor(() => expect(mockAuditState.fetch).toHaveBeenCalled());
     expect(screen.getByText('Total Entries')).toBeInTheDocument();
-    expect(screen.getByText('User 1234')).toBeInTheDocument();
+    expect(screen.getByText('Mod#0001 banned BadUser#1234')).toBeInTheDocument();
+    expect(screen.getByText(/AI auto-mod timed out SpamBot#0001/i)).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^ip$/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('127.0.0.1')).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(/filter audit log/i), { target: { value: 'user-1234' } });
+    fireEvent.change(screen.getByLabelText(/filter audit log by user id/i), {
+      target: { value: 'user-1234' },
+    });
+    fireEvent.change(screen.getByLabelText(/filter audit log by target id/i), {
+      target: { value: 'target-9999' },
+    });
+    fireEvent.change(screen.getByLabelText(/filter audit log by channel id/i), {
+      target: { value: 'chan-1' },
+    });
     fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2026-04-01' } });
     fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2026-04-30' } });
-    await userEvent.click(screen.getByText('User 1234').closest('tr') as HTMLElement);
-    expect(screen.getByText(/cleanup/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('combobox', { name: /audit category filter/i }));
+    expect(screen.getByRole('option', { name: /ai and triage/i })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
+    expect(screen.getByRole('option', { name: /AI auto-mod: Timeout/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Temp roles: Assign \(underscore\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Temp roles: Legacy create/i })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByText('Mod#0001 banned BadUser#1234').closest('tr') as HTMLElement);
+    expect(screen.getAllByText(/cleanup/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Case #42/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/AI auto-mod timed out SpamBot#0001/i).closest('tr') as HTMLElement);
+    expect(screen.getAllByText(/openrouter:moderation-model/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/toxicity 94%/i)).toBeInTheDocument();
+    expect(screen.getByText(/Triage budget exceeded at 87%/i)).toBeInTheDocument();
+    const reasonValue = screen.getByText(/Toxic spam/i);
+    expect(reasonValue.className).toContain('[overflow-wrap:anywhere]');
+    expect(reasonValue.closest('div')?.className).toContain('min-w-0');
+    const messageValue = screen.getByText('https://discord.com/channels/guild-1/chan-1/msg-1');
+    expect(messageValue.className).toContain('[overflow-wrap:anywhere]');
+    expect(messageValue.closest('div')?.className).toContain('min-w-0');
+    const rawDetailsButtons = screen.getAllByRole('button', { name: /show raw details/i });
+    expect(rawDetailsButtons).toHaveLength(2);
+    expect(document.getElementById('audit-raw-details-3')).not.toBeInTheDocument();
+    await userEvent.click(rawDetailsButtons[1]);
+    expect(document.getElementById('audit-raw-details-3')).toHaveTextContent('"model"');
+    expect(screen.getByRole('button', { name: /hide raw details/i })).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: /copy id/i })[0]);
     await userEvent.click(screen.getByRole('button', { name: /next/i }));
 
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('user-1234');
     expect(mockAuditState.setFilters).toHaveBeenCalledWith({ offset: 25 });
+  });
+
+  it('labels API-secret-only audit actors as internal API activity', () => {
+    Object.assign(mockAuditState, {
+      entries: [
+        {
+          id: 4,
+          action: 'config.update',
+          user_id: 'api-secret',
+          user_tag: null,
+          target_id: null,
+          target_tag: null,
+          target_type: null,
+          created_at: '2026-04-28T11:00:00Z',
+          ip_address: null,
+          details: {
+            configDiff: {
+              before: {},
+              after: { moderation: { enabled: true } },
+            },
+          },
+        },
+      ],
+      total: 1,
+    });
+
+    render(<AuditLogPage />);
+
+    expect(screen.getByText('Internal API')).toBeInTheDocument();
+    expect(screen.queryByText('User cret')).not.toBeInTheDocument();
+    expect(screen.queryByText('API secret')).not.toBeInTheDocument();
+  });
+
+  it('uses emitted notification audit action keys in filter options', async () => {
+    render(<AuditLogPage />);
+
+    await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
+    expect(screen.getByRole('option', { name: /Notifications: Add webhook/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Notifications: Test webhook/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: /Notifications: Delete webhook/i }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('option', { name: /Notifications: Add webhook/i }));
+    expect(mockAuditState.setFilters).toHaveBeenCalledWith({
+      action: 'notifications.create',
+      offset: 0,
+    });
+
+    await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
+    await userEvent.click(screen.getByRole('option', { name: /Notifications: Test webhook/i }));
+    expect(mockAuditState.setFilters).toHaveBeenCalledWith({
+      action: 'notifications.test_create',
+      offset: 0,
+    });
+  });
+
+  it('does not style restorative moderation actions as destructive', () => {
+    Object.assign(mockAuditState, {
+      entries: [
+        {
+          id: 5,
+          action: 'mod.unban',
+          user_id: 'user-1234',
+          user_tag: 'Mod#0001',
+          target_id: 'target-9999',
+          target_tag: 'Restored#1234',
+          target_type: 'member',
+          created_at: '2026-04-28T12:00:00Z',
+          ip_address: null,
+          details: {},
+        },
+        {
+          id: 6,
+          action: 'mod.untimeout',
+          user_id: 'user-1234',
+          user_tag: 'Mod#0001',
+          target_id: 'target-8888',
+          target_tag: 'Returned#1234',
+          target_type: 'member',
+          created_at: '2026-04-28T13:00:00Z',
+          ip_address: null,
+          details: {},
+        },
+        {
+          id: 7,
+          action: 'mod.ban',
+          user_id: 'user-1234',
+          user_tag: 'Mod#0001',
+          target_id: 'target-7777',
+          target_tag: 'Removed#1234',
+          target_type: 'member',
+          created_at: '2026-04-28T14:00:00Z',
+          ip_address: null,
+          details: {},
+        },
+      ],
+      total: 3,
+    });
+
+    render(<AuditLogPage />);
+
+    expect(screen.getByText('mod.unban')).toHaveAttribute('data-variant', 'outline');
+    expect(screen.getByText('mod.untimeout')).toHaveAttribute('data-variant', 'outline');
+    expect(screen.getByText('mod.ban')).toHaveAttribute('data-variant', 'destructive');
   });
 
   it('renders conversation detail success and error navigation states', async () => {
@@ -516,13 +751,23 @@ describe('previously unexcluded app page alternate states', () => {
       ],
       total: 3,
       error: 'Audit failed',
-      filters: { action: 'config.update', userId: 'user-1', startDate: '', endDate: '', offset: 25 },
+      filters: {
+        action: 'config.update',
+        category: '',
+        userId: 'user-1',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 25,
+      },
     });
     const loaded = render(<AuditLogPage />);
     expect(screen.getByRole('alert')).toHaveTextContent('Audit failed');
     await userEvent.click(screen.getByRole('button', { name: /clear search/i }));
     expect(mockAuditState.setFilters).toHaveBeenCalledWith({ userId: '', offset: 0 });
     await userEvent.click(screen.getByText('Updater').closest('tr') as HTMLElement);
+    await userEvent.click(screen.getByRole('button', { name: /show raw details/i }));
     expect(screen.getByText(/changed/)).toBeInTheDocument();
     loaded.unmount();
 
@@ -531,15 +776,33 @@ describe('previously unexcluded app page alternate states', () => {
       total: 0,
       loading: true,
       error: null,
-      filters: { action: '', userId: '', startDate: '', endDate: '', offset: 0 },
+      filters: {
+        action: '',
+        category: '',
+        userId: '',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 0,
+      },
     });
     const loading = render(<AuditLogPage />);
-    expect(screen.getByText('Action')).toBeInTheDocument();
+    expect(screen.getByText('Event')).toBeInTheDocument();
     loading.unmount();
 
     Object.assign(mockAuditState, {
       loading: false,
-      filters: { action: 'moderation.delete', userId: '', startDate: '', endDate: '', offset: 0 },
+      filters: {
+        action: 'moderation.delete',
+        category: '',
+        userId: '',
+        targetId: '',
+        channelId: '',
+        startDate: '',
+        endDate: '',
+        offset: 0,
+      },
     });
     render(<AuditLogPage />);
     expect(screen.getByText('No matching entries')).toBeInTheDocument();

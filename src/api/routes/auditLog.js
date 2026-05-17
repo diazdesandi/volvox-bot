@@ -19,6 +19,19 @@ const auditRateLimit = rateLimit({ windowMs: 60 * 1000, max: 30 });
 /** Rate limiter for export endpoints — 10 req/min per IP (exports are heavier). */
 const exportRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });
 
+const CATEGORY_ACTION_PATTERNS = {
+  moderation: ['mod.%', 'moderation.%'],
+  ai: ['ai_automod.%', 'triage.%'],
+  config: ['config.%', 'guild.%'],
+  members: ['members.%'],
+  tickets: ['tickets.%'],
+  temp_roles: ['temp-roles.%', 'tempRoles.%', 'temp_roles.%', 'temprole.%'],
+  notifications: ['notifications.%'],
+};
+const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
+const AUDIT_USER_TAG_MAX_LENGTH = 128;
+const AUDIT_USER_LOOKUP_CONCURRENCY = 5;
+
 /**
  * Helper to get the database pool from app.locals.
  *
@@ -27,6 +40,78 @@ const exportRateLimit = rateLimit({ windowMs: 60 * 1000, max: 10 });
  */
 function getDbPool(req) {
   return req.app.locals.dbPool || null;
+}
+
+function normalizeDisplayName(value) {
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed || /[\r\n]/.test(trimmed)) return null;
+
+  return trimmed.slice(0, AUDIT_USER_TAG_MAX_LENGTH);
+}
+
+function getDiscordUserLabel(user) {
+  if (!user || typeof user !== 'object') return null;
+
+  return (
+    normalizeDisplayName(user.globalName) ||
+    normalizeDisplayName(user.global_name) ||
+    normalizeDisplayName(user.tag) ||
+    normalizeDisplayName(user.username)
+  );
+}
+
+async function resolveDiscordUserLabel(client, userId) {
+  const cachedUser = client?.users?.cache?.get?.(userId);
+  const cachedLabel = getDiscordUserLabel(cachedUser);
+  if (cachedLabel) return cachedLabel;
+
+  if (typeof client?.users?.fetch !== 'function') return null;
+
+  try {
+    return getDiscordUserLabel(await client.users.fetch(userId));
+  } catch {
+    return null;
+  }
+}
+
+async function hydrateMissingUserTags(client, rows) {
+  const userIds = Array.from(
+    new Set(
+      rows
+        .filter(
+          (row) =>
+            !normalizeDisplayName(row.user_tag) && DISCORD_SNOWFLAKE_PATTERN.test(row.user_id),
+        )
+        .map((row) => row.user_id),
+    ),
+  );
+
+  if (userIds.length === 0) return rows;
+
+  const resolvedLabels = new Map();
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < userIds.length) {
+      const userId = userIds[nextIndex];
+      nextIndex++;
+      const label = await resolveDiscordUserLabel(client, userId);
+      if (label) resolvedLabels.set(userId, label);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(AUDIT_USER_LOOKUP_CONCURRENCY, userIds.length) }, worker),
+  );
+
+  if (resolvedLabels.size === 0) return rows;
+
+  return rows.map((row) => {
+    const resolvedLabel = resolvedLabels.get(row.user_id);
+    return resolvedLabel ? { ...row, user_tag: resolvedLabel } : row;
+  });
 }
 
 /**
@@ -62,10 +147,39 @@ function buildFilters(guildId, query) {
     paramIndex++;
   }
 
+  const categoryFilter = actionFilter ? null : toFilterString(query.category);
+  const actionPatterns =
+    categoryFilter && Object.hasOwn(CATEGORY_ACTION_PATTERNS, categoryFilter)
+      ? CATEGORY_ACTION_PATTERNS[categoryFilter]
+      : null;
+  if (Array.isArray(actionPatterns)) {
+    conditions.push(`action LIKE ANY($${paramIndex}::text[])`);
+    params.push(actionPatterns);
+    paramIndex++;
+  }
+
   const userIdFilter = toFilterString(query.userId);
   if (userIdFilter) {
     conditions.push(`user_id = $${paramIndex}`);
     params.push(userIdFilter);
+    paramIndex++;
+  }
+
+  const targetIdFilter = toFilterString(query.targetId);
+  if (targetIdFilter) {
+    conditions.push(`target_id = $${paramIndex}`);
+    params.push(targetIdFilter);
+    paramIndex++;
+  }
+
+  const channelIdFilter = toFilterString(query.channelId);
+  if (channelIdFilter) {
+    conditions.push(`(
+      details->>'channelId' = $${paramIndex}
+      OR details->>'sourceChannelId' = $${paramIndex}
+      OR details->>'logChannelId' = $${paramIndex}
+    )`);
+    params.push(channelIdFilter);
     paramIndex++;
   }
 
@@ -175,8 +289,10 @@ router.get('/:id/audit-log', auditRateLimit, requireGuildAdmin, validateGuild, a
       ),
     ]);
 
+    const entries = await hydrateMissingUserTags(req.app.locals.client, entriesResult.rows);
+
     res.json({
-      entries: entriesResult.rows,
+      entries,
       total: countResult.rows[0].total,
       limit,
       offset,

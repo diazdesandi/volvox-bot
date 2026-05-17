@@ -35,6 +35,7 @@ function authed(req) {
 describe('auditLog routes', () => {
   let app;
   let mockPool;
+  let mockUsersFetch;
 
   const mockGuild = {
     id: 'guild1',
@@ -48,6 +49,7 @@ describe('auditLog routes', () => {
 
   beforeEach(() => {
     vi.stubEnv('BOT_API_SECRET', TEST_SECRET);
+    mockUsersFetch = vi.fn();
 
     mockPool = {
       query: vi.fn().mockResolvedValue({ rows: [] }),
@@ -56,6 +58,7 @@ describe('auditLog routes', () => {
 
     const client = {
       guilds: { cache: new Map([['guild1', mockGuild]]) },
+      users: { cache: new Map(), fetch: mockUsersFetch },
       ws: { status: 0, ping: 42 },
       user: { tag: 'Bot#1234' },
     };
@@ -126,6 +129,43 @@ describe('auditLog routes', () => {
       expect(res.body.total).toBe(50);
       expect(res.body.limit).toBe(10);
       expect(res.body.offset).toBe(0);
+    });
+
+    it('should hydrate missing user tags from Discord users', async () => {
+      const userId = '191633014441115648';
+      const mockEntries = [
+        {
+          id: 1,
+          guild_id: 'guild1',
+          user_id: userId,
+          user_tag: null,
+          action: 'config.update',
+          target_type: null,
+          target_id: null,
+          target_tag: null,
+          details: { method: 'PATCH', path: '/api/v1/guilds/guild1/config' },
+          ip_address: '127.0.0.1',
+          created_at: '2026-05-16T23:42:00Z',
+        },
+      ];
+      mockUsersFetch.mockResolvedValue({
+        id: userId,
+        globalName: 'Bill Chirico',
+        username: 'bill',
+        tag: 'bill#0001',
+      });
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({ rows: mockEntries });
+
+      const res = await authed(request(app).get('/api/v1/guilds/guild1/audit-log'));
+
+      expect(res.status).toBe(200);
+      expect(mockUsersFetch).toHaveBeenCalledWith(userId);
+      expect(res.body.entries[0]).toMatchObject({
+        user_id: userId,
+        user_tag: 'Bill Chirico',
+      });
     });
 
     it('should respect limit cap of 100', async () => {
@@ -239,6 +279,65 @@ describe('auditLog routes', () => {
       expect(countCall[0]).toContain('action = $2');
       expect(countCall[0]).toContain('user_id = $3');
       expect(countCall[0]).toContain('created_at >= $4');
+    });
+
+    it('should ignore category when an exact action filter is provided', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const res = await authed(
+        request(app).get(
+          '/api/v1/guilds/guild1/audit-log?action=config.update&category=moderation',
+        ),
+      );
+
+      expect(res.status).toBe(200);
+
+      const countCall = mockPool.query.mock.calls[0];
+      expect(countCall[0]).toContain('action = $2');
+      expect(countCall[0]).not.toContain('action LIKE ANY');
+      expect(countCall[1]).toEqual(['guild1', 'config.update']);
+    });
+
+    it('should filter by category, target ID, and channel ID', async () => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 1 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const res = await authed(
+        request(app).get(
+          '/api/v1/guilds/guild1/audit-log?category=ai&targetId=user-9&channelId=chan-7',
+        ),
+      );
+
+      expect(res.status).toBe(200);
+
+      const countCall = mockPool.query.mock.calls[0];
+      expect(countCall[0]).toContain('action LIKE ANY($2::text[])');
+      expect(countCall[0]).toContain('target_id = $3');
+      expect(countCall[0]).toContain("details->>'channelId' = $4");
+      expect(countCall[0]).toContain("details->>'sourceChannelId' = $4");
+      expect(countCall[1]).toEqual(['guild1', ['ai_automod.%', 'triage.%'], 'user-9', 'chan-7']);
+    });
+
+    it.each([
+      'toString',
+      '__proto__',
+    ])('should ignore prototype-looking category filter value %s', async (category) => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const res = await authed(
+        request(app).get(`/api/v1/guilds/guild1/audit-log?category=${category}`),
+      );
+
+      expect(res.status).toBe(200);
+
+      const countCall = mockPool.query.mock.calls[0];
+      expect(countCall[0]).not.toContain('action LIKE ANY');
+      expect(countCall[1]).toEqual(['guild1']);
     });
 
     it('should return 503 when database is unavailable', async () => {
@@ -482,14 +581,20 @@ describe('GET /:id/audit-log/export', () => {
     mockPool.query.mockResolvedValueOnce({ rows: [] });
 
     await request(app)
-      .get('/api/v1/guilds/guild1/audit-log/export?format=json&action=config.update&userId=user42')
+      .get(
+        '/api/v1/guilds/guild1/audit-log/export?format=json&action=config.update&userId=user42&targetId=target99&category=moderation',
+      )
       .set('x-api-secret', 'test-audit-secret');
 
     const call = mockPool.query.mock.calls[0];
     expect(call[0]).toContain('action = $2');
+    expect(call[0]).not.toContain('action LIKE ANY');
     expect(call[0]).toContain('user_id = $3');
+    expect(call[0]).toContain('target_id = $4');
     expect(call[1]).toContain('config.update');
+    expect(call[1]).not.toContain('moderation');
     expect(call[1]).toContain('user42');
+    expect(call[1]).toContain('target99');
   });
 
   it('should return 404 for unknown guild', async () => {

@@ -8,6 +8,20 @@ import { warn } from '../../logger.js';
 import { handleOAuthJwt } from './oauthJwt.js';
 
 const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
+const HEADER_SAFE_ASCII_PATTERN = /^[\x20-\x7e]+$/;
+// Keep trusted actor tags within audit_logs.user_tag VARCHAR(100).
+const TRUSTED_ACTOR_AUDIT_USER_TAG_MAX_LENGTH = 100;
+
+function normalizeTrustedActorTag(value) {
+  if (typeof value !== 'string') return null;
+  if (/[\r\n]/.test(value)) return null;
+  if (!HEADER_SAFE_ASCII_PATTERN.test(value)) return null;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  return trimmed.slice(0, TRUSTED_ACTOR_AUDIT_USER_TAG_MAX_LENGTH);
+}
 
 /**
  * Performs a constant-time comparison of the given secret against BOT_API_SECRET.
@@ -55,7 +69,10 @@ export function requireAuth() {
             ? req.headers['x-discord-user-id'].trim()
             : '';
         if (trustedUserId && DISCORD_SNOWFLAKE_PATTERN.test(trustedUserId)) {
-          req.user = { userId: trustedUserId };
+          const trustedUserTag = normalizeTrustedActorTag(req.headers['x-discord-user-tag']);
+          req.user = trustedUserTag
+            ? { userId: trustedUserId, tag: trustedUserTag }
+            : { userId: trustedUserId };
         }
         return next();
       } else {

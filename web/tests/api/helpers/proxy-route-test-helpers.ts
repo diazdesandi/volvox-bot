@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   mockBuildUpstreamUrl: vi.fn(),
   mockGetBotApiBaseUrl: vi.fn(),
   mockGetBotApiConfig: vi.fn(),
+  mockGetDashboardActorHeaders: vi.fn(),
   mockGetToken: vi.fn(),
   mockProxyBotApiEndpoint: vi.fn(),
   mockProxyToBotApi: vi.fn(),
@@ -17,6 +18,7 @@ export const mockAuthorizeGuildModerator = mocks.mockAuthorizeGuildModerator;
 export const mockBuildUpstreamUrl = mocks.mockBuildUpstreamUrl;
 export const mockGetBotApiBaseUrl = mocks.mockGetBotApiBaseUrl;
 export const mockGetBotApiConfig = mocks.mockGetBotApiConfig;
+export const mockGetDashboardActorHeaders = mocks.mockGetDashboardActorHeaders;
 export const mockGetToken = mocks.mockGetToken;
 export const mockProxyBotApiEndpoint = mocks.mockProxyBotApiEndpoint;
 export const mockProxyToBotApi = mocks.mockProxyToBotApi;
@@ -26,6 +28,7 @@ vi.mock('@/lib/bot-api-proxy', () => ({
   authorizeGuildModerator: mocks.mockAuthorizeGuildModerator,
   buildUpstreamUrl: mocks.mockBuildUpstreamUrl,
   getBotApiConfig: mocks.mockGetBotApiConfig,
+  getDashboardActorHeaders: mocks.mockGetDashboardActorHeaders,
   proxyBotApiEndpoint: mocks.mockProxyBotApiEndpoint,
   proxyToBotApi: mocks.mockProxyToBotApi,
 }));
@@ -185,6 +188,10 @@ export function setupProxyRouteMocks() {
     mockAuthorizeGuildModerator.mockResolvedValue(null);
     mockGetBotApiConfig.mockImplementation(() => ({ ...apiConfig }));
     mockGetBotApiBaseUrl.mockReturnValue(apiConfig.baseUrl);
+    mockGetDashboardActorHeaders.mockResolvedValue({
+      'x-discord-user-id': '123456789012345678',
+      'x-discord-user-tag': 'Owner#0001',
+    });
     vi.stubEnv('BOT_OWNER_IDS', 'owner-1');
     mockGetToken.mockResolvedValue({ accessToken: 'access-token', id: 'owner-1' });
     mockBuildUpstreamUrl.mockImplementation(buildTestUpstreamUrl);

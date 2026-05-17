@@ -4,6 +4,7 @@ import {
   authorizeGuildAdmin,
   buildUpstreamUrl,
   getBotApiConfig,
+  getDashboardActorHeaders,
   proxyToBotApi,
 } from '@/lib/bot-api-proxy';
 
@@ -99,9 +100,12 @@ export async function PATCH(
   );
   if (upstreamUrl instanceof NextResponse) return upstreamUrl;
 
+  const actorHeaders = await getDashboardActorHeaders(request);
+  if (actorHeaders instanceof NextResponse) return actorHeaders;
+
   return proxyToBotApi(upstreamUrl, apiConfig.secret, LOG_PREFIX, 'Failed to update config', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...actorHeaders },
     body: JSON.stringify(body),
   });
 }
@@ -149,9 +153,12 @@ export async function PUT(
   );
   if (upstreamUrl instanceof NextResponse) return upstreamUrl;
 
+  const actorHeaders = await getDashboardActorHeaders(request);
+  if (actorHeaders instanceof NextResponse) return actorHeaders;
+
   return proxyToBotApi(upstreamUrl, apiConfig.secret, LOG_PREFIX, 'Failed to bulk update config', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...actorHeaders },
     body: JSON.stringify(body),
   });
 }

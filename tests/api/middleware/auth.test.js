@@ -149,6 +149,79 @@ describe('auth middleware', () => {
     expect(req.user).toEqual({ userId: '123456789012345678' });
   });
 
+  it('should attach trusted actor display tag for valid api-secret requests', async () => {
+    vi.stubEnv('BOT_API_SECRET', 'test-secret');
+    req.headers['x-api-secret'] = 'test-secret';
+    req.headers['x-discord-user-id'] = '123456789012345678';
+    req.headers['x-discord-user-tag'] = 'Ada#0001';
+    const middleware = requireAuth();
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authMethod).toBe('api-secret');
+    expect(req.user).toEqual({ userId: '123456789012345678', tag: 'Ada#0001' });
+  });
+
+  it('should trim trusted actor display tag for valid api-secret requests', async () => {
+    vi.stubEnv('BOT_API_SECRET', 'test-secret');
+    req.headers['x-api-secret'] = 'test-secret';
+    req.headers['x-discord-user-id'] = '123456789012345678';
+    req.headers['x-discord-user-tag'] = ' Ada#0001 ';
+    const middleware = requireAuth();
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authMethod).toBe('api-secret');
+    expect(req.user).toEqual({ userId: '123456789012345678', tag: 'Ada#0001' });
+  });
+
+  it('should truncate long trusted actor display tag for valid api-secret requests', async () => {
+    vi.stubEnv('BOT_API_SECRET', 'test-secret');
+    req.headers['x-api-secret'] = 'test-secret';
+    req.headers['x-discord-user-id'] = '123456789012345678';
+    const actorTag = 'Ada'.repeat(50);
+    const auditUserTagMaxLength = 100;
+    req.headers['x-discord-user-tag'] = actorTag;
+    const middleware = requireAuth();
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authMethod).toBe('api-secret');
+    expect(req.user).toEqual({
+      userId: '123456789012345678',
+      tag: actorTag.slice(0, auditUserTagMaxLength),
+    });
+    expect(req.user.tag).toHaveLength(auditUserTagMaxLength);
+  });
+
+  it.each([
+    '',
+    '   ',
+    '\nAda',
+    'Ada\nLovelace',
+    'Ada\rLovelace',
+    'Ada\r',
+    '\tAda',
+    'Ada \u{1f680}',
+    '\u674e\u96f7',
+    'Ada\x7f',
+  ])('should ignore unsafe trusted actor display tag %s', async (actorTag) => {
+    vi.stubEnv('BOT_API_SECRET', 'test-secret');
+    req.headers['x-api-secret'] = 'test-secret';
+    req.headers['x-discord-user-id'] = '123456789012345678';
+    req.headers['x-discord-user-tag'] = actorTag;
+    const middleware = requireAuth();
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authMethod).toBe('api-secret');
+    expect(req.user).toEqual({ userId: '123456789012345678' });
+  });
+
   it('should ignore missing or blank trusted actor identity on valid api-secret requests', async () => {
     vi.stubEnv('BOT_API_SECRET', 'test-secret');
     req.headers['x-api-secret'] = 'test-secret';

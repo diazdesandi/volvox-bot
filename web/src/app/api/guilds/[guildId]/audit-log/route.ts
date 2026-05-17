@@ -33,7 +33,17 @@ export async function GET(
   );
   if (upstreamUrl instanceof NextResponse) return upstreamUrl;
 
-  const allowedParams = ['limit', 'offset', 'action', 'userId', 'startDate', 'endDate'];
+  const allowedParams = [
+    'limit',
+    'offset',
+    'action',
+    'category',
+    'userId',
+    'targetId',
+    'channelId',
+    'startDate',
+    'endDate',
+  ];
   for (const key of allowedParams) {
     const value = request.nextUrl.searchParams.get(key);
     if (value !== null) {

@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 // --- Runtime validation (deferred to request time, not module load / build) ---
 
 const PLACEHOLDER_PATTERN = /change|placeholder|example|replace.?me/i;
+const DISCORD_DISPLAY_NAME_MAX_LENGTH = 128;
 // Cache successful validation only. Failed validation is retried on later calls,
 // which is safer for misconfigured environments and test setups that patch env.
 let envValidated = false;
@@ -45,6 +46,33 @@ function validateEnv(): void {
  * - guilds: list of guilds the user is in
  */
 const DISCORD_SCOPES = 'identify guilds';
+
+function getStringField(source: unknown, key: string): string | null {
+  if (!source || typeof source !== 'object') return null;
+
+  const value = (source as Record<string, unknown>)[key];
+  if (typeof value !== 'string') return null;
+
+  const trimmed = value.trim();
+  if (!trimmed || /[\r\n]/.test(trimmed)) return null;
+
+  return trimmed.slice(0, DISCORD_DISPLAY_NAME_MAX_LENGTH);
+}
+
+function getDiscordDisplayName(profile: unknown, user: unknown): string | null {
+  const globalName = getStringField(profile, 'global_name');
+  if (globalName) return globalName;
+
+  const username = getStringField(profile, 'username');
+  if (username) {
+    const discriminator = getStringField(profile, 'discriminator');
+    const displayName =
+      discriminator && discriminator !== '0' ? `${username}#${discriminator}` : username;
+    return displayName.slice(0, DISCORD_DISPLAY_NAME_MAX_LENGTH);
+  }
+
+  return getStringField(user, 'name');
+}
 
 /**
  * Refresh a Discord OAuth2 access token using the refresh token.
@@ -141,7 +169,7 @@ export function getAuthOptions(): AuthOptions {
       }),
     ],
     callbacks: {
-      async jwt({ token, account }) {
+      async jwt({ token, account, profile, user }) {
         // Security note: accessToken and refreshToken are stored in the JWT but
         // are NOT exposed to client-side JavaScript because (1) the session
         // callback below intentionally omits them — only user.id and error are
@@ -157,6 +185,11 @@ export function getAuthOptions(): AuthOptions {
             ? account.expires_at * 1000
             : Date.now() + 7 * 24 * 60 * 60 * 1000; // Default to 7 days if provider omits expires_at
           token.id = account.providerAccountId;
+
+          const displayName = getDiscordDisplayName(profile, user);
+          if (displayName) {
+            token.name = displayName;
+          }
         }
 
         // If the access token has not expired, return it as-is.

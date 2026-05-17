@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NextResponse } from 'next/server';
 
 import {
   expectJson,
@@ -6,6 +7,7 @@ import {
   expectSharedProxyFailures,
   guildParams,
   mockAuthorizeGuildAdmin,
+  mockGetDashboardActorHeaders,
   mockProxyToBotApi,
   proxyCases,
   request,
@@ -22,13 +24,81 @@ describe('guild config, roles, and audit proxy routes', () => {
   it('covers audit log query forwarding', async () => {
     const cases = proxyCases([
       {
-        call: () => auditLogRoute.GET(request('http://localhost/api?limit=25&offset=5&ignored=x'), guildParams()),
+        call: () =>
+          auditLogRoute.GET(
+            request(
+              'http://localhost/api?limit=25&offset=5&category=ai&targetId=user-9&channelId=chan-7&ignored=x',
+            ),
+            guildParams(),
+          ),
         path: '/guilds/guild%201/audit-log',
-        query: { limit: '25', offset: '5' },
+        query: {
+          category: 'ai',
+          channelId: 'chan-7',
+          limit: '25',
+          offset: '5',
+          targetId: 'user-9',
+        },
       },
     ]);
 
     await expectProxiedRoutes(cases);
+  });
+
+  it('returns proxied audit log rows without loading dashboard actor headers', async () => {
+    mockProxyToBotApi.mockResolvedValueOnce(
+      NextResponse.json({
+        entries: [
+          {
+            id: 1,
+            guild_id: 'guild-1',
+            user_id: '123456789012345678',
+            user_tag: null,
+            action: 'config.update',
+            target_type: null,
+            target_id: null,
+            target_tag: null,
+            details: null,
+            ip_address: '::1',
+            created_at: '2026-05-16T23:42:00Z',
+          },
+          {
+            id: 2,
+            guild_id: 'guild-1',
+            user_id: '987654321098765432',
+            user_tag: null,
+            action: 'config.update',
+            target_type: null,
+            target_id: null,
+            target_tag: null,
+            details: null,
+            ip_address: '::1',
+            created_at: '2026-05-16T23:43:00Z',
+          },
+        ],
+        total: 2,
+      }),
+    );
+
+    const response = await auditLogRoute.GET(request('http://localhost/api'), guildParams());
+
+    expect(response.status).toBe(200);
+    await expectJson(response, {
+      entries: [
+        expect.objectContaining({
+          id: 1,
+          user_id: '123456789012345678',
+          user_tag: null,
+        }),
+        expect.objectContaining({
+          id: 2,
+          user_id: '987654321098765432',
+          user_tag: null,
+        }),
+      ],
+      total: 2,
+    });
+    expect(mockGetDashboardActorHeaders).not.toHaveBeenCalled();
   });
 
   it('covers config read and write validation before proxying', async () => {
@@ -44,7 +114,14 @@ describe('guild config, roles, and audit proxy routes', () => {
       guildParams(),
     );
     expect(patchResponse.status).toBe(200);
-    expect(mockProxyToBotApi.mock.calls.at(-1)?.[4]).toMatchObject({ method: 'PATCH' });
+    expect(mockGetDashboardActorHeaders).toHaveBeenCalled();
+    expect(mockProxyToBotApi.mock.calls.at(-1)?.[4]).toMatchObject({
+      method: 'PATCH',
+      headers: expect.objectContaining({
+        'x-discord-user-id': '123456789012345678',
+        'x-discord-user-tag': 'Owner#0001',
+      }),
+    });
 
     const putResponse = await configRoute.PUT(
       request('http://localhost/api', {
@@ -54,7 +131,13 @@ describe('guild config, roles, and audit proxy routes', () => {
       guildParams(),
     );
     expect(putResponse.status).toBe(200);
-    expect(mockProxyToBotApi.mock.calls.at(-1)?.[4]).toMatchObject({ method: 'PUT' });
+    expect(mockProxyToBotApi.mock.calls.at(-1)?.[4]).toMatchObject({
+      method: 'PUT',
+      headers: expect.objectContaining({
+        'x-discord-user-id': '123456789012345678',
+        'x-discord-user-tag': 'Owner#0001',
+      }),
+    });
 
     const invalidPatch = await configRoute.PATCH(
       request('http://localhost/api', { method: 'PATCH', body: JSON.stringify({ path: '' }) }),

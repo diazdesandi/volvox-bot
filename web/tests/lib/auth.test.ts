@@ -41,7 +41,7 @@ describe("authOptions", () => {
     expect(authOptions.session?.maxAge).toBe(7 * 24 * 60 * 60);
   });
 
-  it("jwt callback persists access token on sign-in", async () => {
+  it("jwt callback persists access token and display name on sign-in", async () => {
     const { authOptions } = await import("@/lib/auth");
     const jwtCallback = authOptions.callbacks?.jwt;
     expect(jwtCallback).toBeDefined();
@@ -52,19 +52,57 @@ describe("authOptions", () => {
       account: {
         access_token: "discord-access-token",
         refresh_token: "discord-refresh-token",
-        expires_at: 1700000000,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
         provider: "discord",
         type: "oauth",
         providerAccountId: "discord-user-123",
         token_type: "Bearer",
       },
       user: { id: "123", name: "Test", email: "test@test.com" },
+      profile: {
+        id: "discord-user-123",
+        username: "bill",
+        global_name: "Bill Chirico",
+        discriminator: "0",
+      },
       trigger: "signIn",
     } as Parameters<NonNullable<typeof jwtCallback>>[0]);
 
     expect(result.accessToken).toBe("discord-access-token");
     expect(result.refreshToken).toBe("discord-refresh-token");
     expect(result.id).toBe("discord-user-123");
+    expect(result.name).toBe("Bill Chirico");
+  });
+
+  it("truncates combined username and discriminator display names", async () => {
+    const { authOptions } = await import("@/lib/auth");
+    const jwtCallback = authOptions.callbacks?.jwt;
+    expect(jwtCallback).toBeDefined();
+    if (!jwtCallback) return;
+
+    const result = await jwtCallback({
+      token: { sub: "123" },
+      account: {
+        access_token: "discord-access-token",
+        refresh_token: "discord-refresh-token",
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        provider: "discord",
+        type: "oauth",
+        providerAccountId: "discord-user-123",
+        token_type: "Bearer",
+      },
+      user: { id: "123", name: "Test", email: "test@test.com" },
+      profile: {
+        id: "discord-user-123",
+        username: "a".repeat(127),
+        global_name: null,
+        discriminator: "1234",
+      },
+      trigger: "signIn",
+    } as Parameters<NonNullable<typeof jwtCallback>>[0]);
+
+    expect(result.name).toHaveLength(128);
+    expect(result.name).toBe(`${"a".repeat(127)}#`);
   });
 
   it("jwt callback returns existing token when no account", async () => {
