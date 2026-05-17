@@ -2,7 +2,7 @@
 
 import { Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getBotInviteUrl } from '@/lib/discord';
+import { useBotInvite } from '@/hooks/use-bot-invite';
 
 interface InviteButtonProps {
   size?: 'sm' | 'lg';
@@ -11,15 +11,19 @@ interface InviteButtonProps {
 
 /** Render an "Add to Server" button — disabled/hidden when CLIENT_ID is unset. */
 export function InviteButton({ size = 'sm', className }: InviteButtonProps) {
-  const url = getBotInviteUrl();
-  if (!url) return null;
+  const { inviteBot, isInviteConfigured } = useBotInvite();
+  if (!isInviteConfigured) return null;
 
   return (
-    <Button variant="discord" size={size} className={className} asChild>
-      <a href={url} target="_blank" rel="noopener noreferrer">
-        {size === 'lg' && <Bot className="mr-2 h-5 w-5" />}
-        Add to Server
-      </a>
+    <Button
+      type="button"
+      variant="discord"
+      size={size}
+      className={className}
+      onClick={() => inviteBot()}
+    >
+      {size === 'lg' && <Bot className="mr-2 h-5 w-5" />}
+      Add to Server
     </Button>
   );
 }

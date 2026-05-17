@@ -2,9 +2,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetBotInviteUrl, mockOpenCookiePreferences } = vi.hoisted(() => ({
-  mockGetBotInviteUrl: vi.fn(),
+const { mockInviteBot, mockOpenCookiePreferences, mockUseBotInvite } = vi.hoisted(() => ({
+  mockInviteBot: vi.fn(),
   mockOpenCookiePreferences: vi.fn(),
+  mockUseBotInvite: vi.fn(),
 }));
 
 vi.mock('framer-motion', async () => {
@@ -41,8 +42,8 @@ vi.mock('gsap', () => ({
 vi.mock('gsap/ScrollTrigger', () => ({ ScrollTrigger: {} }));
 vi.mock('@gsap/react', () => ({ useGSAP: vi.fn() }));
 
-vi.mock('@/lib/discord', () => ({
-  getBotInviteUrl: () => mockGetBotInviteUrl(),
+vi.mock('@/hooks/use-bot-invite', () => ({
+  useBotInvite: mockUseBotInvite,
 }));
 
 vi.mock('@/lib/cookie-consent', () => ({
@@ -56,11 +57,14 @@ vi.mock('next/image', () => ({
 
 import { Footer } from '@/components/landing/Footer';
 
-const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
-
 describe('Footer', () => {
   beforeEach(() => {
-    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
+    mockInviteBot.mockReset();
+    mockUseBotInvite.mockReset();
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: true,
+    });
     mockOpenCookiePreferences.mockClear();
   });
 
@@ -69,19 +73,23 @@ describe('Footer', () => {
     expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument();
   });
 
-  it('should render the invite link when URL is available', () => {
+  it('should start the dashboard-returning invite flow when available', async () => {
+    const user = userEvent.setup();
     render(<Footer />);
-    const link = screen.getByRole('link', { name: /Initialize Bot/i });
-    expect(link).toHaveAttribute('href', inviteUrl);
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+
+    await user.click(screen.getByRole('button', { name: /Initialize Bot/i }));
+
+    expect(mockInviteBot).toHaveBeenCalledOnce();
   });
 
   it('should render locked state when no invite URL', () => {
-    mockGetBotInviteUrl.mockReturnValue(null);
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: false,
+    });
     render(<Footer />);
     expect(screen.getByText('[Locked]')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Initialize Bot/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Initialize Bot/i })).not.toBeInTheDocument();
   });
 
   it('should render footer navigation links', () => {

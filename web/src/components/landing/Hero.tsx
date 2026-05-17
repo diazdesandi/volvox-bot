@@ -6,8 +6,8 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { Bot, Command } from 'lucide-react';
 import { useMemo, useRef } from 'react';
+import { useBotInvite } from '@/hooks/use-bot-invite';
 import { WEB_APP_VERSION } from '@/lib/app-version';
-import { getBotInviteUrl } from '@/lib/discord';
 
 if (typeof window !== 'undefined') {
   gsap.registerPlugin(ScrollTrigger);
@@ -155,7 +155,7 @@ function DataThreads() {
 export function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const botInviteUrl = getBotInviteUrl();
+  const { inviteBot, isInviteConfigured } = useBotInvite();
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -295,17 +295,16 @@ export function Hero() {
                 />
               </div>
 
-              {botInviteUrl && (
-                <a
-                  href={botInviteUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              {isInviteConfigured && (
+                <button
+                  type="button"
+                  onClick={() => inviteBot()}
                   className="flex items-center gap-2 px-4 sm:px-6 h-10 sm:h-12 bg-foreground text-background font-bold tracking-wide text-[11px] sm:text-[13px] rounded-xl sm:rounded-xl overflow-hidden transition-transform hover:scale-[1.02] active:scale-95 shadow-sm shrink-0"
                 >
                   <Bot className="w-3.5 h-3.5 sm:w-4 h-4" />
                   <span className="hidden sm:inline">Add to Server</span>
                   <span className="sm:hidden">Add</span>
-                </a>
+                </button>
               )}
             </div>
           </div>

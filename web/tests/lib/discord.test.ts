@@ -96,7 +96,7 @@ describe("getBotInviteUrl", () => {
     );
   });
 
-  it("keeps the getting started invite link in sync with the generated permission mask", () => {
+  it("keeps getting started docs on the dashboard-returning invite flow", () => {
     process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID = "test-client-id";
 
     const inviteUrl = getBotInviteUrl();
@@ -104,7 +104,9 @@ describe("getBotInviteUrl", () => {
     const gettingStartedDoc = readFileSync(gettingStartedDocPath, "utf8");
 
     expect(permissions).not.toBeNull();
-    expect(gettingStartedDoc).toContain(`permissions=${permissions}`);
+    expect(gettingStartedDoc).toContain("[volvox.bot](https://volvox.bot)");
+    expect(gettingStartedDoc).not.toContain("https://discord.com/oauth2/authorize");
+    expect(gettingStartedDoc).not.toContain(`permissions=${permissions}`);
   });
 
   it("returns null when NEXT_PUBLIC_DISCORD_CLIENT_ID is not set", () => {

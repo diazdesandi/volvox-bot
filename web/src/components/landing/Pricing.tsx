@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Check, Shield, Terminal, X, Zap } from 'lucide-react';
 import { type ComponentProps, useState } from 'react';
-import { getBotInviteUrl } from '@/lib/discord';
+import { useBotInvite } from '@/hooks/use-bot-invite';
 import { cn } from '@/lib/utils';
 
 // ─── Primitive Components provided by user ──────────────────────
@@ -158,7 +158,7 @@ function ListItem({ className, children, ...props }: ComponentProps<'li'>) {
 
 export function Pricing() {
   const [isAnnual, setIsAnnual] = useState(false);
-  const botInviteUrl = getBotInviteUrl();
+  const { inviteBot, isInviteConfigured } = useBotInvite();
 
   const toggleBilling = () => setIsAnnual((prev) => !prev);
 
@@ -303,15 +303,14 @@ export function Pricing() {
               </List>
 
               <div className="mt-auto pt-4">
-                {botInviteUrl ? (
-                  <a
-                    href={botInviteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {isInviteConfigured ? (
+                  <button
+                    type="button"
+                    onClick={() => inviteBot()}
                     className="flex items-center justify-center h-14 rounded-xl bg-muted/60 text-foreground font-bold tracking-widest text-xs uppercase hover:bg-muted transition-colors border border-border"
                   >
                     INITIALIZE STANDARD
-                  </a>
+                  </button>
                 ) : (
                   <button
                     type="button"
@@ -388,16 +387,15 @@ export function Pricing() {
               </List>
 
               <div className="mt-auto pt-4 relative z-10">
-                {botInviteUrl ? (
-                  <a
-                    href={botInviteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {isInviteConfigured ? (
+                  <button
+                    type="button"
+                    onClick={() => inviteBot()}
                     className="flex items-center justify-center gap-2 text-background text-sm font-bold tracking-wide uppercase h-14 w-full rounded-xl bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.2)] hover:bg-primary/90 transition-all active:scale-[0.98]"
                   >
                     <Shield className="w-4 h-4 opacity-80" />
                     DEPLOY OVERCLOCKED
-                  </a>
+                  </button>
                 ) : (
                   <button
                     type="button"

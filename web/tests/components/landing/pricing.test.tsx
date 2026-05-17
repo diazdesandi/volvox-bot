@@ -2,8 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetBotInviteUrl, mockUseInView, mockUseReducedMotion } = vi.hoisted(() => ({
-  mockGetBotInviteUrl: vi.fn(),
+const { mockInviteBot, mockUseBotInvite, mockUseInView, mockUseReducedMotion } = vi.hoisted(() => ({
+  mockInviteBot: vi.fn(),
+  mockUseBotInvite: vi.fn(),
   mockUseInView: vi.fn(),
   mockUseReducedMotion: vi.fn(),
 }));
@@ -46,19 +47,22 @@ vi.mock('framer-motion', async () => {
   };
 });
 
-vi.mock('@/lib/discord', () => ({
-  getBotInviteUrl: () => mockGetBotInviteUrl(),
+vi.mock('@/hooks/use-bot-invite', () => ({
+  useBotInvite: mockUseBotInvite,
 }));
 
 import { Pricing } from '@/components/landing/Pricing';
 
-const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
-
 describe('Pricing', () => {
   beforeEach(() => {
+    mockInviteBot.mockReset();
     mockUseInView.mockReturnValue(true);
     mockUseReducedMotion.mockReturnValue(false);
-    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
+    mockUseBotInvite.mockReset();
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: true,
+    });
   });
 
   it('should render 2 tiers with monthly pricing by default', () => {
@@ -83,20 +87,24 @@ describe('Pricing', () => {
     expect(screen.getByText('SYSTEM ACCESS TIERS')).toBeInTheDocument();
   });
 
-  it('should link both tier actions to the direct bot invite URL', () => {
+  it('should start the dashboard-returning invite flow from both tier actions', async () => {
+    const user = userEvent.setup();
     render(<Pricing />);
-    const links = screen.getAllByRole('link', { name: /INITIALIZE|DEPLOY/i });
-    expect(links).toHaveLength(2);
+    const buttons = screen.getAllByRole('button', { name: /INITIALIZE|DEPLOY/i });
+    expect(buttons).toHaveLength(2);
 
-    for (const link of links) {
-      expect(link).toHaveAttribute('href', inviteUrl);
-      expect(link).toHaveAttribute('target', '_blank');
-      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    for (const button of buttons) {
+      await user.click(button);
     }
+
+    expect(mockInviteBot).toHaveBeenCalledTimes(2);
   });
 
   it('should disable both tier actions when no invite URL is configured', () => {
-    mockGetBotInviteUrl.mockReturnValue(null);
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: false,
+    });
     render(<Pricing />);
 
     expect(screen.queryAllByRole('link', { name: /INITIALIZE|DEPLOY/i })).toHaveLength(0);

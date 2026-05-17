@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetBotInviteUrl } = vi.hoisted(() => ({
-  mockGetBotInviteUrl: vi.fn(),
+const { mockInviteBot, mockUseBotInvite } = vi.hoisted(() => ({
+  mockInviteBot: vi.fn(),
+  mockUseBotInvite: vi.fn(),
 }));
 
 vi.mock('framer-motion', async () => {
@@ -46,17 +48,20 @@ vi.mock('gsap', () => ({
 vi.mock('gsap/ScrollTrigger', () => ({ ScrollTrigger: {} }));
 vi.mock('@gsap/react', () => ({ useGSAP: vi.fn() }));
 
-vi.mock('@/lib/discord', () => ({
-  getBotInviteUrl: () => mockGetBotInviteUrl(),
+vi.mock('@/hooks/use-bot-invite', () => ({
+  useBotInvite: mockUseBotInvite,
 }));
 
 import { Hero } from '@/components/landing/Hero';
 
-const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
-
 describe('Hero', () => {
   beforeEach(() => {
-    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
+    mockInviteBot.mockReset();
+    mockUseBotInvite.mockReset();
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: true,
+    });
   });
 
   it('renders the VOLVOX hero brand', () => {
@@ -66,19 +71,22 @@ describe('Hero', () => {
     expect(screen.getByText('BOT')).toBeInTheDocument();
   });
 
-  it('renders a direct invite link when URL is configured', () => {
+  it('starts the dashboard-returning invite flow when Add to Server is clicked', async () => {
+    const user = userEvent.setup();
     render(<Hero />);
 
-    const link = screen.getByRole('link', { name: /Add to Server/i });
-    expect(link).toHaveAttribute('href', inviteUrl);
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    await user.click(screen.getByRole('button', { name: /Add to Server/i }));
+
+    expect(mockInviteBot).toHaveBeenCalledOnce();
   });
 
   it('hides the invite CTA when no invite URL is configured', () => {
-    mockGetBotInviteUrl.mockReturnValue(null);
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: false,
+    });
     render(<Hero />);
 
-    expect(screen.queryByRole('link', { name: /Add to Server/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add to Server/i })).not.toBeInTheDocument();
   });
 });

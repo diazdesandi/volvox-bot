@@ -1,37 +1,45 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockGetBotInviteUrl } = vi.hoisted(() => ({
-  mockGetBotInviteUrl: vi.fn(),
+const { mockInviteBot, mockUseBotInvite } = vi.hoisted(() => ({
+  mockInviteBot: vi.fn(),
+  mockUseBotInvite: vi.fn(),
 }));
 
-vi.mock('@/lib/discord', () => ({
-  getBotInviteUrl: () => mockGetBotInviteUrl(),
+vi.mock('@/hooks/use-bot-invite', () => ({
+  useBotInvite: mockUseBotInvite,
 }));
 
 import { InviteButton } from '@/components/landing/InviteButton';
 
-const inviteUrl = 'https://discord.com/api/oauth2/authorize?client_id=test&scope=bot';
-
 describe('InviteButton', () => {
   beforeEach(() => {
-    mockGetBotInviteUrl.mockReturnValue(inviteUrl);
+    mockInviteBot.mockReset();
+    mockUseBotInvite.mockReset();
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: true,
+    });
   });
 
-  it('renders a direct invite link that opens in a new tab', () => {
+  it('starts the dashboard-returning invite flow when clicked', async () => {
+    const user = userEvent.setup();
     render(<InviteButton />);
 
-    const link = screen.getByRole('link', { name: /Add to Server/i });
-    expect(link).toHaveAttribute('href', inviteUrl);
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    await user.click(screen.getByRole('button', { name: /Add to Server/i }));
+
+    expect(mockInviteBot).toHaveBeenCalledOnce();
   });
 
-  it('renders nothing when no invite URL is configured', () => {
-    mockGetBotInviteUrl.mockReturnValue(null);
+  it('renders nothing when no invite flow is configured', () => {
+    mockUseBotInvite.mockReturnValue({
+      inviteBot: mockInviteBot,
+      isInviteConfigured: false,
+    });
     const { container } = render(<InviteButton />);
 
-    expect(screen.queryByRole('link', { name: /Add to Server/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add to Server/i })).not.toBeInTheDocument();
     expect(container).toBeEmptyDOMElement();
   });
 });

@@ -10,8 +10,8 @@ import { type MouseEvent, useRef } from 'react';
 import { siDiscord, siX } from 'simple-icons';
 import { CookiePreferencesButton } from '@/components/layout/cookie-preferences-button';
 import { SimpleIcon } from '@/components/ui/simple-icon';
+import { useBotInvite } from '@/hooks/use-bot-invite';
 import { WEB_APP_VERSION } from '@/lib/app-version';
-import { getBotInviteUrl } from '@/lib/discord';
 import { scrollToLandingSection } from '@/lib/scroll-to-section';
 import { SUPPORT_DISCORD_URL } from '@/lib/support';
 
@@ -76,7 +76,7 @@ function FooterBackground() {
 export function Footer() {
   const containerRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const botInviteUrl = getBotInviteUrl();
+  const { inviteBot, isInviteConfigured } = useBotInvite();
 
   const handleSectionLinkClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
     if (!href.startsWith('#')) return;
@@ -209,17 +209,16 @@ export function Footer() {
 
               {/* Action Buttons */}
               <div className="cta-buttons flex flex-col sm:flex-row items-center justify-center gap-4">
-                {botInviteUrl ? (
-                  <Link
-                    href={botInviteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                {isInviteConfigured ? (
+                  <button
+                    type="button"
+                    onClick={() => inviteBot()}
                     className="group relative flex items-center gap-3 px-8 py-4 rounded-2xl bg-foreground text-background font-black tracking-tight text-sm overflow-hidden transition-all hover:scale-[1.02] active:scale-95 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.3)] dark:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <Zap className="w-4 h-4 fill-current" />
                     <span>Initialize Bot</span>
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1 opacity-50" />
-                  </Link>
+                  </button>
                 ) : (
                   <div className="px-8 py-4 rounded-2xl bg-muted border border-border text-foreground/40 font-mono text-[11px] tracking-widest uppercase">
                     [Locked]
