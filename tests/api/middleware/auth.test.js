@@ -163,6 +163,38 @@ describe('auth middleware', () => {
     expect(req.user).toEqual({ userId: '123456789012345678', tag: 'Ada#0001' });
   });
 
+  it('should trim trusted actor display tag for valid api-secret requests', async () => {
+    vi.stubEnv('BOT_API_SECRET', 'test-secret');
+    req.headers['x-api-secret'] = 'test-secret';
+    req.headers['x-discord-user-id'] = '123456789012345678';
+    req.headers['x-discord-user-tag'] = ' Ada#0001 ';
+    const middleware = requireAuth();
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authMethod).toBe('api-secret');
+    expect(req.user).toEqual({ userId: '123456789012345678', tag: 'Ada#0001' });
+  });
+
+  it('should truncate long trusted actor display tag for valid api-secret requests', async () => {
+    vi.stubEnv('BOT_API_SECRET', 'test-secret');
+    req.headers['x-api-secret'] = 'test-secret';
+    req.headers['x-discord-user-id'] = '123456789012345678';
+    const actorTag = 'Ada'.repeat(50);
+    req.headers['x-discord-user-tag'] = actorTag;
+    const middleware = requireAuth();
+
+    await middleware(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(req.authMethod).toBe('api-secret');
+    expect(req.user).toEqual({
+      userId: '123456789012345678',
+      tag: actorTag.slice(0, 128),
+    });
+  });
+
   it.each([
     '',
     '   ',
