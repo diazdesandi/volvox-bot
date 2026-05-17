@@ -149,6 +149,7 @@ describe('dashboard Amplitude analytics', () => {
     storeAnalyticsConsent();
     globalThis.localStorage.setItem('AMP_test', 'queued-event');
     globalThis.sessionStorage.setItem('amplitude_unsent_public-key', 'queued-event');
+    globalThis.localStorage.setItem('amplitude_dashboard_preferences', 'keep-me');
     document.cookie = 'AMP_cookie=test; path=/';
 
     const { initDashboardAmplitude, trackDashboardEvent } =
@@ -168,6 +169,7 @@ describe('dashboard Amplitude analytics', () => {
     expect(mockTrack).not.toHaveBeenCalled();
     expect(globalThis.localStorage.getItem('AMP_test')).toBeNull();
     expect(globalThis.sessionStorage.getItem('amplitude_unsent_public-key')).toBeNull();
+    expect(globalThis.localStorage.getItem('amplitude_dashboard_preferences')).toBe('keep-me');
     expect(document.cookie).not.toContain('AMP_cookie=');
   });
 

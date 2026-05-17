@@ -95,25 +95,36 @@ function emitConsentChanged(consent: StoredCookieConsent | null): void {
 }
 
 /**
- * Remove the persisted cookie-consent entry and notify listeners that consent has been cleared.
+ * Remove the persisted cookie-consent entry without notifying listeners.
  *
  * @param storage - The Storage instance from which the consent entry will be removed
  */
-function removeStoredConsentAndNotify(storage: Storage): void {
+function removeStoredConsent(storage: Storage): void {
   try {
     storage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
   } catch {
     // Storage cleanup can fail in restricted browser modes; state must still revoke consent.
   }
+}
 
+/**
+ * Remove the persisted cookie-consent entry and notify listeners that consent has been cleared.
+ *
+ * @param storage - The Storage instance from which the consent entry will be removed
+ */
+function removeStoredConsentAndNotify(storage: Storage): void {
+  removeStoredConsent(storage);
   emitConsentChanged(null);
 }
 
 /**
- * Reads and returns the stored cookie consent if present, valid, and not expired.
+ * Reads the stored cookie consent decision for the current browser.
  *
- * @param now - Reference time used to determine whether stored consent is expired. Defaults to the current time.
- * @returns The stored `StoredCookieConsent` when a valid, unexpired record exists; `null` otherwise.
+ * Expired or structurally invalid consent is removed and emits a consent-change event with
+ * `null`; malformed JSON is removed without dispatching a nested event.
+ *
+ * @param now - Clock value used to evaluate expiry.
+ * @returns The stored consent record when present and valid, otherwise `null`.
  */
 export function readCookieConsent(now = new Date()): StoredCookieConsent | null {
   const storage = getBrowserStorage();
@@ -147,30 +158,30 @@ export function readCookieConsent(now = new Date()): StoredCookieConsent | null 
 
     return parsedConsent;
   } catch {
-    removeStoredConsentAndNotify(storage);
+    removeStoredConsent(storage);
     return null;
   }
 }
 
 /**
- * Determines whether the stored cookie consent currently permits analytics.
+ * Checks whether analytics consent is currently granted for this browser.
  *
- * @param now - Reference time used to evaluate consent expiration; defaults to the current time.
- * @returns `true` if a non-expired stored consent exists and `analytics` is enabled, `false` otherwise.
+ * @param now - Clock value used to evaluate expiry.
+ * @returns `true` only when a valid stored decision explicitly enables analytics.
  */
 export function hasAnalyticsConsent(now = new Date()): boolean {
   return readCookieConsent(now)?.categories.analytics === true;
 }
 
 /**
- * Persists the user's cookie consent and notifies listeners of the change.
+ * Persists a cookie consent decision and notifies in-tab listeners.
  *
- * Constructs a versioned StoredCookieConsent record (with `essential: true` and the provided `analytics` value),
- * stores it in browser localStorage under the consent key, emits a consent-changed event, and returns the stored record.
+ * If storage is unavailable or the write fails, no decision is persisted and listeners are
+ * notified with `null` so analytics state revokes conservatively for the current tab.
  *
- * @param categories - The consent choices; `analytics` controls whether analytics cookies are allowed
- * @param now - Reference time used to set `decidedAt` and compute `expiresAt` (useful for testing)
- * @returns The stored `StoredCookieConsent` on success, `null` if storage is unavailable or saving fails
+ * @param categories - Optional-cookie categories selected by the user.
+ * @param now - Clock value used for decision and expiry timestamps.
+ * @returns The persisted consent record, or `null` when storage cannot save it.
  */
 export function saveCookieConsent(
   categories: CookieConsentInput,
@@ -179,6 +190,7 @@ export function saveCookieConsent(
   const storage = getBrowserStorage();
 
   if (!storage) {
+    emitConsentChanged(null);
     return null;
   }
 
@@ -197,14 +209,15 @@ export function saveCookieConsent(
     emitConsentChanged(consent);
     return consent;
   } catch {
+    emitConsentChanged(null);
     return null;
   }
 }
 
 /**
- * Removes any persisted cookie consent and notifies listeners that consent has been cleared.
+ * Clears the persisted consent decision and notifies in-tab listeners.
  *
- * If browser storage is unavailable, this function does nothing.
+ * @returns Nothing.
  */
 export function clearCookieConsent(): void {
   const storage = getBrowserStorage();
@@ -217,9 +230,9 @@ export function clearCookieConsent(): void {
 }
 
 /**
- * Requests that any cookie-preferences UI be opened by dispatching a global event.
+ * Opens the cookie preferences dialog in the current tab.
  *
- * If `globalThis.window` is undefined (non-browser environment), this function does nothing.
+ * @returns Nothing.
  */
 export function openCookiePreferences(): void {
   if (typeof globalThis.window === 'undefined') {

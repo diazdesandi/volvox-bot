@@ -1,7 +1,7 @@
 'use client';
 
 import { Cookie } from 'lucide-react';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -51,7 +51,11 @@ function getInitialAnalyticsPreference(consent: StoredCookieConsent | null): boo
  * @returns The rendered banner and preferences dialog elements, or `null` while initial client-side state is loading.
  */
 export function CookieConsentBanner() {
+  const bannerTitleId = useId();
+  const bannerDescriptionId = useId();
   const analyticsSwitchId = useId();
+  const analyticsDescriptionId = useId();
+  const acceptAllButtonRef = useRef<HTMLButtonElement>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [storedConsent, setStoredConsent] = useState<StoredCookieConsent | null>(null);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
@@ -106,11 +110,13 @@ export function CookieConsentBanner() {
     setIsPreferencesOpen(false);
   };
 
-  if (!hasMounted) {
-    return null;
-  }
+  const shouldShowBanner = hasMounted && !storedConsent && !isPreferencesOpen;
 
-  const shouldShowBanner = !storedConsent && !isPreferencesOpen;
+  useEffect(() => {
+    if (shouldShowBanner) {
+      acceptAllButtonRef.current?.focus();
+    }
+  }, [shouldShowBanner]);
 
   const resetDraftPreferences = () => {
     setAnalyticsEnabled(getInitialAnalyticsPreference(storedConsent));
@@ -125,11 +131,19 @@ export function CookieConsentBanner() {
     setIsPreferencesOpen(open);
   };
 
+  if (!hasMounted) {
+    return null;
+  }
+
   return (
     <>
       {shouldShowBanner && (
         <section
+          aria-describedby={bannerDescriptionId}
           aria-label="Cookie consent"
+          aria-labelledby={bannerTitleId}
+          aria-modal="false"
+          role="alertdialog"
           className={cn(
             'fixed inset-x-3 bottom-3 z-50 mx-auto max-w-4xl rounded-2xl border',
             'border-border/70 bg-background/95 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl',
@@ -148,8 +162,13 @@ export function CookieConsentBanner() {
                 <Cookie className="h-4 w-4 text-primary" />
               </div>
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold text-foreground">Cookie preferences</h2>
-                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                <h2 className="text-sm font-semibold text-foreground" id={bannerTitleId}>
+                  Cookie preferences
+                </h2>
+                <p
+                  className="max-w-2xl text-sm leading-6 text-muted-foreground"
+                  id={bannerDescriptionId}
+                >
                   Volvox.Bot uses essential cookies to keep the dashboard working. Analytics cookies
                   help us understand aggregate dashboard usage and stay off until you allow them.
                 </p>
@@ -162,7 +181,7 @@ export function CookieConsentBanner() {
             </div>
 
             <div className="flex shrink-0 flex-col gap-2 sm:min-w-52">
-              <Button size="sm" onClick={() => savePreferences(true)}>
+              <Button ref={acceptAllButtonRef} size="sm" onClick={() => savePreferences(true)}>
                 Accept all
               </Button>
               <Button size="sm" variant="outline" onClick={() => savePreferences(false)}>
@@ -220,13 +239,16 @@ export function CookieConsentBanner() {
                   <Label htmlFor={analyticsSwitchId} className="text-sm font-semibold">
                     Analytics
                   </Label>
-                  <p className="text-sm leading-6 text-muted-foreground">
+                  <p
+                    className="text-sm leading-6 text-muted-foreground"
+                    id={analyticsDescriptionId}
+                  >
                     Allows Amplitude analytics for aggregate dashboard usage.
                   </p>
                 </div>
                 <Switch
                   id={analyticsSwitchId}
-                  aria-describedby="cookie-preferences-description"
+                  aria-describedby={analyticsDescriptionId}
                   checked={analyticsEnabled}
                   onCheckedChange={setAnalyticsEnabled}
                 />

@@ -72,7 +72,7 @@ describe('cookie consent storage', () => {
 
     expect(readCookieConsent()).toBeNull();
     expect(window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY)).toBeNull();
-    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: null }));
+    expect(listener).not.toHaveBeenCalled();
 
     window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, listener);
   });
@@ -88,6 +88,19 @@ describe('cookie consent storage', () => {
     expect(readCookieConsent()).toBeNull();
     expect(getItemSpy).toHaveBeenCalledWith(COOKIE_CONSENT_STORAGE_KEY);
     expect(removeItemSpy).not.toHaveBeenCalled();
+  });
+
+  it('emits a revocation event when consent cannot be saved', () => {
+    const listener = vi.fn();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Blocked storage', 'QuotaExceededError');
+    });
+    window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, listener);
+
+    expect(saveCookieConsent({ analytics: true })).toBeNull();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: null }));
+
+    window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, listener);
   });
 
   it('clears stored consent and emits an update', () => {

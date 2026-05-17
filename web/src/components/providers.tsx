@@ -18,6 +18,7 @@ import {
 } from '@/lib/amplitude';
 import {
   COOKIE_CONSENT_CHANGED_EVENT,
+  COOKIE_CONSENT_STORAGE_KEY,
   hasAnalyticsConsent,
   type StoredCookieConsent,
 } from '@/lib/cookie-consent';
@@ -89,6 +90,15 @@ function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
   return guildId ? 'selected' : 'none';
 }
 
+function getAnalyticsConsentFromEventDetail(consent: unknown): boolean {
+  if (!consent || typeof consent !== 'object') {
+    return false;
+  }
+
+  const categories = (consent as Partial<StoredCookieConsent>).categories;
+  return categories?.analytics === true;
+}
+
 /**
  * Tracks whether the user has consented to analytics and updates in response to consent changes.
  *
@@ -101,21 +111,31 @@ function useAnalyticsConsent() {
   const [analyticsConsent, setAnalyticsConsent] = useState<boolean | null>(null);
 
   useEffect(() => {
-    setAnalyticsConsent(hasAnalyticsConsent());
-
-    const handleConsentChanged = (event: Event) => {
-      if (event instanceof CustomEvent) {
-        const consent = event.detail as StoredCookieConsent | null;
-        setAnalyticsConsent(consent?.categories.analytics === true);
-        return;
-      }
-
+    const syncAnalyticsConsent = () => {
       setAnalyticsConsent(hasAnalyticsConsent());
     };
 
+    const handleConsentChanged = (event: Event) => {
+      if (event instanceof CustomEvent) {
+        setAnalyticsConsent(getAnalyticsConsentFromEventDetail(event.detail));
+        return;
+      }
+
+      syncAnalyticsConsent();
+    };
+
+    const handleStorageChanged = (event: StorageEvent) => {
+      if (event.key === COOKIE_CONSENT_STORAGE_KEY || event.key === null) {
+        syncAnalyticsConsent();
+      }
+    };
+
+    syncAnalyticsConsent();
     globalThis.window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, handleConsentChanged);
+    globalThis.window.addEventListener('storage', handleStorageChanged);
     return () => {
       globalThis.window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, handleConsentChanged);
+      globalThis.window.removeEventListener('storage', handleStorageChanged);
     };
   }, []);
 

@@ -21,11 +21,12 @@ describe('CookieConsentBanner', () => {
 
     render(<CookieConsentBanner />);
 
-    expect(await screen.findByRole('region', { name: /cookie consent/i })).toBeInTheDocument();
+    expect(await screen.findByRole('alertdialog', { name: /cookie preferences/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /accept all/i })).toHaveFocus();
     await user.click(screen.getByRole('button', { name: /accept all/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('region', { name: /cookie consent/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog', { name: /cookie preferences/i })).not.toBeInTheDocument();
     });
     expect(readCookieConsent()?.categories).toEqual({
       essential: true,
@@ -44,7 +45,7 @@ describe('CookieConsentBanner', () => {
       essential: true,
       analytics: false,
     });
-    expect(screen.queryByRole('region', { name: /cookie consent/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog', { name: /cookie preferences/i })).not.toBeInTheDocument();
   });
 
   it('keeps the banner open and explains when preferences cannot be saved', async () => {
@@ -58,7 +59,7 @@ describe('CookieConsentBanner', () => {
     await user.click(await screen.findByRole('button', { name: /accept all/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
-    expect(screen.getByRole('region', { name: /cookie consent/i })).toBeInTheDocument();
+    expect(screen.getByRole('alertdialog', { name: /cookie preferences/i })).toBeInTheDocument();
   });
 
   it('customizes analytics consent from the preferences dialog', async () => {
@@ -68,6 +69,12 @@ describe('CookieConsentBanner', () => {
 
     await user.click(await screen.findByRole('button', { name: /customize/i }));
     expect(screen.getByRole('dialog', { name: /cookie preferences/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('switch', {
+        name: /analytics/i,
+        description: /allows amplitude analytics/i,
+      }),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('switch', { name: /analytics/i }));
     await user.click(screen.getByRole('button', { name: /save preferences/i }));
@@ -81,7 +88,7 @@ describe('CookieConsentBanner', () => {
   it('ignores malformed consent change events without crashing', async () => {
     render(<CookieConsentBanner />);
 
-    await screen.findByRole('region', { name: /cookie consent/i });
+    await screen.findByRole('alertdialog', { name: /cookie preferences/i });
 
     expect(() => {
       window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, { detail: {} }));
@@ -114,7 +121,7 @@ describe('CookieConsentBanner', () => {
     render(<CookieConsentBanner />);
 
     await waitFor(() => {
-      expect(screen.queryByRole('region', { name: /cookie consent/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('alertdialog', { name: /cookie preferences/i })).not.toBeInTheDocument();
     });
 
     openCookiePreferences();

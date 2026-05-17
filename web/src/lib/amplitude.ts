@@ -23,7 +23,11 @@ type BrowserAmplitudeOptions = NonNullable<Parameters<typeof amplitude.init>[2]>
 type BrowserAmplitudeProperties = Record<string, unknown>;
 
 const AMPLITUDE_MIN_ID_LENGTH = 5;
-const AMPLITUDE_STORAGE_KEY_PREFIXES = ['AMP_', 'amplitude_', 'amplitude.'] as const;
+const AMPLITUDE_STORAGE_KEY_PREFIXES = [
+  'AMP_',
+  'amplitude_unsent_',
+  'amplitude_unsent_identify_',
+] as const;
 
 let hasInitialized = false;
 let activeUserId: string | undefined;
@@ -141,12 +145,9 @@ function getCookieRemovalDomains(hostname: string): string[] {
  */
 function getCookieRemovalPaths(pathname: string): string[] {
   const paths = new Set<string>(['/']);
-  const segments = pathname.split('/').filter(Boolean);
-  let currentPath = '';
 
-  for (const segment of segments) {
-    currentPath = `${currentPath}/${segment}`;
-    paths.add(currentPath);
+  if (pathname && pathname !== '/') {
+    paths.add(pathname);
   }
 
   return [...paths];
@@ -173,10 +174,18 @@ function clearAmplitudeCookies(): void {
 
     for (const name of cookieNames) {
       for (const domain of domains) {
-        const domainAttribute = domain ? `; domain=${domain}` : '';
         for (const cookiePath of paths) {
-          // biome-ignore lint/suspicious/noDocumentCookie: Amplitude cleanup must expire legacy browser cookies.
-          globalThis.document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${cookiePath}${domainAttribute}; SameSite=Lax`;
+          const cookieAttributes = [
+            `${name}=`,
+            'Max-Age=0',
+            'expires=Thu, 01 Jan 1970 00:00:00 GMT',
+            `path=${cookiePath}`,
+            ...(domain ? [`domain=${domain}`] : []),
+            'SameSite=Lax',
+          ];
+
+          // biome-ignore lint/suspicious/noDocumentCookie: Expire legacy Amplitude cookies.
+          globalThis.document.cookie = cookieAttributes.join('; ');
         }
       }
     }
@@ -327,11 +336,13 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
 }
 
 /**
- * Disables dashboard analytics for the current page, clears the module's active user state, and removes Amplitude-related web storage and cookies.
+ * Revokes dashboard Amplitude collection for the current browser session.
  *
- * This function sets Amplitude to opt-out mode, clears the stored user id if one was previously initialized, and attempts to remove Amplitude keys from local/session storage and cookies. Cleanup is attempted even if disabling opt-out or clearing the user id throws.
+ * This opts the SDK out, clears the active user id when the SDK was initialized in this page load,
+ * and removes queued Amplitude browser storage/cookies so future events cannot flush after consent
+ * is revoked.
  *
- * @returns `true` if opt-out and cleanup completed without error, `false` otherwise (also `false` when not running in a browser).
+ * @returns `true` when revocation completed without SDK errors, otherwise `false`.
  */
 export function resetDashboardAmplitude(): boolean {
   if (globalThis.window === undefined) {

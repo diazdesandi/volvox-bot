@@ -341,6 +341,43 @@ describe('Providers', () => {
     expect(mockTrackDashboardEvent).not.toHaveBeenCalled();
   });
 
+  it('resets Amplitude when analytics consent is revoked in another tab', async () => {
+    mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
+    mockUsePathname.mockReturnValue('/dashboard/settings');
+    mockUseGuildSelection.mockReturnValue('1234567890');
+    mockUseSession.mockReturnValue({
+      data: { user: { id: 'discord-user-123' } },
+      status: 'authenticated',
+    });
+
+    render(
+      <Providers>
+        <div>Dashboard</div>
+      </Providers>,
+    );
+
+    expect(mockInitDashboardAmplitude).toHaveBeenCalledWith('discord-user-123');
+    mockResetDashboardAmplitude.mockClear();
+
+    window.localStorage.setItem(
+      'volvox.cookieConsent.v1',
+      JSON.stringify({
+        version: 1,
+        decidedAt: '2026-05-16T00:00:00.000Z',
+        expiresAt: '2099-05-16T00:00:00.000Z',
+        categories: {
+          essential: true,
+          analytics: false,
+        },
+      }),
+    );
+    window.dispatchEvent(new StorageEvent('storage', { key: 'volvox.cookieConsent.v1' }));
+
+    await waitFor(() => {
+      expect(mockResetDashboardAmplitude).toHaveBeenCalledOnce();
+    });
+  });
+
   it('tracks dashboard guild selection changes without sending the raw guild id', () => {
     mockUseTheme.mockReturnValue({ resolvedTheme: 'dark' });
     mockUsePathname.mockReturnValue('/dashboard/settings');
