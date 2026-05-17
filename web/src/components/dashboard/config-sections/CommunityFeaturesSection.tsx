@@ -12,7 +12,6 @@ interface CommunityFeaturesSectionProps {
 }
 
 const COMMUNITY_FEATURES = [
-  { key: 'help', label: 'Help / FAQ', desc: '/help command for server knowledge base' },
   { key: 'announce', label: 'Announcements', desc: '/announce for scheduled messages' },
   { key: 'snippet', label: 'Code Snippets', desc: '/snippet for saving and sharing code' },
   { key: 'poll', label: 'Polls', desc: '/poll for community voting' },

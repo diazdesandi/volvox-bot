@@ -45,8 +45,8 @@ function makeAnalytics(overrides: Partial<DashboardAnalytics> = {}): DashboardAn
     commandUsage: {
       source: 'logs',
       items: [
-        { command: 'help', uses: 50 },
-        { command: 'status', uses: 25 },
+        { command: 'status', uses: 50 },
+        { command: 'tldr', uses: 25 },
       ],
     },
     userEngagement: {
@@ -134,8 +134,8 @@ describe('exportAnalyticsPdf', () => {
     exportAnalyticsPdf(makeAnalytics());
 
     const html: string = mockWin.document.write.mock.calls[0]?.[0] ?? '';
-    expect(html).toContain('/help');
     expect(html).toContain('/status');
+    expect(html).toContain('/tldr');
   });
 
   it('HTML output includes user engagement section when present', () => {

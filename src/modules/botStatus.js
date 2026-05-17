@@ -12,7 +12,7 @@
  *     intervalMinutes: 5,
  *     messages: [
  *       { type: 'Watching', text: '{guildCount} servers' },
- *       { type: 'Playing', text: 'with /help' }
+ *       { type: 'Playing', text: 'with /tldr' }
  *     ]
  *   }
  * }

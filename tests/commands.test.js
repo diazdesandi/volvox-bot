@@ -32,6 +32,10 @@ describe('command files', () => {
     expect(commandFiles).not.toContain('github.js');
   });
 
+  it('should not register the removed help topics command', () => {
+    expect(commandFiles).not.toContain('help.js');
+  });
+
   for (const file of commandFiles) {
     describe(file, () => {
       let mod;

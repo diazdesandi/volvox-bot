@@ -125,7 +125,6 @@ const minimalConfig = {
   },
   engagement: { enabled: false },
   tickets: { enabled: false },
-  help: { enabled: false },
   announce: { enabled: false },
   snippet: { enabled: false },
   poll: { enabled: false },

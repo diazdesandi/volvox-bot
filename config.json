@@ -207,9 +207,6 @@
       "reload": "admin"
     }
   },
-  "help": {
-    "enabled": false
-  },
   "announce": {
     "enabled": false
   },

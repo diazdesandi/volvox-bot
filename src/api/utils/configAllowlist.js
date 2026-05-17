@@ -13,7 +13,6 @@ export const SAFE_CONFIG_KEYS = new Set([
   'starboard',
   'permissions',
   'memory',
-  'help',
   'announce',
   'snippet',
   'poll',

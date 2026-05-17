@@ -129,10 +129,12 @@ describe('config.json', () => {
     expect(config).not.toHaveProperty('afk');
     expect(config).not.toHaveProperty('challenges');
     expect(config).not.toHaveProperty('github');
+    expect(config).not.toHaveProperty('help');
     expect(config).not.toHaveProperty('reminders');
     expect(SAFE_CONFIG_KEYS.has('afk')).toBe(false);
     expect(SAFE_CONFIG_KEYS.has('challenges')).toBe(false);
     expect(SAFE_CONFIG_KEYS.has('github')).toBe(false);
+    expect(SAFE_CONFIG_KEYS.has('help')).toBe(false);
     expect(SAFE_CONFIG_KEYS.has('reminders')).toBe(false);
   });
 

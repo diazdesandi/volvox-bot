@@ -221,13 +221,13 @@ describe('getRotationMessages / resolveRotationIntervalMs', () => {
       rotation: {
         messages: [
           { type: 'Watching', text: '{guildCount} servers' },
-          { type: 'Playing', text: 'with /help' },
+          { type: 'Playing', text: 'with /tldr' },
         ],
       },
     });
     expect(messages).toEqual([
       { type: 'Watching', text: '{guildCount} servers' },
-      { type: 'Playing', text: 'with /help' },
+      { type: 'Playing', text: 'with /tldr' },
     ]);
   });
 
@@ -249,10 +249,10 @@ describe('getRotationMessages / resolveRotationIntervalMs', () => {
   it('warns and falls back when activityType cannot be resolved', () => {
     const messages = getRotationMessages({
       activityType: 'BadType',
-      activities: ['with /help'],
+      activities: ['with /tldr'],
     });
 
-    expect(messages).toEqual([{ type: 'Playing', text: 'with /help' }]);
+    expect(messages).toEqual([{ type: 'Playing', text: 'with /tldr' }]);
     expect(warn).toHaveBeenCalledWith(
       'Invalid bot status activity type, falling back to Playing',
       expect.objectContaining({

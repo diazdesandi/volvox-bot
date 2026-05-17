@@ -87,7 +87,7 @@ const analyticsPayload = {
   ],
   commandUsage: {
     source: "logs",
-    items: [{ command: "help", uses: 42 }],
+    items: [{ command: "status", uses: 42 }],
   },
   comparison: null,
   heatmap: [
@@ -465,7 +465,7 @@ describe.skip("AnalyticsDashboard", () => {
       expect(screen.getByText("Command usage stats")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("/help")).toBeInTheDocument();
+    expect(screen.getByText("/status")).toBeInTheDocument();
     expect(screen.getByText("42")).toBeInTheDocument();
   });
 });

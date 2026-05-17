@@ -1123,7 +1123,7 @@ describe('guilds routes', () => {
             {
               type: 'command',
               actor: 'user1',
-              detail: 'help',
+              detail: 'status',
               ts: new Date('2026-02-17T12:01:00.000Z'),
             },
           ],
@@ -1210,8 +1210,8 @@ describe('guilds routes', () => {
       expect(res.body.commandUsage).toEqual({ source: 'command_usage', items: [] });
       expect(res.body.recentEvents).toEqual([
         {
-          id: 'command-9a6e74336efc6921',
-          text: 'user1 used /help',
+          id: 'command-4518a77ea6a57480',
+          text: 'user1 used /status',
           timestamp: '2026-02-17T12:01:00.000Z',
         },
         {
@@ -1679,7 +1679,7 @@ describe('guilds routes', () => {
         .mockResolvedValueOnce({ rows: [] }) // volume
         .mockResolvedValueOnce({ rows: [] }) // channel
         .mockResolvedValueOnce({ rows: [] }) // heatmap
-        .mockResolvedValueOnce({ rows: [{ command_name: 'help', uses: 5 }] }) // commandUsage
+        .mockResolvedValueOnce({ rows: [{ command_name: 'status', uses: 5 }] }) // commandUsage
         .mockResolvedValueOnce({ rows: [] }) // userEngagement
         .mockResolvedValueOnce({ rows: [] }) // peakHour
         .mockResolvedValueOnce({ rows: [] }) // xpEconomy
@@ -1701,7 +1701,7 @@ describe('guilds routes', () => {
       expect(res.body.comparison.kpis.aiCostUsd).toBeNull();
       expect(res.body.commandUsage).toEqual({
         source: 'command_usage',
-        items: [{ command: 'help', uses: 5 }],
+        items: [{ command: 'status', uses: 5 }],
       });
 
       const comparisonKpiQuery = mockPool.query.mock.calls[1]?.[0];

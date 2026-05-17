@@ -36,7 +36,7 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
     icon: 'bot',
     label: 'Community Tools',
     description: 'Member-facing utility commands and starboard.',
-    sectionKeys: ['help', 'announce', 'snippet', 'poll', 'review', 'starboard'],
+    sectionKeys: ['announce', 'snippet', 'poll', 'review', 'starboard'],
     featureIds: ['community-tools', 'starboard'],
   },
   {
@@ -335,8 +335,8 @@ export const CONFIG_SEARCH_ITEMS: ConfigSearchItem[] = [
     featureId: 'community-tools',
     categoryId: 'community-tools',
     label: 'Community Tool Toggles',
-    description: 'Help, announce, snippet, poll, review.',
-    keywords: ['help', 'announce', 'snippet', 'poll', 'review'],
+    description: 'Announce, snippet, poll, review.',
+    keywords: ['announce', 'snippet', 'poll', 'review'],
     isAdvanced: false,
   },
   {

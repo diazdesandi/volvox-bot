@@ -82,7 +82,6 @@ export function isGuildConfig(data: unknown): data is GuildConfig {
     'starboard',
     'permissions',
     'memory',
-    'help',
     'announce',
     'snippet',
     'poll',

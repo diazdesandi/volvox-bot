@@ -70,7 +70,7 @@ const analyticsPayload: DashboardAnalytics = {
   },
   channelActivity: [{ channelId: 'general,1', name: 'General "Chat"', messages: 10 }],
   topChannels: [{ channelId: 'top-1', name: 'Top, "Channel"', messages: 12 }],
-  commandUsage: { source: 'logs', items: [{ command: '/help', uses: 7 }] },
+  commandUsage: { source: 'logs', items: [{ command: '/status', uses: 7 }] },
   comparison: {
     previousRange: {
       from: '2026-01-25T00:00:00.000Z',

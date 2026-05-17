@@ -73,11 +73,6 @@ export function CommunityToolsCategory() {
               {(
                 [
                   {
-                    key: 'help',
-                    label: 'Help / FAQ',
-                    desc: '/help command for knowledge base',
-                  },
-                  {
                     key: 'announce',
                     label: 'Announcements',
                     desc: '/announce for scheduled messages',

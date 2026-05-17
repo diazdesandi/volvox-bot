@@ -64,7 +64,7 @@ const { analyticsPayload } = vi.hoisted(() => {
     ],
     commandUsage: {
       source: 'logs',
-      items: [{ command: 'help', uses: 42 }],
+      items: [{ command: 'status', uses: 42 }],
     },
     comparison: {
       previousRange: {

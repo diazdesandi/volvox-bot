@@ -432,7 +432,6 @@ export interface BotConfig {
   memory?: MemoryConfig;
 
   // Community/dashboard sections
-  help?: ToggleSectionConfig;
   announce?: ToggleSectionConfig;
   snippet?: ToggleSectionConfig;
   poll?: ToggleSectionConfig;
@@ -456,7 +455,6 @@ export type ConfigSection =
   | 'starboard'
   | 'permissions'
   | 'memory'
-  | 'help'
   | 'announce'
   | 'snippet'
   | 'poll'

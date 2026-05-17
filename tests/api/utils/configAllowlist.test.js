@@ -32,6 +32,10 @@ describe('configAllowlist', () => {
       expect(SAFE_CONFIG_KEYS.has('github')).toBe(false);
     });
 
+    it('should not allow removed help topic config writes', () => {
+      expect(SAFE_CONFIG_KEYS.has('help')).toBe(false);
+    });
+
     it('should not allow removed reminder config writes', () => {
       expect(SAFE_CONFIG_KEYS.has('reminders')).toBe(false);
     });

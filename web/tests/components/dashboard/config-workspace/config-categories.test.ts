@@ -57,6 +57,7 @@ describe('config workspace category helpers', () => {
   it('matches search items by label, description, and keywords', () => {
     expect(getMatchingSearchItems('  role menu  ')).toEqual([]);
     expect(getMatchingSearchItems('github')).toEqual([]);
+    expect(getMatchingSearchItems('help')).toEqual([]);
     expect(getMatchingSearchItems('AUTO-PURGE').map((item) => item.id)).toContain('audit-log-retention');
     expect(getMatchingSearchItems('')).toEqual([]);
   });
