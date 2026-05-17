@@ -182,6 +182,7 @@ describe('auth middleware', () => {
     req.headers['x-api-secret'] = 'test-secret';
     req.headers['x-discord-user-id'] = '123456789012345678';
     const actorTag = 'Ada'.repeat(50);
+    const auditUserTagMaxLength = 100;
     req.headers['x-discord-user-tag'] = actorTag;
     const middleware = requireAuth();
 
@@ -191,8 +192,9 @@ describe('auth middleware', () => {
     expect(req.authMethod).toBe('api-secret');
     expect(req.user).toEqual({
       userId: '123456789012345678',
-      tag: actorTag.slice(0, 128),
+      tag: actorTag.slice(0, auditUserTagMaxLength),
     });
+    expect(req.user.tag).toHaveLength(auditUserTagMaxLength);
   });
 
   it.each([

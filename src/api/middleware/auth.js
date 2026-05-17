@@ -9,7 +9,8 @@ import { handleOAuthJwt } from './oauthJwt.js';
 
 const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
 const HEADER_SAFE_ASCII_PATTERN = /^[\x20-\x7e]+$/;
-const TRUSTED_ACTOR_TAG_MAX_LENGTH = 128;
+// Keep trusted actor tags within audit_logs.user_tag VARCHAR(100).
+const TRUSTED_ACTOR_AUDIT_USER_TAG_MAX_LENGTH = 100;
 
 function normalizeTrustedActorTag(value) {
   if (typeof value !== 'string') return null;
@@ -19,7 +20,7 @@ function normalizeTrustedActorTag(value) {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  return trimmed.slice(0, TRUSTED_ACTOR_TAG_MAX_LENGTH);
+  return trimmed.slice(0, TRUSTED_ACTOR_AUDIT_USER_TAG_MAX_LENGTH);
 }
 
 /**
