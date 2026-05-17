@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CookieConsentBanner } from '@/components/cookie-consent-banner';
 import {
+  COOKIE_CONSENT_CHANGED_EVENT,
   COOKIE_CONSENT_STORAGE_KEY,
   openCookiePreferences,
   readCookieConsent,
@@ -75,6 +76,35 @@ describe('CookieConsentBanner', () => {
       expect(screen.queryByRole('dialog', { name: /cookie preferences/i })).not.toBeInTheDocument();
     });
     expect(readCookieConsent()?.categories.analytics).toBe(true);
+  });
+
+  it('ignores malformed consent change events without crashing', async () => {
+    render(<CookieConsentBanner />);
+
+    await screen.findByRole('region', { name: /cookie consent/i });
+
+    expect(() => {
+      window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, { detail: {} }));
+    }).not.toThrow();
+  });
+
+  it('discards unsaved analytics toggle changes when preferences are canceled', async () => {
+    const user = userEvent.setup();
+
+    render(<CookieConsentBanner />);
+    await user.click(await screen.findByRole('button', { name: /customize/i }));
+
+    let analyticsSwitch = await screen.findByRole('switch', { name: /analytics/i });
+    expect(analyticsSwitch).not.toBeChecked();
+
+    await user.click(analyticsSwitch);
+    expect(analyticsSwitch).toBeChecked();
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    await user.click(await screen.findByRole('button', { name: /customize/i }));
+
+    analyticsSwitch = await screen.findByRole('switch', { name: /analytics/i });
+    expect(analyticsSwitch).not.toBeChecked();
   });
 
   it('does not show the banner after a saved decision and can reopen preferences later', async () => {

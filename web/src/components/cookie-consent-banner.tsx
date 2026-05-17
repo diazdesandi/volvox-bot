@@ -20,12 +20,17 @@ import {
   type StoredCookieConsent,
   saveCookieConsent,
 } from '@/lib/cookie-consent';
+import { cn } from '@/lib/utils';
 
 const COOKIE_SAVE_ERROR_MESSAGE =
   'Cookie preferences could not save in this browser. Check storage permissions and try again.';
 
 function getInitialAnalyticsPreference(consent: StoredCookieConsent | null): boolean {
-  return consent?.categories.analytics ?? false;
+  const categories = consent?.categories;
+
+  return typeof categories === 'object' && typeof categories.analytics === 'boolean'
+    ? categories.analytics
+    : false;
 }
 
 export function CookieConsentBanner() {
@@ -90,18 +95,38 @@ export function CookieConsentBanner() {
 
   const shouldShowBanner = !storedConsent && !isPreferencesOpen;
 
+  const resetDraftPreferences = () => {
+    setAnalyticsEnabled(getInitialAnalyticsPreference(storedConsent));
+    setPreferenceError(null);
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      resetDraftPreferences();
+    }
+
+    setIsPreferencesOpen(open);
+  };
+
   return (
     <>
       {shouldShowBanner && (
         <section
           aria-label="Cookie consent"
-          className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-4xl rounded-2xl border border-border/70 bg-background/95 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl sm:bottom-5 sm:p-5"
+          className={cn(
+            'fixed inset-x-3 bottom-3 z-50 mx-auto max-w-4xl rounded-2xl border',
+            'border-border/70 bg-background/95 p-4 shadow-2xl shadow-black/20 backdrop-blur-xl',
+            'sm:bottom-5 sm:p-5',
+          )}
         >
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex gap-3">
               <div
                 aria-hidden="true"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/50 bg-card/70"
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
+                  'border-border/50 bg-card/70',
+                )}
               >
                 <Cookie className="h-4 w-4 text-primary" />
               </div>
@@ -130,7 +155,7 @@ export function CookieConsentBanner() {
                 size="sm"
                 variant="ghost-primary"
                 onClick={() => {
-                  setPreferenceError(null);
+                  resetDraftPreferences();
                   setIsPreferencesOpen(true);
                 }}
               >
@@ -141,7 +166,7 @@ export function CookieConsentBanner() {
         </section>
       )}
 
-      <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
+      <Dialog open={isPreferencesOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent aria-describedby="cookie-preferences-description" className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Cookie preferences</DialogTitle>
@@ -160,7 +185,13 @@ export function CookieConsentBanner() {
                     Required for sign-in, security, and core dashboard behavior.
                   </p>
                 </div>
-                <span className="shrink-0 whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                <span
+                  className={cn(
+                    'shrink-0 whitespace-nowrap rounded-full border',
+                    'border-primary/30 bg-primary/10',
+                    'px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary',
+                  )}
+                >
                   Always on
                 </span>
               </div>
@@ -197,7 +228,13 @@ export function CookieConsentBanner() {
               Reject non-essential
             </Button>
             <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <Button variant="secondary" onClick={() => setIsPreferencesOpen(false)}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  resetDraftPreferences();
+                  setIsPreferencesOpen(false);
+                }}
+              >
                 Cancel
               </Button>
               <Button onClick={() => savePreferences(analyticsEnabled)}>Save preferences</Button>
