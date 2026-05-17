@@ -7,6 +7,7 @@ import {
   groupProviderModelOptions,
   isProviderModelId,
 } from '@/lib/provider-model-options';
+import providersCatalog from '@/data/providers.json';
 
 const providerCatalog = {
   providers: {
@@ -167,5 +168,75 @@ describe('provider model options', () => {
 
     expect(options[0]?.value).toBe('moonshot:kimi-k2.6');
     expect(getVisibleProviderModelValue('not a provider model', options)).toBe(options[0]?.value);
+  });
+});
+
+describe('providers.json catalog display names', () => {
+  it('no OpenRouter model displayName contains "(via OpenRouter)"', () => {
+    const openrouterModels = providersCatalog.providers.openrouter.models as Record<
+      string,
+      { displayName: string }
+    >;
+    for (const [modelId, model] of Object.entries(openrouterModels)) {
+      expect(
+        model.displayName,
+        `Model ${modelId} should not include "(via OpenRouter)" in displayName`,
+      ).not.toContain('(via OpenRouter)');
+    }
+  });
+
+  it('changed OpenRouter models have correct display names without provider suffix', () => {
+    const openrouterModels = providersCatalog.providers.openrouter.models as Record<
+      string,
+      { displayName: string }
+    >;
+
+    expect(openrouterModels['minimax/minimax-m2.5']?.displayName).toBe('MiniMax M2.5');
+    expect(openrouterModels['minimax/minimax-m2.5:free']?.displayName).toBe('MiniMax M2.5 Free');
+    expect(openrouterModels['moonshotai/kimi-k2.6']?.displayName).toBe('Kimi K2.6');
+    expect(openrouterModels['moonshotai/kimi-k2.5']?.displayName).toBe('Kimi K2.5');
+    expect(openrouterModels['moonshotai/kimi-k2-thinking']?.displayName).toBe('Kimi K2 Thinking');
+    expect(openrouterModels['moonshotai/kimi-k2-0905']?.displayName).toBe('Kimi K2 0905');
+    expect(openrouterModels['moonshotai/kimi-k2']?.displayName).toBe('Kimi K2');
+  });
+
+  it('no provider model displayName contains "(via OpenRouter)" across the full catalog', () => {
+    const { providers } = providersCatalog;
+    for (const [providerName, providerConfig] of Object.entries(providers)) {
+      const models = (providerConfig as { models: Record<string, { displayName: string }> }).models;
+      for (const [modelId, model] of Object.entries(models)) {
+        expect(
+          model.displayName,
+          `${providerName}/${modelId} should not include "(via OpenRouter)"`,
+        ).not.toContain('(via OpenRouter)');
+      }
+    }
+  });
+
+  it('buildVisibleProviderModelOptions on the real catalog produces OpenRouter options without "(via OpenRouter)"', () => {
+    const options = buildVisibleProviderModelOptions(providersCatalog);
+    const openrouterOptions = options.filter((o) => o.providerName === 'openrouter');
+
+    expect(openrouterOptions.length).toBeGreaterThan(0);
+    for (const option of openrouterOptions) {
+      expect(option.label).not.toContain('(via OpenRouter)');
+      expect(option.modelDisplayName).not.toContain('(via OpenRouter)');
+    }
+  });
+
+  it('specific OpenRouter model options have the correct label and modelDisplayName', () => {
+    const options = buildVisibleProviderModelOptions(providersCatalog);
+
+    const m25 = options.find((o) => o.value === 'openrouter:minimax/minimax-m2.5');
+    expect(m25?.label).toBe('MiniMax M2.5');
+    expect(m25?.modelDisplayName).toBe('MiniMax M2.5');
+
+    const kimiK26 = options.find((o) => o.value === 'openrouter:moonshotai/kimi-k2.6');
+    expect(kimiK26?.label).toBe('Kimi K2.6');
+    expect(kimiK26?.modelDisplayName).toBe('Kimi K2.6');
+
+    const kimiK2 = options.find((o) => o.value === 'openrouter:moonshotai/kimi-k2');
+    expect(kimiK2?.label).toBe('Kimi K2');
+    expect(kimiK2?.modelDisplayName).toBe('Kimi K2');
   });
 });

@@ -635,4 +635,43 @@ describe('AiAutomationCategory', () => {
       screen.getAllByRole('option', { name: `Current saved model: ${unsupportedModel}` }),
     ).toHaveLength(2);
   });
+
+  it('renders OpenRouter model option without "(via OpenRouter)" suffix in detection model dropdown', () => {
+    mockAiAutoModContext(
+      vi.fn(),
+      createDraftConfig({ aiAutoMod: { model: 'openrouter:minimax/minimax-m2.5' } }),
+    );
+
+    render(<AiAutomationCategory />);
+
+    const select = screen.getByLabelText('Detection Model');
+    expect(select).toHaveValue('openrouter:minimax/minimax-m2.5');
+
+    const option = select.querySelector('option[value="openrouter:minimax/minimax-m2.5"]');
+    expect(option).not.toBeNull();
+    expect(option?.textContent).not.toContain('(via OpenRouter)');
+    expect(option?.textContent).toBe('MiniMax M2.5');
+  });
+
+  it('renders OpenRouter model option without "(via OpenRouter)" suffix in triage classifier dropdown', () => {
+    mockConfigContext({
+      activeTabId: 'triage',
+      draftConfig: createDraftConfig({
+        triage: {
+          classifyModel: 'openrouter:minimax/minimax-m2.5',
+          respondModel: 'minimax:MiniMax-M2.7',
+        },
+      }),
+    });
+
+    render(<AiAutomationCategory />);
+
+    const classifierSelect = screen.getByLabelText('Classifier Engine');
+    expect(classifierSelect).toHaveValue('openrouter:minimax/minimax-m2.5');
+
+    const option = classifierSelect.querySelector('option[value="openrouter:minimax/minimax-m2.5"]');
+    expect(option).not.toBeNull();
+    expect(option?.textContent).not.toContain('(via OpenRouter)');
+    expect(option?.textContent).toBe('MiniMax M2.5');
+  });
 });

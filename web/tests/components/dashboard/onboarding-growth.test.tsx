@@ -309,6 +309,38 @@ describe('OnboardingGrowthCategory', () => {
     );
   });
 
+  it('shows OpenRouter model option label without "(via OpenRouter)" suffix', () => {
+    const draftConfig = {
+      tldr: {
+        enabled: true,
+        model: 'openrouter:minimax/minimax-m2.5',
+        systemPrompt: '',
+        defaultMessages: 50,
+        maxMessages: 200,
+        cooldownSeconds: 300,
+      },
+    };
+
+    mockUseConfigContext.mockReturnValue({
+      draftConfig,
+      saving: false,
+      guildId: 'guild-1',
+      visibleFeatureIds: new Set(['tldr']),
+      activeTabId: 'tldr',
+      updateDraftConfig: vi.fn(),
+    });
+
+    render(<OnboardingGrowthCategory />);
+
+    const modelSelect = screen.getByLabelText('TL;DR Model');
+    expect(modelSelect).toHaveValue('openrouter:minimax/minimax-m2.5');
+
+    const option = modelSelect.querySelector('option[value="openrouter:minimax/minimax-m2.5"]');
+    expect(option).not.toBeNull();
+    expect(option?.textContent).not.toContain('(via OpenRouter)');
+    expect(option?.textContent).toBe('MiniMax M2.5');
+  });
+
   it('preserves unsupported saved models in the TLDR model selector', () => {
     const unsupportedModel = 'anthropic:claude-3-5-haiku';
     const updateDraftConfig = vi.fn();
