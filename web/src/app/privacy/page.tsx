@@ -168,11 +168,11 @@ export default function PrivacyPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <h3 className={subheadingClassName}>Backups and legal requirements</h3>
+              <h3 className={subheadingClassName}>Retention and legal requirements</h3>
               <p className={bodyClassName}>
-                Deleted or expired data may remain in backups for a limited period or be preserved
-                where necessary for security, fraud prevention, legal compliance, or defense of
-                claims.
+                Deleted or expired data may remain in retained system archives for a limited period
+                or be preserved where necessary for security, fraud prevention, legal compliance, or
+                defense of claims.
               </p>
             </div>
           </div>

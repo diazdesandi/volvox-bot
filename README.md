@@ -46,7 +46,6 @@ AI-powered Discord bot and dashboard — built by the [Volvox](https://volvox.de
 - **📜 Audit Log** — Complete action history with filtering, export, and WebSocket streaming.
 - **⚡ Redis Caching** — Distributed caching with graceful in-memory fallback.
 - **⚙️ Runtime Config** — All settings editable via `/config` command or dashboard. Stored in PostgreSQL with live reload.
-- **💾 Backup & Restore** — Export/import config with automatic scheduled backups.
 
 ---
 

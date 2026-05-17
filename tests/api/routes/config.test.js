@@ -93,9 +93,7 @@ describe('config routes', () => {
       expect(res.status).toBe(200);
     });
 
-    it.skip('should deny non-bot-owner OAuth users', async () => {
-      // FIXME: Mock isolation issue - backup.test.js sets BOT_OWNER_IDS
-      // which persists across tests due to Vitest mock hoisting
+    it('should deny non-bot-owner OAuth users', async () => {
       _resetSecretCache();
       vi.stubEnv('SESSION_SECRET', 'jwt-test-secret');
       const token = createOAuthToken();

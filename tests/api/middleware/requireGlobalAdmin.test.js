@@ -130,11 +130,11 @@ describe('requireGlobalAdmin middleware', () => {
       const res = makeRes();
       const next = vi.fn();
 
-      requireGlobalAdmin('Backup access', req, res, next);
+      requireGlobalAdmin('Admin tools access', req, res, next);
 
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ error: expect.stringContaining('Backup access') }),
+        expect.objectContaining({ error: expect.stringContaining('Admin tools access') }),
       );
     });
 
