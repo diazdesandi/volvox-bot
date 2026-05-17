@@ -78,7 +78,7 @@ function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
 }
 
 function useAnalyticsConsent() {
-  const [analyticsConsent, setAnalyticsConsent] = useState(() => hasAnalyticsConsent());
+  const [analyticsConsent, setAnalyticsConsent] = useState(false);
 
   useEffect(() => {
     setAnalyticsConsent(hasAnalyticsConsent());

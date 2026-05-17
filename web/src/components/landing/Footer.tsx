@@ -22,6 +22,7 @@ if (typeof window !== 'undefined') {
 // ─── Footer Links Config ─────────────────────────────────
 const footerLinks = [
   {
+    id: 'systemCore',
     title: 'SYSTEM_CORE',
     links: [
       { label: 'Dashboard', href: '#dashboard' },
@@ -31,6 +32,7 @@ const footerLinks = [
     ],
   },
   {
+    id: 'resources',
     title: 'RESOURCES',
     links: [
       { label: 'Documentation', href: 'https://docs.volvox.bot' },
@@ -38,6 +40,7 @@ const footerLinks = [
     ],
   },
   {
+    id: 'legalProtocol',
     title: 'LEGAL_PROTOCOL',
     links: [
       { label: 'Privacy Policy', href: '/privacy' },
@@ -313,9 +316,12 @@ export function Footer() {
                       </Link>
                     </li>
                   ))}
-                  {col.title === 'LEGAL_PROTOCOL' && (
+                  {col.id === 'legalProtocol' && (
                     <li>
-                      <CookiePreferencesButton />
+                      <CookiePreferencesButton className="group flex items-center gap-1.5 text-[14px] font-medium text-foreground/60 hover:text-foreground">
+                        <ChevronRight className="w-3.5 h-3.5 opacity-0 -ml-5 group-hover:opacity-40 group-hover:ml-0 transition-all" />
+                        Cookie Preferences
+                      </CookiePreferencesButton>
                     </li>
                   )}
                 </ul>

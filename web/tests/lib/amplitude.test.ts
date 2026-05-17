@@ -171,6 +171,20 @@ describe('dashboard Amplitude analytics', () => {
     expect(document.cookie).not.toContain('AMP_cookie=');
   });
 
+  it('expires visible Amplitude cookies on the current page path when consent is revoked', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    storeAnalyticsConsent();
+    window.history.pushState({}, '', '/dashboard/settings');
+    document.cookie = 'AMP_path_cookie=test; path=/dashboard/settings';
+
+    expect(document.cookie).toContain('AMP_path_cookie=');
+
+    const { resetDashboardAmplitude } = await import('@/lib/amplitude');
+
+    expect(resetDashboardAmplitude()).toBe(true);
+    expect(document.cookie).not.toContain('AMP_path_cookie=');
+  });
+
   it('exports all required dashboard event name constants', async () => {
     const amplitude = await import('@/lib/amplitude');
 

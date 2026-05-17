@@ -101,7 +101,12 @@ describe('Footer', () => {
 
     render(<Footer />);
 
-    await user.click(screen.getByRole('button', { name: /cookie preferences/i }));
+    const cookiePreferencesButton = screen.getByRole('button', { name: /cookie preferences/i });
+
+    expect(cookiePreferencesButton).toHaveClass('text-[14px]', 'text-foreground/60');
+    expect(cookiePreferencesButton.querySelector('svg')).toBeInTheDocument();
+
+    await user.click(cookiePreferencesButton);
 
     expect(mockOpenCookiePreferences).toHaveBeenCalledOnce();
   });

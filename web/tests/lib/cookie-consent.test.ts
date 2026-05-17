@@ -12,6 +12,7 @@ import {
 describe('cookie consent storage', () => {
   afterEach(() => {
     window.localStorage.clear();
+    vi.restoreAllMocks();
     vi.clearAllMocks();
   });
 
@@ -57,14 +58,36 @@ describe('cookie consent storage', () => {
       { analytics: true },
       new Date('2026-05-16T12:00:00.000Z'),
     );
+    const listener = vi.fn();
 
     expect(expiredConsent).not.toBeNull();
+    window.addEventListener(COOKIE_CONSENT_CHANGED_EVENT, listener);
+
     expect(readCookieConsent(new Date('2028-05-16T12:00:00.000Z'))).toBeNull();
     expect(window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY)).toBeNull();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: null }));
 
     window.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, '{bad-json');
+    listener.mockClear();
+
     expect(readCookieConsent()).toBeNull();
     expect(window.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY)).toBeNull();
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: null }));
+
+    window.removeEventListener(COOKIE_CONSENT_CHANGED_EVENT, listener);
+  });
+
+  it('treats blocked storage reads as unavailable without retrying cleanup', () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Blocked storage', 'SecurityError');
+    });
+    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('Blocked storage', 'SecurityError');
+    });
+
+    expect(readCookieConsent()).toBeNull();
+    expect(getItemSpy).toHaveBeenCalledWith(COOKIE_CONSENT_STORAGE_KEY);
+    expect(removeItemSpy).not.toHaveBeenCalled();
   });
 
   it('clears stored consent and emits an update', () => {

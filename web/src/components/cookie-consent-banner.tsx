@@ -21,6 +21,9 @@ import {
   saveCookieConsent,
 } from '@/lib/cookie-consent';
 
+const COOKIE_SAVE_ERROR_MESSAGE =
+  'Cookie preferences could not save in this browser. Check storage permissions and try again.';
+
 function getInitialAnalyticsPreference(consent: StoredCookieConsent | null): boolean {
   return consent?.categories.analytics ?? false;
 }
@@ -31,6 +34,7 @@ export function CookieConsentBanner() {
   const [storedConsent, setStoredConsent] = useState<StoredCookieConsent | null>(null);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
 
   useEffect(() => {
     const consent = readCookieConsent();
@@ -46,12 +50,14 @@ export function CookieConsentBanner() {
           : readCookieConsent();
       setStoredConsent(nextConsent);
       setAnalyticsEnabled(getInitialAnalyticsPreference(nextConsent));
+      setPreferenceError(null);
     };
 
     const handlePreferencesOpen = () => {
       const latestConsent = readCookieConsent();
       setStoredConsent(latestConsent);
       setAnalyticsEnabled(getInitialAnalyticsPreference(latestConsent));
+      setPreferenceError(null);
       setIsPreferencesOpen(true);
     };
 
@@ -66,8 +72,15 @@ export function CookieConsentBanner() {
 
   const savePreferences = (analytics: boolean) => {
     const consent = saveCookieConsent({ analytics });
+
+    if (!consent) {
+      setPreferenceError(COOKIE_SAVE_ERROR_MESSAGE);
+      return;
+    }
+
     setStoredConsent(consent);
     setAnalyticsEnabled(analytics);
+    setPreferenceError(null);
     setIsPreferencesOpen(false);
   };
 
@@ -98,6 +111,11 @@ export function CookieConsentBanner() {
                   Volvox.Bot uses essential cookies to keep the dashboard working. Analytics cookies
                   help us understand aggregate dashboard usage and stay off until you allow them.
                 </p>
+                {preferenceError && (
+                  <p className="text-xs font-medium text-destructive" role="alert">
+                    {preferenceError}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -108,7 +126,14 @@ export function CookieConsentBanner() {
               <Button size="sm" variant="outline" onClick={() => savePreferences(false)}>
                 Reject non-essential
               </Button>
-              <Button size="sm" variant="ghost-primary" onClick={() => setIsPreferencesOpen(true)}>
+              <Button
+                size="sm"
+                variant="ghost-primary"
+                onClick={() => {
+                  setPreferenceError(null);
+                  setIsPreferencesOpen(true);
+                }}
+              >
                 Customize
               </Button>
             </div>
@@ -160,6 +185,12 @@ export function CookieConsentBanner() {
               </div>
             </div>
           </div>
+
+          {preferenceError && (
+            <p className="text-xs font-medium text-destructive" role="alert">
+              {preferenceError}
+            </p>
+          )}
 
           <DialogFooter className="gap-2 sm:justify-between">
             <Button variant="outline" onClick={() => savePreferences(false)}>

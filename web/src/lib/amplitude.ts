@@ -109,6 +109,19 @@ function getCookieRemovalDomains(hostname: string): string[] {
   return [...domains];
 }
 
+function getCookieRemovalPaths(pathname: string): string[] {
+  const paths = new Set<string>(['/']);
+  const segments = pathname.split('/').filter(Boolean);
+  let currentPath = '';
+
+  for (const segment of segments) {
+    currentPath = `${currentPath}/${segment}`;
+    paths.add(currentPath);
+  }
+
+  return [...paths];
+}
+
 function clearAmplitudeCookies(): void {
   if (typeof globalThis.document === 'undefined') {
     return;
@@ -121,12 +134,15 @@ function clearAmplitudeCookies(): void {
       .filter((name) => name && isAmplitudeStorageKey(name));
 
     const domains = getCookieRemovalDomains(globalThis.location?.hostname ?? '');
+    const paths = getCookieRemovalPaths(globalThis.location?.pathname ?? '/');
 
     for (const name of cookieNames) {
       for (const domain of domains) {
         const domainAttribute = domain ? `; domain=${domain}` : '';
-        // biome-ignore lint/suspicious/noDocumentCookie: Amplitude cleanup must expire legacy browser cookies.
-        globalThis.document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/${domainAttribute}; SameSite=Lax`;
+        for (const cookiePath of paths) {
+          // biome-ignore lint/suspicious/noDocumentCookie: Amplitude cleanup must expire legacy browser cookies.
+          globalThis.document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=${cookiePath}${domainAttribute}; SameSite=Lax`;
+        }
       }
     }
   } catch {

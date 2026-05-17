@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CookieConsentBanner } from '@/components/cookie-consent-banner';
 import {
   COOKIE_CONSENT_STORAGE_KEY,
@@ -12,6 +12,7 @@ import {
 describe('CookieConsentBanner', () => {
   afterEach(() => {
     window.localStorage.clear();
+    vi.restoreAllMocks();
   });
 
   it('shows a first-visit banner and accepts all cookies', async () => {
@@ -43,6 +44,20 @@ describe('CookieConsentBanner', () => {
       analytics: false,
     });
     expect(screen.queryByRole('region', { name: /cookie consent/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the banner open and explains when preferences cannot be saved', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage unavailable', 'QuotaExceededError');
+    });
+
+    render(<CookieConsentBanner />);
+
+    await user.click(await screen.findByRole('button', { name: /accept all/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not save/i);
+    expect(screen.getByRole('region', { name: /cookie consent/i })).toBeInTheDocument();
   });
 
   it('customizes analytics consent from the preferences dialog', async () => {

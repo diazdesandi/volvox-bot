@@ -20,8 +20,16 @@ export interface CookieConsentInput {
   readonly analytics: boolean;
 }
 
-function isBrowserStorageAvailable(): boolean {
-  return typeof globalThis.window !== 'undefined' && typeof globalThis.localStorage !== 'undefined';
+function getBrowserStorage(): Storage | null {
+  if (typeof globalThis.window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return typeof globalThis.localStorage !== 'undefined' ? globalThis.localStorage : null;
+  } catch {
+    return null;
+  }
 }
 
 function addDays(date: Date, days: number): Date {
@@ -59,31 +67,49 @@ function emitConsentChanged(consent: StoredCookieConsent | null): void {
   );
 }
 
+function removeStoredConsentAndNotify(storage: Storage): void {
+  try {
+    storage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
+  } catch {
+    // Storage cleanup can fail in restricted browser modes; state must still revoke consent.
+  }
+
+  emitConsentChanged(null);
+}
+
 export function readCookieConsent(now = new Date()): StoredCookieConsent | null {
-  if (!isBrowserStorageAvailable()) {
+  const storage = getBrowserStorage();
+
+  if (!storage) {
+    return null;
+  }
+
+  let rawConsent: string | null;
+
+  try {
+    rawConsent = storage.getItem(COOKIE_CONSENT_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+
+  if (!rawConsent) {
     return null;
   }
 
   try {
-    const rawConsent = globalThis.localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY);
-
-    if (!rawConsent) {
-      return null;
-    }
-
     const parsedConsent = JSON.parse(rawConsent) as unknown;
 
     if (
       !isValidStoredConsent(parsedConsent) ||
       Date.parse(parsedConsent.expiresAt) <= now.getTime()
     ) {
-      globalThis.localStorage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
+      removeStoredConsentAndNotify(storage);
       return null;
     }
 
     return parsedConsent;
   } catch {
-    globalThis.localStorage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
+    removeStoredConsentAndNotify(storage);
     return null;
   }
 }
@@ -96,7 +122,9 @@ export function saveCookieConsent(
   categories: CookieConsentInput,
   now = new Date(),
 ): StoredCookieConsent | null {
-  if (!isBrowserStorageAvailable()) {
+  const storage = getBrowserStorage();
+
+  if (!storage) {
     return null;
   }
 
@@ -111,7 +139,7 @@ export function saveCookieConsent(
   };
 
   try {
-    globalThis.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(consent));
+    storage.setItem(COOKIE_CONSENT_STORAGE_KEY, JSON.stringify(consent));
     emitConsentChanged(consent);
     return consent;
   } catch {
@@ -120,12 +148,13 @@ export function saveCookieConsent(
 }
 
 export function clearCookieConsent(): void {
-  if (!isBrowserStorageAvailable()) {
+  const storage = getBrowserStorage();
+
+  if (!storage) {
     return;
   }
 
-  globalThis.localStorage.removeItem(COOKIE_CONSENT_STORAGE_KEY);
-  emitConsentChanged(null);
+  removeStoredConsentAndNotify(storage);
 }
 
 export function openCookiePreferences(): void {
