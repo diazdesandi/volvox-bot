@@ -148,8 +148,12 @@ function buildFilters(guildId, query) {
   }
 
   const categoryFilter = actionFilter ? null : toFilterString(query.category);
-  const actionPatterns = categoryFilter ? CATEGORY_ACTION_PATTERNS[categoryFilter] : null;
-  if (actionPatterns) {
+  const actionPatterns =
+    categoryFilter &&
+    Object.prototype.hasOwnProperty.call(CATEGORY_ACTION_PATTERNS, categoryFilter)
+      ? CATEGORY_ACTION_PATTERNS[categoryFilter]
+      : null;
+  if (Array.isArray(actionPatterns)) {
     conditions.push(`action LIKE ANY($${paramIndex}::text[])`);
     params.push(actionPatterns);
     paramIndex++;

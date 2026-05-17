@@ -4,9 +4,18 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 const NativeURL = globalThis.URL;
 const nativeClipboardDescriptor = Object.getOwnPropertyDescriptor(globalThis.navigator, 'clipboard');
-const nativeHasPointerCapture = HTMLElement.prototype.hasPointerCapture;
-const nativeReleasePointerCapture = HTMLElement.prototype.releasePointerCapture;
-const nativeSetPointerCapture = HTMLElement.prototype.setPointerCapture;
+const nativeHasPointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'hasPointerCapture',
+);
+const nativeReleasePointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'releasePointerCapture',
+);
+const nativeSetPointerCaptureDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'setPointerCapture',
+);
 
 function createTestURL() {
   class TestURL extends NativeURL {}
@@ -41,6 +50,18 @@ function restoreClipboard() {
   Reflect.deleteProperty(globalThis.navigator, 'clipboard');
 }
 
+function restorePointerCaptureMethod(
+  method: 'hasPointerCapture' | 'releasePointerCapture' | 'setPointerCapture',
+  descriptor: PropertyDescriptor | undefined,
+) {
+  if (descriptor) {
+    Object.defineProperty(HTMLElement.prototype, method, descriptor);
+    return;
+  }
+
+  Reflect.deleteProperty(HTMLElement.prototype, method);
+}
+
 beforeAll(() => {
   Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
     configurable: true,
@@ -57,32 +78,9 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  if (nativeHasPointerCapture) {
-    Object.defineProperty(HTMLElement.prototype, 'hasPointerCapture', {
-      configurable: true,
-      value: nativeHasPointerCapture,
-    });
-  } else {
-    Reflect.deleteProperty(HTMLElement.prototype, 'hasPointerCapture');
-  }
-
-  if (nativeReleasePointerCapture) {
-    Object.defineProperty(HTMLElement.prototype, 'releasePointerCapture', {
-      configurable: true,
-      value: nativeReleasePointerCapture,
-    });
-  } else {
-    Reflect.deleteProperty(HTMLElement.prototype, 'releasePointerCapture');
-  }
-
-  if (nativeSetPointerCapture) {
-    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
-      configurable: true,
-      value: nativeSetPointerCapture,
-    });
-  } else {
-    Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture');
-  }
+  restorePointerCaptureMethod('hasPointerCapture', nativeHasPointerCaptureDescriptor);
+  restorePointerCaptureMethod('releasePointerCapture', nativeReleasePointerCaptureDescriptor);
+  restorePointerCaptureMethod('setPointerCapture', nativeSetPointerCaptureDescriptor);
 });
 
 const {
