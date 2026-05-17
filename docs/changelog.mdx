@@ -29,6 +29,8 @@ description: 'Release notes for Volvox.Bot covering new features, dashboard impr
 
 **Reminders retired** — The `/remind` command, its scheduler, and the **Reminders** section in **Config** have all been removed. The bot no longer delivers personal or channel reminders, and any pending reminders have been cleared. If you leaned on this for routine pings, Discord's scheduled events or a lightweight webhook-driven cron are the closest replacements. The rest of your configuration is untouched.
 
+**Backup and restore retired** — Config backup and restore — including the export and import endpoints and any scheduled automatic backups — have been removed. Usage was minimal and the surface area carried real risk: an accidental restore could clobber a live config in a single click. Your live configuration is unaffected and stays editable from the dashboard or the `/config` command. If you want a snapshot before a big change, copy the relevant settings out of the dashboard manually before editing.
+  
 ## Fixes
 
 **Direct @mentions no longer trip over themselves** — The lower-latency mention path shipped on 2026-05-11 occasionally raced against the standard triage flow and aborted the very response it was trying to speed up. Direct mentions and replies to the bot now complete reliably instead of silently bailing mid-evaluation. See [Moderation](/features/moderation).
