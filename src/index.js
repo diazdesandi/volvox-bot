@@ -38,7 +38,6 @@ import { startEngagementFlushInterval, stopEngagementFlushInterval } from './mod
 import { registerEventHandlers } from './modules/events.js';
 import { checkMem0Health, markUnavailable } from './modules/memory.js';
 import { startTempbanScheduler, stopTempbanScheduler } from './modules/moderation.js';
-import { loadOptOuts } from './modules/optout.js';
 import { startScheduler, stopScheduler } from './modules/scheduler.js';
 import { startTriage, stopTriage } from './modules/triage.js';
 import {
@@ -419,9 +418,6 @@ async function startup() {
 
   // Start periodic conversation cleanup
   startConversationCleanup();
-
-  // Load opt-out preferences from DB before enabling memory features
-  await loadOptOuts();
 
   // Check mem0 availability for user memory features (with timeout to avoid blocking startup).
   // AbortController prevents a late-resolving health check from calling markAvailable()

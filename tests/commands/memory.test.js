@@ -184,12 +184,6 @@ vi.mock('../../src/modules/memory.js', () => ({
   deleteMemory: vi.fn(() => Promise.resolve(true)),
 }));
 
-// Mock optout module
-vi.mock('../../src/modules/optout.js', () => ({
-  isOptedOut: vi.fn(() => false),
-  toggleOptOut: vi.fn(() => ({ optedOut: true })),
-}));
-
 // Mock safeSend wrappers — spies that delegate to the interaction methods
 vi.mock('../../src/utils/safeSend.js', () => ({
   safeReply: vi.fn((target, options) => target.reply(options)),
@@ -215,7 +209,6 @@ import {
   getMemories,
   searchMemories,
 } from '../../src/modules/memory.js';
-import { isOptedOut, toggleOptOut } from '../../src/modules/optout.js';
 import { safeEditReply, safeReply, safeUpdate } from '../../src/utils/safeSend.js';
 
 /**
@@ -269,8 +262,6 @@ describe('memory command', () => {
     deleteAllMemories.mockResolvedValue(true);
     searchMemories.mockResolvedValue({ memories: [], relations: [] });
     deleteMemory.mockResolvedValue(true);
-    toggleOptOut.mockReturnValue({ optedOut: true });
-    isOptedOut.mockReturnValue(false);
   });
 
   describe('data export', () => {
@@ -346,54 +337,6 @@ describe('memory command', () => {
       const content = interaction.editReply.mock.calls[0][0].content;
       expect(content.length).toBeLessThanOrEqual(2000);
       expect(content).toContain('...and more');
-    });
-  });
-
-  describe('/memory optout', () => {
-    it('should toggle opt-out and reply with opted-out message', async () => {
-      toggleOptOut.mockReturnValue({ optedOut: true });
-      const interaction = createMockInteraction({ subcommand: 'optout' });
-
-      await execute(interaction);
-
-      expect(toggleOptOut).toHaveBeenCalledWith('123456');
-      expect(interaction.reply).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('opted out'),
-          ephemeral: true,
-        }),
-      );
-    });
-
-    it('should toggle opt-in and reply with opted-in message', async () => {
-      toggleOptOut.mockReturnValue({ optedOut: false });
-      const interaction = createMockInteraction({ subcommand: 'optout' });
-
-      await execute(interaction);
-
-      expect(toggleOptOut).toHaveBeenCalledWith('123456');
-      expect(interaction.reply).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('opted back in'),
-          ephemeral: true,
-        }),
-      );
-    });
-
-    it('should work even when memory system is unavailable', async () => {
-      checkAndRecoverMemory.mockReturnValue(false);
-      toggleOptOut.mockReturnValue({ optedOut: true });
-      const interaction = createMockInteraction({ subcommand: 'optout' });
-
-      await execute(interaction);
-
-      expect(toggleOptOut).toHaveBeenCalledWith('123456');
-      expect(interaction.reply).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('opted out'),
-          ephemeral: true,
-        }),
-      );
     });
   });
 
@@ -741,25 +684,6 @@ describe('memory command', () => {
       );
     });
 
-    it('should show opted-out status for target user', async () => {
-      isOptedOut.mockReturnValue(true);
-      getMemories.mockResolvedValue([]);
-      const interaction = createMockInteraction({
-        subcommand: 'view',
-        subcommandGroup: 'admin',
-        targetUser: { id: '999', username: 'targetuser' },
-        hasManageGuild: true,
-      });
-
-      await execute(interaction);
-
-      expect(interaction.editReply).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: expect.stringContaining('opted out'),
-        }),
-      );
-    });
-
     it('should show memories for target user', async () => {
       getMemories.mockResolvedValue([
         { id: 'mem-1', memory: 'Loves TypeScript' },
@@ -988,21 +912,6 @@ describe('memory command', () => {
         interaction,
         expect.objectContaining({
           content: expect.stringContaining('unavailable'),
-          ephemeral: true,
-        }),
-      );
-    });
-
-    it('should use safeReply for optout response', async () => {
-      toggleOptOut.mockReturnValue({ optedOut: true });
-      const interaction = createMockInteraction({ subcommand: 'optout' });
-
-      await execute(interaction);
-
-      expect(safeReply).toHaveBeenCalledWith(
-        interaction,
-        expect.objectContaining({
-          content: expect.stringContaining('opted out'),
           ephemeral: true,
         }),
       );

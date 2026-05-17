@@ -185,9 +185,8 @@ export default function PrivacyPage() {
               <h3 className={subheadingClassName}>Controls in the product</h3>
               <p className={bodyClassName}>
                 Where supported, users can control certain privacy settings directly. For example,
-                memory-related AI opt-outs may be managed through <code>memory_optouts</code>, and
                 public leaderboard visibility may be limited using the <code>public_profile</code>{' '}
-                setting. Cookie Preferences lets you accept, reject, update, or revoke optional
+                setting, and Cookie Preferences lets you accept, reject, update, or revoke optional
                 analytics consent for the current browser while keeping essential cookies enabled.
               </p>
             </div>

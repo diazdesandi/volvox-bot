@@ -1,6 +1,6 @@
 /**
  * Reload Command
- * Reloads bot config, commands, triage, and opt-outs without a full restart.
+ * Reloads bot config, commands, and triage without a full restart.
  * Restricted to bot owners.
  */
 
@@ -9,7 +9,6 @@ import { fileURLToPath } from 'node:url';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { info, error as logError } from '../logger.js';
 import { getConfig, loadConfig } from '../modules/config.js';
-import { loadOptOuts } from '../modules/optout.js';
 import { startTriage, stopTriage } from '../modules/triage.js';
 import { HealthMonitor } from '../utils/health.js';
 import { loadCommandsFromDirectory } from '../utils/loadCommands.js';
@@ -26,7 +25,7 @@ export const data = new SlashCommandBuilder()
 export const adminOnly = true;
 
 /**
- * Reloads bot configuration, command modules, Discord slash registrations, triage service, and opt-out data; restricted to bot owners.
+ * Reloads bot configuration, command modules, Discord slash registrations, and triage service; restricted to bot owners.
  *
  * Attempts each reload step in sequence and edits an ephemeral reply with an embed summarizing per-step success/failure and total elapsed time.
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - The slash command interaction that initiated the reload.
@@ -129,24 +128,6 @@ export async function execute(interaction) {
   } catch (err) {
     results.push({ name: 'Triage', success: false, error: err.message });
     logError('Reload: triage restart failed', {
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-      error: err.message,
-    });
-  }
-
-  // Step 5: Reload opt-outs
-  try {
-    await loadOptOuts();
-    results.push({ name: 'Opt-outs', success: true });
-    info('Reload: opt-outs reloaded', {
-      guildId: interaction.guildId,
-      channelId: interaction.channelId,
-      userId: interaction.user.id,
-    });
-  } catch (err) {
-    results.push({ name: 'Opt-outs', success: false, error: err.message });
-    logError('Reload: opt-out reload failed', {
       guildId: interaction.guildId,
       channelId: interaction.channelId,
       error: err.message,

@@ -10,7 +10,6 @@
  *   /memory view    — Show all memories the bot has about you
  *   /memory forget  — Clear all your memories (with confirmation)
  *   /memory forget <topic> — Clear memories matching a topic
- *   /memory optout  — Toggle memory collection on/off
  *   /memory admin view @user   — (Mod) View any user's memories
  *   /memory admin clear @user  — (Mod) Clear any user's memories
  */
@@ -31,7 +30,6 @@ import {
   getMemories,
   searchMemories,
 } from '../modules/memory.js';
-import { isOptedOut, toggleOptOut } from '../modules/optout.js';
 import { safeEditReply, safeReply, safeUpdate } from '../utils/safeSend.js';
 import { splitMessage } from '../utils/splitMessage.js';
 
@@ -66,9 +64,6 @@ export const data = new SlashCommandBuilder()
           .setDescription('Specific topic to forget (omit to forget everything)')
           .setRequired(false),
       ),
-  )
-  .addSubcommand((sub) =>
-    sub.setName('optout').setDescription('Toggle memory collection on/off for your account'),
   )
   .addSubcommandGroup((group) =>
     group
@@ -109,12 +104,6 @@ export async function execute(interaction) {
     return;
   }
 
-  // Handle opt-out (doesn't require memory to be available)
-  if (subcommand === 'optout') {
-    await handleOptOut(interaction, userId);
-    return;
-  }
-
   if (!checkAndRecoverMemory(guildId)) {
     await safeReply(interaction, {
       content:
@@ -134,37 +123,6 @@ export async function execute(interaction) {
       await handleForgetAll(interaction, userId, username, guildId);
     }
   }
-}
-
-/**
- * Toggle whether the bot collects memories for a user and notify them with an ephemeral reply.
- *
- * @param {import('discord.js').ChatInputCommandInteraction} interaction - The command interaction used for replying and context.
- * @param {string} userId - The ID of the user whose opt-out state will be toggled.
- */
-async function handleOptOut(interaction, userId) {
-  const { optedOut } = await toggleOptOut(userId);
-
-  if (optedOut) {
-    await safeReply(interaction, {
-      content:
-        '🚫 You have **opted out** of memory collection. The bot will no longer remember things about you. Your existing memories are unchanged — use `/memory forget` to delete them.',
-      ephemeral: true,
-    });
-  } else {
-    await safeReply(interaction, {
-      content:
-        '✅ You have **opted back in** to memory collection. The bot will start remembering things about you again.',
-      ephemeral: true,
-    });
-  }
-
-  info('Memory opt-out toggled', {
-    guildId: interaction.guildId,
-    channelId: interaction.channelId,
-    userId,
-    optedOut,
-  });
 }
 
 /**
@@ -395,9 +353,9 @@ async function handleAdmin(interaction, subcommand) {
 /**
  * Display a target user's stored memories to an administrator in an ephemeral reply.
  *
- * Retrieves the target's memories (if any), includes an "(opted out)" marker when applicable,
- * formats the results for Discord message length limits, edits the deferred ephemeral reply with
- * the formatted content, and emits an informational log event containing Discord context.
+ * Retrieves the target's memories (if any), formats the results for Discord message length limits,
+ * edits the deferred ephemeral reply with the formatted content, and emits an informational log
+ * event containing Discord context.
  *
  * @param {import('discord.js').ChatInputCommandInteraction} interaction - The command interaction from the admin.
  * @param {string} targetId - The Discord ID of the user whose memories are being viewed.
@@ -408,17 +366,16 @@ async function handleAdminView(interaction, targetId, targetUsername, guildId) {
   await interaction.deferReply({ ephemeral: true });
 
   const memories = await getMemories(targetId, guildId);
-  const optedOutStatus = isOptedOut(targetId) ? ' *(opted out)*' : '';
 
   if (memories.length === 0) {
     await safeEditReply(interaction, {
-      content: `🧠 No memories found for **${targetUsername}**${optedOutStatus}.`,
+      content: `🧠 No memories found for **${targetUsername}**.`,
     });
     return;
   }
 
   const memoryList = memories.map((m, i) => `${i + 1}. ${m.memory}`).join('\n');
-  const header = `🧠 **Memories for ${targetUsername}${optedOutStatus}:**\n\n`;
+  const header = `🧠 **Memories for ${targetUsername}:**\n\n`;
   const content = formatMemoryList(memoryList, header);
 
   await safeEditReply(interaction, { content });

@@ -21,7 +21,6 @@
 import MemoryClient from 'mem0ai';
 import { debug, info, warn as logWarn } from '../logger.js';
 import { getConfig } from './config.js';
-import { isOptedOut } from './optout.js';
 
 /** App namespace — isolates memories from other mem0 consumers */
 const APP_ID = 'volvox-bot';
@@ -496,7 +495,6 @@ const MAX_MEMORY_CONTEXT_CHARS = 2000;
  */
 export async function buildMemoryContext(userId, username, query, guildId) {
   if (!checkAndRecoverMemory(guildId)) return '';
-  if (isOptedOut(userId)) return '';
 
   const { memories, relations } = await searchMemories(userId, query, undefined, guildId);
 
@@ -525,7 +523,7 @@ export async function buildMemoryContext(userId, username, query, guildId) {
 /**
  * Extract memorable facts from a user/assistant exchange and store them in the memory service.
  *
- * Respects per-guild memory configuration and user opt-out; if extraction fails it logs the error and returns false without disabling the memory system.
+ * Respects per-guild memory configuration; if extraction fails it logs the error and returns false without disabling the memory system.
  * @param {string} userId - Discord user ID for whom memories should be stored.
  * @param {string} username - Display name to include in stored memory metadata.
  * @param {string} userMessage - The user's message content to analyze.
@@ -541,7 +539,6 @@ export async function extractAndStoreMemories(
   guildId,
 ) {
   if (!checkAndRecoverMemory(guildId)) return false;
-  if (isOptedOut(userId)) return false;
 
   const memConfig = getMemoryConfig(guildId);
   if (!memConfig.autoExtract) return false;

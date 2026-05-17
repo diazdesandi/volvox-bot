@@ -15,10 +15,6 @@ vi.mock('../../src/modules/config.js', () => ({
   loadConfig: vi.fn().mockResolvedValue({}),
 }));
 
-vi.mock('../../src/modules/optout.js', () => ({
-  loadOptOuts: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../src/modules/triage.js', () => ({
   startTriage: vi.fn().mockResolvedValue(undefined),
   stopTriage: vi.fn(),
@@ -50,7 +46,6 @@ vi.mock('../../src/utils/safeSend.js', () => ({
 import { adminOnly, data, execute } from '../../src/commands/reload.js';
 import * as logger from '../../src/logger.js';
 import { loadConfig } from '../../src/modules/config.js';
-import { loadOptOuts } from '../../src/modules/optout.js';
 import { startTriage, stopTriage } from '../../src/modules/triage.js';
 import { loadCommandsFromDirectory } from '../../src/utils/loadCommands.js';
 import { isBotOwner } from '../../src/utils/permissions.js';
@@ -108,7 +103,6 @@ describe('reload command', () => {
     expect(registerCommands).toHaveBeenCalled();
     expect(stopTriage).toHaveBeenCalled();
     expect(startTriage).toHaveBeenCalled();
-    expect(loadOptOuts).toHaveBeenCalled();
 
     expect(safeEditReply).toHaveBeenCalledTimes(1);
     const embedData = safeEditReply.mock.calls[0][1].embeds[0].data;
@@ -126,7 +120,6 @@ describe('reload command', () => {
     expect(registerCommands).toHaveBeenCalled();
     expect(stopTriage).toHaveBeenCalled();
     expect(startTriage).toHaveBeenCalled();
-    expect(loadOptOuts).toHaveBeenCalled();
 
     expect(safeEditReply).toHaveBeenCalledTimes(1);
     const embedData = safeEditReply.mock.calls[0][1].embeds[0].data;
