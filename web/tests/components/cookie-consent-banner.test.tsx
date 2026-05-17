@@ -114,6 +114,33 @@ describe('CookieConsentBanner', () => {
     expect(analyticsSwitch).not.toBeChecked();
   });
 
+  it('keeps unsaved dialog changes when consent changes elsewhere', async () => {
+    const user = userEvent.setup();
+
+    render(<CookieConsentBanner />);
+    await user.click(await screen.findByRole('button', { name: /customize/i }));
+    const analyticsSwitch = await screen.findByRole('switch', { name: /analytics/i });
+
+    await user.click(analyticsSwitch);
+    expect(analyticsSwitch).toBeChecked();
+
+    window.dispatchEvent(
+      new CustomEvent(COOKIE_CONSENT_CHANGED_EVENT, {
+        detail: {
+          version: 1,
+          decidedAt: '2026-05-16T00:00:00.000Z',
+          expiresAt: '2099-05-16T00:00:00.000Z',
+          categories: {
+            essential: true,
+            analytics: false,
+          },
+        },
+      }),
+    );
+
+    expect(analyticsSwitch).toBeChecked();
+  });
+
   it('does not show the banner after a saved decision and can reopen preferences later', async () => {
     const user = userEvent.setup();
     saveCookieConsent({ analytics: false }, new Date('2026-05-16T12:00:00.000Z'));

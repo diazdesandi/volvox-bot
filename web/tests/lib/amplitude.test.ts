@@ -173,6 +173,25 @@ describe('dashboard Amplitude analytics', () => {
     expect(document.cookie).not.toContain('AMP_cookie=');
   });
 
+  it('reuses the initialized SDK instance when analytics consent is granted again', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    storeAnalyticsConsent();
+
+    const { initDashboardAmplitude } = await import('@/lib/amplitude');
+
+    expect(initDashboardAmplitude('discord-user-123')).toBe(true);
+    storeAnalyticsConsent(false);
+    expect(initDashboardAmplitude('discord-user-123')).toBe(false);
+    storeAnalyticsConsent(true);
+    expect(initDashboardAmplitude('discord-user-123')).toBe(true);
+
+    expect(mockInit).toHaveBeenCalledOnce();
+    expect(mockSetOptOut).toHaveBeenCalledWith(true);
+    expect(mockSetOptOut).toHaveBeenLastCalledWith(false);
+    expect(mockSetUserId).toHaveBeenCalledWith(undefined);
+    expect(mockSetUserId).toHaveBeenCalledWith('discord-user-123');
+  });
+
   it('expires visible Amplitude cookies on the current page path when consent is revoked', async () => {
     vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
     storeAnalyticsConsent();
@@ -185,6 +204,42 @@ describe('dashboard Amplitude analytics', () => {
 
     expect(resetDashboardAmplitude()).toBe(true);
     expect(document.cookie).not.toContain('AMP_path_cookie=');
+  });
+
+  it('expires Amplitude cookies across known and current path variants', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AMPLITUDE_API_KEY', 'public-key');
+    storeAnalyticsConsent();
+    window.history.pushState({}, '', '/dashboard/settings/moderation');
+    const cookieWrites: string[] = [];
+    const cookieDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'cookie');
+
+    Object.defineProperty(document, 'cookie', {
+      configurable: true,
+      get: () => 'AMP_path_cookie=test',
+      set: (value: string) => {
+        cookieWrites.push(value);
+      },
+    });
+
+    try {
+      const { resetDashboardAmplitude } = await import('@/lib/amplitude');
+
+      expect(resetDashboardAmplitude()).toBe(true);
+    } finally {
+      if (cookieDescriptor) {
+        Object.defineProperty(document, 'cookie', cookieDescriptor);
+      }
+    }
+
+    expect(cookieWrites).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('path=/'),
+        expect.stringContaining('path=/dashboard'),
+        expect.stringContaining('path=/community'),
+        expect.stringContaining('path=/dashboard/settings'),
+        expect.stringContaining('path=/dashboard/settings/moderation'),
+      ]),
+    );
   });
 
   it('exports all required dashboard event name constants', async () => {

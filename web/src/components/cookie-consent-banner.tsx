@@ -56,6 +56,7 @@ export function CookieConsentBanner() {
   const analyticsSwitchId = useId();
   const analyticsDescriptionId = useId();
   const acceptAllButtonRef = useRef<HTMLButtonElement>(null);
+  const isPreferencesOpenRef = useRef(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [storedConsent, setStoredConsent] = useState<StoredCookieConsent | null>(null);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
@@ -75,8 +76,11 @@ export function CookieConsentBanner() {
           ? (event.detail as StoredCookieConsent | null)
           : readCookieConsent();
       setStoredConsent(nextConsent);
-      setAnalyticsEnabled(getInitialAnalyticsPreference(nextConsent));
-      setPreferenceError(null);
+
+      if (!isPreferencesOpenRef.current) {
+        setAnalyticsEnabled(getInitialAnalyticsPreference(nextConsent));
+        setPreferenceError(null);
+      }
     };
 
     const handlePreferencesOpen = () => {
@@ -84,6 +88,7 @@ export function CookieConsentBanner() {
       setStoredConsent(latestConsent);
       setAnalyticsEnabled(getInitialAnalyticsPreference(latestConsent));
       setPreferenceError(null);
+      isPreferencesOpenRef.current = true;
       setIsPreferencesOpen(true);
     };
 
@@ -107,6 +112,7 @@ export function CookieConsentBanner() {
     setStoredConsent(consent);
     setAnalyticsEnabled(analytics);
     setPreferenceError(null);
+    isPreferencesOpenRef.current = false;
     setIsPreferencesOpen(false);
   };
 
@@ -128,6 +134,7 @@ export function CookieConsentBanner() {
       resetDraftPreferences();
     }
 
+    isPreferencesOpenRef.current = open;
     setIsPreferencesOpen(open);
   };
 
@@ -192,6 +199,7 @@ export function CookieConsentBanner() {
                 variant="ghost-primary"
                 onClick={() => {
                   resetDraftPreferences();
+                  isPreferencesOpenRef.current = true;
                   setIsPreferencesOpen(true);
                 }}
               >

@@ -102,13 +102,13 @@ function getAnalyticsConsentFromEventDetail(consent: unknown): boolean {
 /**
  * Tracks whether the user has consented to analytics and updates in response to consent changes.
  *
- * Subscribes to cookie-consent change notifications and keeps a boolean state that reflects whether
- * analytics are allowed; returns `null` while the initial consent state is unresolved.
+ * Reads the initial browser consent synchronously, then subscribes to in-tab consent-change
+ * notifications and cross-tab storage events.
  *
- * @returns `true` if the user has consented to analytics, `false` if they have not, or `null` while unknown.
+ * @returns `true` if the user has consented to analytics, `false` if they have not.
  */
 function useAnalyticsConsent() {
-  const [analyticsConsent, setAnalyticsConsent] = useState<boolean | null>(null);
+  const [analyticsConsent, setAnalyticsConsent] = useState<boolean>(() => hasAnalyticsConsent());
 
   useEffect(() => {
     const syncAnalyticsConsent = () => {
@@ -208,10 +208,6 @@ function AmplitudeContextBridge() {
   const isAuthenticatedDashboardRoute = status === 'authenticated' && isDashboardRoute(pathname);
 
   useEffect(() => {
-    if (hasConsentedToAnalytics === null) {
-      return;
-    }
-
     if (!hasConsentedToAnalytics) {
       resetDashboardAmplitude();
       return;
@@ -221,10 +217,6 @@ function AmplitudeContextBridge() {
   }, [hasConsentedToAnalytics, userId]);
 
   useEffect(() => {
-    if (hasConsentedToAnalytics === null) {
-      return;
-    }
-
     if (!hasConsentedToAnalytics) {
       lastTrackedRouteRef.current = null;
       return;
@@ -252,10 +244,6 @@ function AmplitudeContextBridge() {
   }, [guildId, hasConsentedToAnalytics, pathname, status, telemetryRoute]);
 
   useEffect(() => {
-    if (hasConsentedToAnalytics === null) {
-      return;
-    }
-
     if (!hasConsentedToAnalytics) {
       lastTrackedGuildIdRef.current = undefined;
       return;

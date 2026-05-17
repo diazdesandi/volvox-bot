@@ -28,6 +28,7 @@ const AMPLITUDE_STORAGE_KEY_PREFIXES = [
   'amplitude_unsent_',
   'amplitude_unsent_identify_',
 ] as const;
+const AMPLITUDE_COOKIE_REMOVAL_BASE_PATHS = ['/', '/dashboard', '/community'] as const;
 
 let hasInitialized = false;
 let activeUserId: string | undefined;
@@ -141,13 +142,16 @@ function getCookieRemovalDomains(hostname: string): string[] {
  * Build a set of cookie path variants from a URL pathname.
  *
  * @param pathname - The URL pathname (e.g., `/a/b/c`) used to derive path variants
- * @returns An array containing `'/'` and each cumulative path segment (e.g., `'/a'`, `'/a/b'`, `'/a/b/c'`)
+ * @returns An array containing common app paths plus each cumulative path segment (e.g., `'/a'`, `'/a/b'`, `'/a/b/c'`)
  */
 function getCookieRemovalPaths(pathname: string): string[] {
-  const paths = new Set<string>(['/']);
+  const paths = new Set<string>(AMPLITUDE_COOKIE_REMOVAL_BASE_PATHS);
 
-  if (pathname && pathname !== '/') {
-    paths.add(pathname);
+  const normalizedPathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const pathSegments = normalizedPathname.split('/').filter(Boolean);
+
+  for (let index = 1; index <= pathSegments.length; index += 1) {
+    paths.add(`/${pathSegments.slice(0, index).join('/')}`);
   }
 
   return [...paths];
@@ -338,9 +342,10 @@ export function initDashboardAmplitude(userId?: string | null): boolean {
 /**
  * Revokes dashboard Amplitude collection for the current browser session.
  *
- * This opts the SDK out, clears the active user id when the SDK was initialized in this page load,
- * and removes queued Amplitude browser storage/cookies so future events cannot flush after consent
- * is revoked.
+ * This opts the SDK out, clears the active user id when the SDK has already been initialized in
+ * this page load, and removes queued Amplitude browser storage/cookies so future events cannot
+ * flush after consent is revoked. The initialized flag remains intact so a later re-grant can use
+ * the existing SDK instance instead of calling `init` twice.
  *
  * @returns `true` when revocation completed without SDK errors, otherwise `false`.
  */
@@ -351,7 +356,6 @@ export function resetDashboardAmplitude(): boolean {
 
   const shouldClearAmplitudeUserId = hasInitialized;
   activeUserId = undefined;
-  hasInitialized = false;
 
   try {
     amplitude.setOptOut(true);
