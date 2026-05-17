@@ -51,15 +51,27 @@ function formatDate(iso: string): string {
   });
 }
 
+const DESTRUCTIVE_ACTION_SEGMENTS = [
+  'ban',
+  'delete',
+  'kick',
+  'softban',
+  'tempban',
+  'timeout',
+] as const;
+
+function hasActionSegment(action: string, segment: string): boolean {
+  return action.split(/[._-]/).includes(segment);
+}
+
 /**
- * Selects a UI variant name based on keywords present in an audit action string.
+ * Selects a UI variant name based on action identifier segments.
  *
- * @param action - The audit action identifier to inspect; substring matches are case-sensitive.
+ * @param action - The audit action identifier to inspect.
  * @returns Badge variant for destructive moderation actions, creates, updates, AI/triage events, or generic entries.
  */
 function actionVariant(action: string): 'default' | 'secondary' | 'destructive' | 'outline' {
-  if (action.includes('delete')) return 'destructive';
-  if (action.includes('ban') || action.includes('kick') || action.includes('timeout')) {
+  if (DESTRUCTIVE_ACTION_SEGMENTS.some((segment) => hasActionSegment(action, segment))) {
     return 'destructive';
   }
   if (action.includes('create')) return 'default';

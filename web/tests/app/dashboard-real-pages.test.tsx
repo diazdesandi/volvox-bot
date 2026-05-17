@@ -571,6 +571,56 @@ describe('previously unexcluded app pages', () => {
     expect(screen.queryByText('API secret')).not.toBeInTheDocument();
   });
 
+  it('does not style restorative moderation actions as destructive', () => {
+    Object.assign(mockAuditState, {
+      entries: [
+        {
+          id: 5,
+          action: 'mod.unban',
+          user_id: 'user-1234',
+          user_tag: 'Mod#0001',
+          target_id: 'target-9999',
+          target_tag: 'Restored#1234',
+          target_type: 'member',
+          created_at: '2026-04-28T12:00:00Z',
+          ip_address: null,
+          details: {},
+        },
+        {
+          id: 6,
+          action: 'mod.untimeout',
+          user_id: 'user-1234',
+          user_tag: 'Mod#0001',
+          target_id: 'target-8888',
+          target_tag: 'Returned#1234',
+          target_type: 'member',
+          created_at: '2026-04-28T13:00:00Z',
+          ip_address: null,
+          details: {},
+        },
+        {
+          id: 7,
+          action: 'mod.ban',
+          user_id: 'user-1234',
+          user_tag: 'Mod#0001',
+          target_id: 'target-7777',
+          target_tag: 'Removed#1234',
+          target_type: 'member',
+          created_at: '2026-04-28T14:00:00Z',
+          ip_address: null,
+          details: {},
+        },
+      ],
+      total: 3,
+    });
+
+    render(<AuditLogPage />);
+
+    expect(screen.getByText('mod.unban')).toHaveAttribute('data-variant', 'outline');
+    expect(screen.getByText('mod.untimeout')).toHaveAttribute('data-variant', 'outline');
+    expect(screen.getByText('mod.ban')).toHaveAttribute('data-variant', 'destructive');
+  });
+
   it('renders conversation detail success and error navigation states', async () => {
     mockParams.conversationId = 'conversation-abc123';
     mockSearchParamsState.value = new URLSearchParams('guildId=guild-1');

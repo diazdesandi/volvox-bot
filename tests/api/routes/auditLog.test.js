@@ -324,7 +324,7 @@ describe('auditLog routes', () => {
     it.each([
       'toString',
       '__proto__',
-    ])('should ignore inherited category filter key %s', async (category) => {
+    ])('should ignore prototype-looking category filter value %s', async (category) => {
       mockPool.query
         .mockResolvedValueOnce({ rows: [{ total: 0 }] })
         .mockResolvedValueOnce({ rows: [] });
