@@ -393,19 +393,6 @@ export interface EngagementConfig extends ToggleSectionConfig {
   activityBadges: ActivityBadge[];
 }
 
-/** Github feed settings. */
-export interface GithubFeedConfig extends ToggleSectionConfig {
-  channelId: string | null;
-  repos: string[];
-  events: string[];
-  pollIntervalMinutes?: number;
-}
-
-/** Github integration settings. */
-export interface GithubConfig {
-  feed: GithubFeedConfig;
-}
-
 /** Review request system settings. */
 export interface ReviewConfig extends ToggleSectionConfig {
   channelId: string | null;
@@ -456,7 +443,6 @@ export interface BotConfig {
   reputation?: ReputationConfig;
   xp?: XpConfig;
   engagement?: EngagementConfig;
-  github?: GithubConfig;
   review?: ReviewConfig;
   tickets?: TicketsConfig;
   auditLog?: AuditLogConfig;
@@ -481,7 +467,6 @@ export type ConfigSection =
   | 'reputation'
   | 'xp'
   | 'engagement'
-  | 'github'
   | 'review'
   | 'tickets'
   | 'auditLog'

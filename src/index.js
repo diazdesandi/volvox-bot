@@ -36,7 +36,6 @@ import { loadConfig } from './modules/config.js';
 import { startEngagementFlushInterval, stopEngagementFlushInterval } from './modules/engagement.js';
 
 import { registerEventHandlers } from './modules/events.js';
-import { startGithubFeed, stopGithubFeed } from './modules/githubFeed.js';
 import { checkMem0Health, markUnavailable } from './modules/memory.js';
 import { startTempbanScheduler, stopTempbanScheduler } from './modules/moderation.js';
 import { loadOptOuts } from './modules/optout.js';
@@ -195,13 +194,12 @@ async function loadCommands() {
 async function gracefulShutdown(signal) {
   info('Shutdown initiated', { signal });
 
-  // 1. Stop triage, conversation cleanup timer, tempban scheduler, announcement scheduler, and GitHub feed
+  // 1. Stop triage, conversation cleanup timer, tempban scheduler, and announcement scheduler
   stopTriage();
   stopConversationCleanup();
   stopTempbanScheduler();
   stopWarningExpiryScheduler();
   stopScheduler();
-  stopGithubFeed();
   stopBotStatus();
 
   // 1.5. Stop API server (drain in-flight HTTP requests before closing DB)
@@ -441,7 +439,6 @@ async function startup() {
     startTempbanScheduler(client);
     startWarningExpiryScheduler();
     startScheduler(client);
-    startGithubFeed(client);
     startEngagementFlushInterval();
   }
 

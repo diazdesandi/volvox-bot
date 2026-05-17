@@ -89,7 +89,6 @@ export function isGuildConfig(data: unknown): data is GuildConfig {
     'tldr',
     'reputation',
     'engagement',
-    'github',
     'review',
     'tickets',
     'auditLog',

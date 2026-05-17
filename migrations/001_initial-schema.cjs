@@ -269,19 +269,6 @@ exports.up = (pgm) => {
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_snippets_guild ON snippets(guild_id)');
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(guild_id, name)');
 
-  // ── github_feed_state ─────────────────────────────────────────────
-  pgm.sql(`
-    CREATE TABLE IF NOT EXISTS github_feed_state (
-      id SERIAL PRIMARY KEY,
-      guild_id TEXT NOT NULL,
-      repo TEXT NOT NULL,
-      last_event_id TEXT,
-      last_poll_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(guild_id, repo)
-    )
-  `);
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_github_feed_guild ON github_feed_state(guild_id)');
-
   // ── afk_status ────────────────────────────────────────────────────
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS afk_status (
@@ -616,7 +603,6 @@ exports.down = (pgm) => {
   pgm.sql('DROP TABLE IF EXISTS reputation CASCADE');
   pgm.sql('DROP TABLE IF EXISTS afk_pings CASCADE');
   pgm.sql('DROP TABLE IF EXISTS afk_status CASCADE');
-  pgm.sql('DROP TABLE IF EXISTS github_feed_state CASCADE');
   pgm.sql('DROP TABLE IF EXISTS snippets CASCADE');
   pgm.sql('DROP TABLE IF EXISTS polls CASCADE');
   pgm.sql('DROP TABLE IF EXISTS starboard_posts CASCADE');

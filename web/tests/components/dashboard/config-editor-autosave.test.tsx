@@ -124,7 +124,6 @@ const minimalConfig = {
     roleRewards: { stackRoles: true, removeOnLevelDown: false },
   },
   engagement: { enabled: false },
-  github: { feed: { enabled: false } },
   tickets: { enabled: false },
   help: { enabled: false },
   announce: { enabled: false },

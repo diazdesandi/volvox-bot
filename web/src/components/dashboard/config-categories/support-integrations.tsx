@@ -8,12 +8,13 @@ import { cn } from '@/lib/utils';
 import { ConfigCategoryLayout } from './config-category-layout';
 
 /**
- * Renders the integrations configuration panel for the currently active tab (tickets or GitHub feed).
+ * Renders the support configuration panel for the currently active tab.
  *
- * The component reads editable state from the config context and renders controls for toggling the feature
- * and editing its settings. If no draft configuration or no active tab is available, nothing is rendered.
+ * The component reads editable state from the config context and renders controls for toggling
+ * tickets and editing ticket settings. If no draft configuration or no active tab is available,
+ * nothing is rendered.
  *
- * @returns The rendered configuration UI for the active integration tab, or `null` when no draft config or active tab exists.
+ * @returns The rendered configuration UI for the active support tab, or `null` when no draft config or active tab exists.
  */
 export function SupportIntegrationsCategory() {
   const { draftConfig, saving, guildId, updateDraftConfig, activeTabId } = useConfigContext();
@@ -31,13 +32,6 @@ export function SupportIntegrationsCategory() {
       updateDraftConfig((prev) => ({
         ...prev,
         tickets: { ...prev.tickets, enabled: v },
-      }));
-  } else if (activeTab === 'github-feed') {
-    isCurrentFeatureEnabled = draftConfig.github?.feed?.enabled ?? false;
-    handleToggleCurrentFeature = (v) =>
-      updateDraftConfig((prev) => ({
-        ...prev,
-        github: { ...prev.github, feed: { ...prev.github?.feed, enabled: v } },
       }));
   }
 
@@ -227,77 +221,6 @@ export function SupportIntegrationsCategory() {
                   maxSelections={1}
                   filter="text"
                 />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* GitHub Feed Layout */}
-      {activeTab === 'github-feed' && (
-        <div className="space-y-6">
-          <div className="p-4 sm:p-6 rounded-[24px] border border-border/40 bg-muted/20 backdrop-blur-xl space-y-6">
-            <div className="space-y-2">
-              <label
-                htmlFor="feed-channel-id"
-                className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
-              >
-                Feed Channel ID
-              </label>
-              <ChannelSelector
-                id="feed-channel-id"
-                guildId={guildId}
-                selected={
-                  draftConfig.github?.feed?.channelId ? [draftConfig.github.feed.channelId] : []
-                }
-                onChange={(selected) =>
-                  updateDraftConfig((prev) => ({
-                    ...prev,
-                    github: {
-                      ...prev.github,
-                      feed: { ...prev.github?.feed, channelId: selected[0] ?? null },
-                    },
-                  }))
-                }
-                disabled={saving}
-                placeholder="Select Github feed channel"
-                maxSelections={1}
-                filter="text"
-              />
-            </div>
-
-            <div className="space-y-2 pt-4 border-t border-border/40">
-              <label
-                htmlFor="poll-interval-minutes"
-                className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60 ml-1"
-              >
-                Poll Interval
-              </label>
-              <div className="relative w-full sm:w-1/2 md:w-1/3">
-                <input
-                  id="poll-interval-minutes"
-                  type="number"
-                  min={1}
-                  value={draftConfig.github?.feed?.pollIntervalMinutes ?? 5}
-                  onChange={(event) => {
-                    const value = parseNumberInput(event.target.value, 1);
-                    if (value !== undefined) {
-                      updateDraftConfig((prev) => ({
-                        ...prev,
-                        github: {
-                          ...prev.github,
-                          feed: { ...prev.github?.feed, pollIntervalMinutes: value },
-                        },
-                      }));
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  disabled={saving}
-                  className={cn(inputClasses, 'pr-12 text-center')}
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground/50">
-                  MIN
-                </span>
               </div>
             </div>
           </div>

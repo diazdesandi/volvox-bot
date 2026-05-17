@@ -2,7 +2,6 @@ export { AuditLogSection } from './AuditLogSection';
 export { ChannelModeSection } from './ChannelModeSection';
 export { CommunityFeaturesSection } from './CommunityFeaturesSection';
 export { EngagementSection } from './EngagementSection';
-export { GitHubSection } from './GitHubSection';
 export { MemorySection } from './MemorySection';
 export { PermissionsSection } from './PermissionsSection';
 export { StarboardSection } from './StarboardSection';

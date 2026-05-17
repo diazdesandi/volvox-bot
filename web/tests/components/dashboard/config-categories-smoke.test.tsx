@@ -32,15 +32,6 @@ const baseConfig: GuildConfig = {
     autoCloseHours: 48,
     maxOpenPerUser: 3,
   },
-  github: {
-    feed: {
-      enabled: true,
-      channelId: 'github',
-      repos: ['VolvoxLLC/volvox-bot'],
-      events: ['push'],
-      pollIntervalMinutes: 5,
-    },
-  },
   starboard: {
     enabled: true,
     channelId: 'stars',
@@ -149,7 +140,6 @@ import { SupportIntegrationsCategory } from '@/components/dashboard/config-categ
 import { AuditLogSection } from '@/components/dashboard/config-sections/AuditLogSection';
 import { CommunityFeaturesSection } from '@/components/dashboard/config-sections/CommunityFeaturesSection';
 import { EngagementSection } from '@/components/dashboard/config-sections/EngagementSection';
-import { GitHubSection } from '@/components/dashboard/config-sections/GitHubSection';
 import { MemorySection } from '@/components/dashboard/config-sections/MemorySection';
 import { PermissionsSection } from '@/components/dashboard/config-sections/PermissionsSection';
 import { StarboardSection } from '@/components/dashboard/config-sections/StarboardSection';
@@ -176,7 +166,6 @@ const featureCategoryByTabId: Record<string, string> = {
   'community-tools': 'community-tools',
   starboard: 'community-tools',
   tickets: 'support-integrations',
-  'github-feed': 'support-integrations',
 };
 
 function setConfigContext(activeTabId: string) {
@@ -213,6 +202,26 @@ describe('dashboard config coverage smoke tests', () => {
     expect(metadata).not.toMatch(/challenge/i);
   });
 
+  it('does not expose the removed GitHub feed feature in config workspace metadata', () => {
+    const metadata = JSON.stringify({
+      categories: CONFIG_CATEGORIES,
+      searchItems: CONFIG_SEARCH_ITEMS,
+      featureLabels: FEATURE_LABELS,
+      navigation: CONFIG_NAVIGATION.map((category) => ({
+        ...category,
+        icon: category.icon.displayName ?? category.icon.name,
+        tabs: category.tabs.map((tab) => ({
+          ...tab,
+          icon: tab.icon.displayName ?? tab.icon.name,
+        })),
+      })),
+    });
+
+    expect(metadata).not.toMatch(/github-feed/i);
+    expect(metadata).not.toMatch(/GitHub Feed/i);
+    expect(metadata).not.toMatch(/GitHub Activity Feed/i);
+  });
+
   it.each([
     ['ai-automod', ModerationSafetyCategory, 'Detection Model'],
     ['moderation', ModerationSafetyCategory, 'Moderation'],
@@ -221,7 +230,6 @@ describe('dashboard config coverage smoke tests', () => {
     ['community-tools', CommunityToolsCategory, 'Community Tools'],
     ['starboard', CommunityToolsCategory, 'Starboard'],
     ['tickets', SupportIntegrationsCategory, 'Tickets'],
-    ['github-feed', SupportIntegrationsCategory, 'GitHub'],
   ])('renders %s config category', (activeTabId, Component, expectedText) => {
     setConfigContext(activeTabId);
 
@@ -295,7 +303,6 @@ describe('dashboard config coverage smoke tests', () => {
           saving={false}
           onActivityBadgesChange={vi.fn()}
         />
-        <GitHubSection draftConfig={baseConfig} saving={false} onFieldChange={vi.fn()} />
         <MemorySection
           draftConfig={baseConfig}
           saving={false}
@@ -319,7 +326,6 @@ describe('dashboard config coverage smoke tests', () => {
     );
 
     expect(document.body.textContent).toMatch(/Enable/i);
-    expect(document.body.textContent).toMatch(/GitHub/i);
     expect(document.body.textContent).toMatch(/Ticket/i);
   });
 });

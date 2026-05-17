@@ -18,7 +18,6 @@ import {
   Zap,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { GithubIcon } from '@/components/ui/github-icon';
 import type { ConfigCategoryId, ConfigFeatureId } from './types';
 
 export type NavIcon = ComponentType<{ className?: string }>;
@@ -159,19 +158,13 @@ export const CONFIG_NAVIGATION: ConfigCategoryNav[] = [
     id: 'support-integrations',
     label: 'Support & Integrations',
     icon: Ticket,
-    description: 'Tickets and Github activity automation.',
+    description: 'Support ticket workflows.',
     tabs: [
       {
         id: 'tickets',
         label: 'Tickets',
         icon: Ticket,
         desc: 'Configure support ticket routing and lifecycle limits.',
-      },
-      {
-        id: 'github-feed',
-        label: 'GitHub Feed',
-        icon: GithubIcon,
-        desc: 'Post repository updates into a Discord channel.',
       },
     ],
   },

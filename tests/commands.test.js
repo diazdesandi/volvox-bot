@@ -28,6 +28,10 @@ describe('command files', () => {
     expect(commandFiles).not.toContain('showcase.js');
   });
 
+  it('should not register the removed GitHub feed command', () => {
+    expect(commandFiles).not.toContain('github.js');
+  });
+
   for (const file of commandFiles) {
     describe(file, () => {
       let mod;

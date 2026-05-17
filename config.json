@@ -196,7 +196,6 @@
       "modlog": "moderator",
       "announce": "moderator",
       "tldr": "everyone",
-      "github": "everyone",
       "rank": "everyone",
       "leaderboard": "everyone",
       "profile": "everyone",
@@ -216,19 +215,6 @@
   },
   "poll": {
     "enabled": false
-  },
-  "github": {
-    "feed": {
-      "enabled": false,
-      "channelId": null,
-      "repos": [],
-      "events": [
-        "pr",
-        "issue",
-        "release",
-        "push"
-      ]
-    }
   },
   "tickets": {
     "enabled": false,

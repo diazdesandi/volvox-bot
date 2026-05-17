@@ -56,12 +56,13 @@ describe('config workspace category helpers', () => {
 
   it('matches search items by label, description, and keywords', () => {
     expect(getMatchingSearchItems('  role menu  ')).toEqual([]);
+    expect(getMatchingSearchItems('github')).toEqual([]);
     expect(getMatchingSearchItems('AUTO-PURGE').map((item) => item.id)).toContain('audit-log-retention');
     expect(getMatchingSearchItems('')).toEqual([]);
   });
 
   it('collects matched feature ids from search results', () => {
-    expect(getMatchedFeatureIds('github').has('github-feed')).toBe(true);
+    expect([...getMatchedFeatureIds('github')]).not.toContain('github-feed');
     expect(getMatchedFeatureIds('zzzz-no-match').size).toBe(0);
   });
 });

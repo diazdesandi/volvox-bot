@@ -43,9 +43,9 @@ export const CONFIG_CATEGORIES: ConfigCategoryMeta[] = [
     id: 'support-integrations',
     icon: 'ticket',
     label: 'Support & Integrations',
-    description: 'Tickets and Github activity automation.',
-    sectionKeys: ['tickets', 'github'],
-    featureIds: ['tickets', 'github-feed'],
+    description: 'Support ticket workflows.',
+    sectionKeys: ['tickets'],
+    featureIds: ['tickets'],
   },
 ];
 
@@ -66,7 +66,6 @@ export const FEATURE_LABELS: Record<ConfigFeatureId, string> = {
   permissions: 'Permissions',
   'community-tools': 'Community Command Toggles',
   tickets: 'Tickets',
-  'github-feed': 'Github Activity Feed',
   'audit-log': 'Audit Log',
 };
 
@@ -357,15 +356,6 @@ export const CONFIG_SEARCH_ITEMS: ConfigSearchItem[] = [
     description: 'Auto-close and max-open constraints.',
     keywords: ['auto close', 'max open', 'transcript'],
     isAdvanced: true,
-  },
-  {
-    id: 'github-feed-core',
-    featureId: 'github-feed',
-    categoryId: 'support-integrations',
-    label: 'Github Feed Settings',
-    description: 'Configure repository feed channel and polling.',
-    keywords: ['github', 'feed', 'poll interval', 'channel'],
-    isAdvanced: false,
   },
   {
     id: 'audit-log-enabled',

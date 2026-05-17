@@ -24,7 +24,6 @@ export type ConfigFeatureId =
   | 'permissions'
   | 'community-tools'
   | 'tickets'
-  | 'github-feed'
   | 'audit-log';
 
 export type ConfigSectionKey = ConfigSection | 'aiAutoMod';

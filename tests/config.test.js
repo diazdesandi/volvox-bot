@@ -128,8 +128,10 @@ describe('config.json', () => {
     expect(config.tldr.enabled).toBe(true);
     expect(config).not.toHaveProperty('afk');
     expect(config).not.toHaveProperty('challenges');
+    expect(config).not.toHaveProperty('github');
     expect(SAFE_CONFIG_KEYS.has('afk')).toBe(false);
     expect(SAFE_CONFIG_KEYS.has('challenges')).toBe(false);
+    expect(SAFE_CONFIG_KEYS.has('github')).toBe(false);
   });
 
   it('should have a logging section', () => {
