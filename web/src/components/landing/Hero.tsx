@@ -140,15 +140,9 @@ function DataThreads() {
 }
 
 /**
- * Render the main hero section with animated title, subtitle, CTA, and decorative background.
+ * Renders the main hero section containing the animated brand title, subtitle, console-style CTA, and layered decorative backgrounds.
  *
- * The component displays the branded title, a short subtitle, a console-style call-to-action
- * with an optional "Add to Server" link, and multiple layered visual decorations (prismatic
- * background, animated data threads, parallax elements, and looping background particles).
- *
- * Animations and scroll-driven transforms are applied to the title, subtitle, CTA, and deep
- * background layers to create entrance and parallax effects. The version label is shown at
- * the top and the "Add to Server" button is rendered only when a bot invite URL is available.
+ * The CTA button is rendered only when a bot invite is configured; clicking it invokes the invite handler. Visual decorations and entrance/parallax effects are applied for presentation only.
  *
  * @returns The hero section React element.
  */

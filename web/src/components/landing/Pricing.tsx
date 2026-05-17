@@ -154,7 +154,16 @@ function ListItem({ className, children, ...props }: ComponentProps<'li'>) {
   );
 }
 
-// ─── Main Section ──────────────────────────────────────────────
+/**
+ * Render the Pricing section with a monthly/annual toggle and two plan cards.
+ *
+ * Renders an interactive pricing UI that displays core features, a billing-mode toggle (monthly vs. annual),
+ * and two plans ("Standard" and "Overclocked") with their prices, features, and CTAs.
+ * The displayed prices and savings indicators update based on the billing mode.
+ * Each plan's CTA invokes `inviteBot()` when the invite is configured; otherwise the CTA is rendered disabled.
+ *
+ * @returns The React element for the pricing section.
+ */
 
 export function Pricing() {
   const [isAnnual, setIsAnnual] = useState(false);

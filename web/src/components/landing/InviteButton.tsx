@@ -9,7 +9,13 @@ interface InviteButtonProps {
   className?: string;
 }
 
-/** Render an "Add to Server" button — disabled/hidden when CLIENT_ID is unset. */
+/**
+ * Render an "Add to Server" button that initiates the bot invite when invite configuration is available.
+ *
+ * @param size - Button size; `'lg'` renders a leading bot icon before the label
+ * @param className - Additional CSS classes to apply to the button
+ * @returns The button element, or `null` if inviting the bot is not configured
+ */
 export function InviteButton({ size = 'sm', className }: InviteButtonProps) {
   const { inviteBot, isInviteConfigured } = useBotInvite();
   if (!isInviteConfigured) return null;
