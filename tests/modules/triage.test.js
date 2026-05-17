@@ -1926,6 +1926,18 @@ describe('triage module', () => {
       expect(channelBuffers.get('ch1')?.timer).toBeTruthy();
     });
 
+    it('should buffer direct mentions without scheduling when the caller owns evaluation', async () => {
+      await accumulateMessage(makeMessage('ch1', '<@bot-id> can you help?'), config, {
+        autoEvaluate: false,
+      });
+
+      expect(info).not.toHaveBeenCalledWith('Direct mention detected, forcing evaluation', {
+        channelId: 'ch1',
+      });
+      expect(channelBuffers.get('ch1')?.messages).toHaveLength(1);
+      expect(channelBuffers.get('ch1')?.timer).toBeNull();
+    });
+
     it('should set targetMessageIds to mentioned messages when overriding ignore', async () => {
       channelBuffers.set('ch1', {
         messages: [

@@ -901,8 +901,10 @@ export function stopTriage() {
  *
  * @param {import('discord.js').Message} message - The Discord message to accumulate.
  * @param {Object} [msgConfig] - Optional configuration override; when provided it is used instead of calling getConfig.
+ * @param {Object} [options] - Optional routing controls for callers that own evaluation.
+ * @param {boolean} [options.autoEvaluate=true] - Whether to trigger or schedule evaluation after buffering.
  */
-export async function accumulateMessage(message, msgConfig) {
+export async function accumulateMessage(message, msgConfig, options = {}) {
   const liveConfig = msgConfig || getConfig(message.guild?.id || null);
   const triageConfig = liveConfig.triage;
   if (!triageConfig?.enabled) return;
@@ -981,6 +983,8 @@ export async function accumulateMessage(message, msgConfig) {
     message.guild?.id || null,
     entry.userId,
   );
+
+  if (options?.autoEvaluate === false) return;
 
   const directMentionFastPath =
     isDirectMentionFastPathEnabled(triageConfig) && isBotDirectTarget(entry, client?.user?.id);

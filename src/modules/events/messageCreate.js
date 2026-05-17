@@ -214,7 +214,7 @@ export function registerMessageCreateHandler(client, _config, healthMonitor) {
         // can use recent channel history to produce a meaningful response.
         // Await to ensure message is in buffer before forced triage.
         try {
-          await accumulateMessage(message, guildConfig);
+          await accumulateMessage(message, guildConfig, { autoEvaluate: false });
         } catch (accErr) {
           logError('Failed to accumulate message for triage', {
             channelId: message.channel.id,

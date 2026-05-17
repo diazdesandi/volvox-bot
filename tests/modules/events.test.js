@@ -246,7 +246,7 @@ describe('events module', () => {
       await onCallbacks.messageCreate(message);
 
       expect(sendTyping).toHaveBeenCalled();
-      expect(accumulateMessage).toHaveBeenCalledWith(message, config);
+      expect(accumulateMessage).toHaveBeenCalledWith(message, config, { autoEvaluate: false });
       expect(evaluateNow).toHaveBeenCalledWith('c1', config, client, null);
     });
 
@@ -270,7 +270,7 @@ describe('events module', () => {
       };
       await onCallbacks.messageCreate(message);
 
-      expect(accumulateMessage).toHaveBeenCalledWith(message, config);
+      expect(accumulateMessage).toHaveBeenCalledWith(message, config, { autoEvaluate: false });
       expect(evaluateNow).toHaveBeenCalledWith('c1', config, client, null);
     });
 
@@ -293,7 +293,9 @@ describe('events module', () => {
         reply: vi.fn(),
       };
       await onCallbacks.messageCreate(message);
-      expect(accumulateMessage).toHaveBeenCalledWith(message, expect.anything());
+      expect(accumulateMessage).toHaveBeenCalledWith(message, expect.anything(), {
+        autoEvaluate: false,
+      });
       expect(evaluateNow).toHaveBeenCalledWith('c1', config, client, null);
       expect(message.reply).not.toHaveBeenCalled();
     });
@@ -342,7 +344,7 @@ describe('events module', () => {
         reply: vi.fn().mockResolvedValue(undefined),
       };
       await onCallbacks.messageCreate(message);
-      expect(accumulateMessage).toHaveBeenCalledWith(message, config);
+      expect(accumulateMessage).toHaveBeenCalledWith(message, config, { autoEvaluate: false });
       expect(evaluateNow).toHaveBeenCalledWith('thread-id-999', config, client, null);
     });
 
