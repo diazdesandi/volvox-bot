@@ -295,9 +295,8 @@ describe('OnboardingGrowthCategory', () => {
     expect(modelSelect).toHaveValue('moonshot:kimi-k2.6');
     expect(screen.queryByText('AFK Responder')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AFK')).not.toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Kimi K2.6' })).toHaveAttribute(
-      'value',
-      'moonshot:kimi-k2.6',
+    expect(modelSelect.querySelector('option[value="moonshot:kimi-k2.6"]')).toHaveTextContent(
+      'Kimi K2.6',
     );
 
     fireEvent.change(modelSelect, {

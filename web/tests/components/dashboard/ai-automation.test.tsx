@@ -30,11 +30,11 @@ const { visibleModelOptions } = vi.hoisted(() => ({
     },
     {
       value: 'openrouter:minimax/minimax-m2.5',
-      label: 'MiniMax M2.5 (via OpenRouter)',
+      label: 'MiniMax M2.5',
       providerName: 'openrouter',
       providerDisplayName: 'OpenRouter',
       modelName: 'minimax/minimax-m2.5',
-      modelDisplayName: 'MiniMax M2.5 (via OpenRouter)',
+      modelDisplayName: 'MiniMax M2.5',
     },
   ],
 }));

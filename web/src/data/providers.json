@@ -82,37 +82,37 @@
       "capabilities": { "webSearch": false, "thinking": false },
       "models": {
         "minimax/minimax-m2.5": {
-          "displayName": "MiniMax M2.5 (via OpenRouter)",
+          "displayName": "MiniMax M2.5",
           "pricing": { "input": 0.15, "output": 1.20, "cacheRead": 0.03, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         },
         "minimax/minimax-m2.5:free": {
-          "displayName": "MiniMax M2.5 Free (via OpenRouter)",
+          "displayName": "MiniMax M2.5 Free",
           "pricing": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         },
         "moonshotai/kimi-k2.6": {
-          "displayName": "Kimi K2.6 (via OpenRouter)",
+          "displayName": "Kimi K2.6",
           "pricing": { "input": 0.60, "output": 2.80, "cacheRead": 0.16, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         },
         "moonshotai/kimi-k2.5": {
-          "displayName": "Kimi K2.5 (via OpenRouter)",
+          "displayName": "Kimi K2.5",
           "pricing": { "input": 0.44, "output": 2.00, "cacheRead": 0, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         },
         "moonshotai/kimi-k2-thinking": {
-          "displayName": "Kimi K2 Thinking (via OpenRouter)",
+          "displayName": "Kimi K2 Thinking",
           "pricing": { "input": 0.60, "output": 2.50, "cacheRead": 0, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         },
         "moonshotai/kimi-k2-0905": {
-          "displayName": "Kimi K2 0905 (via OpenRouter)",
+          "displayName": "Kimi K2 0905",
           "pricing": { "input": 0.40, "output": 2.00, "cacheRead": 0, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         },
         "moonshotai/kimi-k2": {
-          "displayName": "Kimi K2 (via OpenRouter)",
+          "displayName": "Kimi K2",
           "pricing": { "input": 0.57, "output": 2.30, "cacheRead": 0, "cacheWrite": 0 },
           "availability": { "visible": true, "tier": "free" }
         }
