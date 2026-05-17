@@ -117,7 +117,7 @@ export function CookieConsentBanner() {
       )}
 
       <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
-        <DialogContent aria-describedby="cookie-preferences-description" className="sm:max-w-xl">
+        <DialogContent aria-describedby="cookie-preferences-description" className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Cookie preferences</DialogTitle>
             <DialogDescription id="cookie-preferences-description">
@@ -128,28 +128,27 @@ export function CookieConsentBanner() {
 
           <div className="space-y-3">
             <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-1">
                   <p className="text-sm font-semibold text-foreground">Essential</p>
-                  <p className="text-sm leading-6 text-muted-foreground">
+                  <p className="text-sm leading-6 text-muted-foreground sm:whitespace-nowrap">
                     Required for sign-in, security, and core dashboard behavior.
                   </p>
                 </div>
-                <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                <span className="shrink-0 whitespace-nowrap rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
                   Always on
                 </span>
               </div>
             </div>
 
             <div className="rounded-2xl border border-border/60 bg-card/40 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1 space-y-1">
                   <Label htmlFor={analyticsSwitchId} className="text-sm font-semibold">
                     Analytics
                   </Label>
                   <p className="text-sm leading-6 text-muted-foreground">
-                    Allows Amplitude analytics for aggregate dashboard usage. Disabled unless you
-                    opt in.
+                    Allows Amplitude analytics for aggregate dashboard usage.
                   </p>
                 </div>
                 <Switch
