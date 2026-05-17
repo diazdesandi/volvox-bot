@@ -295,9 +295,11 @@ describe('OnboardingGrowthCategory', () => {
     expect(modelSelect).toHaveValue('moonshot:kimi-k2.6');
     expect(screen.queryByText('AFK Responder')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AFK')).not.toBeInTheDocument();
-    expect(modelSelect.querySelector('option[value="moonshot:kimi-k2.6"]')).toHaveTextContent(
-      'Kimi K2.6',
-    );
+    const kimiOption = modelSelect.querySelector('option[value="moonshot:kimi-k2.6"]');
+    if (!(kimiOption instanceof HTMLOptionElement)) {
+      throw new Error('Expected Moonshot Kimi K2.6 option to render');
+    }
+    expect(kimiOption).toHaveTextContent('Kimi K2.6');
 
     fireEvent.change(modelSelect, {
       target: { value: 'openrouter:minimax/minimax-m2.5' },
