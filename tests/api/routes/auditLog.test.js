@@ -321,24 +321,24 @@ describe('auditLog routes', () => {
       expect(countCall[1]).toEqual(['guild1', ['ai_automod.%', 'triage.%'], 'user-9', 'chan-7']);
     });
 
-    it.each(['toString', '__proto__'])(
-      'should ignore inherited category filter key %s',
-      async (category) => {
-        mockPool.query
-          .mockResolvedValueOnce({ rows: [{ total: 0 }] })
-          .mockResolvedValueOnce({ rows: [] });
+    it.each([
+      'toString',
+      '__proto__',
+    ])('should ignore inherited category filter key %s', async (category) => {
+      mockPool.query
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
 
-        const res = await authed(
-          request(app).get(`/api/v1/guilds/guild1/audit-log?category=${category}`),
-        );
+      const res = await authed(
+        request(app).get(`/api/v1/guilds/guild1/audit-log?category=${category}`),
+      );
 
-        expect(res.status).toBe(200);
+      expect(res.status).toBe(200);
 
-        const countCall = mockPool.query.mock.calls[0];
-        expect(countCall[0]).not.toContain('action LIKE ANY');
-        expect(countCall[1]).toEqual(['guild1']);
-      },
-    );
+      const countCall = mockPool.query.mock.calls[0];
+      expect(countCall[0]).not.toContain('action LIKE ANY');
+      expect(countCall[1]).toEqual(['guild1']);
+    });
 
     it('should return 503 when database is unavailable', async () => {
       // Create app without dbPool

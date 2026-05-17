@@ -149,8 +149,7 @@ function buildFilters(guildId, query) {
 
   const categoryFilter = actionFilter ? null : toFilterString(query.category);
   const actionPatterns =
-    categoryFilter &&
-    Object.prototype.hasOwnProperty.call(CATEGORY_ACTION_PATTERNS, categoryFilter)
+    categoryFilter && Object.hasOwn(CATEGORY_ACTION_PATTERNS, categoryFilter)
       ? CATEGORY_ACTION_PATTERNS[categoryFilter]
       : null;
   if (Array.isArray(actionPatterns)) {
