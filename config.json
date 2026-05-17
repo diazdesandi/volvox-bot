@@ -153,15 +153,15 @@
       "messages": [
         {
           "type": "Watching",
-          "text": "{guildCount} servers"
+          "text": "{guildCount} servers with {memberCount} members"
         },
         {
           "type": "Listening",
-          "text": "to {memberCount} members"
+          "text": "to {memberCount} members across {guildCount} servers"
         },
         {
           "type": "Playing",
-          "text": "with /help"
+          "text": "with {memberCount} members across {guildCount} servers"
         }
       ]
     }
@@ -266,7 +266,18 @@
   },
   "xp": {
     "enabled": false,
-    "levelThresholds": [100, 300, 600, 1000, 1500, 2500, 4000, 6000, 8500, 12000],
+    "levelThresholds": [
+      100,
+      300,
+      600,
+      1000,
+      1500,
+      2500,
+      4000,
+      6000,
+      8500,
+      12000
+    ],
     "levelActions": [],
     "defaultActions": [],
     "levelUpDm": {
