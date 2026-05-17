@@ -162,6 +162,10 @@
         {
           "type": "Playing",
           "text": "with {memberCount} members across {guildCount} servers"
+        },
+        {
+          "type": "Competing",
+          "text": "against {memberCount} members across {guildCount} servers"
         }
       ]
     }
