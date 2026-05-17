@@ -845,6 +845,11 @@ const DM_ACTION_LABELS = Object.freeze({
   ban: 'ban',
 });
 
+function formatCaseCategoryLabel(category) {
+  const label = CATEGORY_LABELS[category] ?? category;
+  return label.replace(/\b\p{L}/gu, (char) => char.toUpperCase());
+}
+
 /**
  * Format an array of strings as a natural-language list.
  * @param {string[]} values - List of items to format.
@@ -854,6 +859,18 @@ function formatList(values) {
   if (values.length === 0) return 'none';
   if (values.length === 1) return values[0];
   return `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`;
+}
+
+function buildAiAutoModCaseReason(result, actions) {
+  const categoryScores = result.categories.map((category) => {
+    const score = Number(result.scores?.[category] ?? 0);
+    const percent = Math.round(Math.min(1, Math.max(0, score)) * 100);
+    return `${formatCaseCategoryLabel(category)} ${percent}%`;
+  });
+  const categorySummary = categoryScores.length > 0 ? categoryScores.join(', ') : 'none';
+  const actionSummary = formatList(actions);
+
+  return `AI Auto Mod: ${categorySummary} / ${actionSummary}`;
 }
 
 /**
@@ -1026,7 +1043,6 @@ async function executeSingleAction(context) {
  * @param {Object} guildConfig - Full guild configuration forwarded to action executors.
  * @returns {string[]} An array of action names that were successfully executed (e.g., `['flag','delete']`); empty if no actions succeeded. */
 async function executeAction(message, client, result, autoModConfig, guildConfig) {
-  const reason = `AI Auto-Mod: ${result.categories.join(', ')} — ${result.reason}`;
   const botId = client.user?.id ?? 'bot';
   const botTag = client.user?.tag ?? 'Bot#0000';
   const { actions, skippedImpossibleActions } = getExecutableActions(
@@ -1034,6 +1050,7 @@ async function executeAction(message, client, result, autoModConfig, guildConfig
     autoModConfig,
     message,
   );
+  const reason = buildAiAutoModCaseReason(result, actions);
   const executedActions = [];
   const successfulAuditEvents = [];
   const notifiedDmActions = new Set();

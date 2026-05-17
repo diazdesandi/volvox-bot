@@ -281,8 +281,14 @@ export function CaseTable({
                     <TableCell className="hidden max-w-[140px] truncate text-sm md:table-cell">
                       {c.moderator_tag}
                     </TableCell>
-                    <TableCell className="hidden max-w-[200px] truncate text-sm text-muted-foreground lg:table-cell">
-                      {c.reason ?? <span className="italic">—</span>}
+                    <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">
+                      {c.reason ? (
+                        <span className="block max-w-[200px] truncate" title={c.reason}>
+                          {c.reason}
+                        </span>
+                      ) : (
+                        <span className="italic">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {formatDate(c.created_at)}

@@ -655,7 +655,7 @@ describe('checkAiAutoMod', () => {
       target_tag: 'user#0001',
       moderator_id: 'bot-1',
       moderator_tag: 'Bot#0001',
-      reason: 'AI Auto-Mod: harassment — harassment',
+      reason: 'AI Auto Mod: Harassment 90% / warn',
     });
     vi.mocked(createWarnCaseWithWarning).mockResolvedValue({
       caseData: { id: 1, case_number: 42 },
@@ -963,6 +963,44 @@ describe('checkAiAutoMod', () => {
     );
   });
 
+  it('records concise AI auto-mod case reasons with category percentages and actions', async () => {
+    mockGenerate.mockResolvedValue(
+      makeAiResponse(
+        JSON.stringify({
+          toxicity: 0.1,
+          spam: 0.1,
+          harassment: 0.6,
+          hateSpeech: 0.1,
+          sexualContent: 0.55,
+          violence: 0.1,
+          selfHarm: 0.1,
+          reason: 'long provider explanation that should not be stored on the case row',
+        }),
+      ),
+    );
+    const guildConfig = makeAiAutoModGuildConfig(
+      {
+        thresholds: { harassment: 0.5, sexualContent: 0.5 },
+        actions: { harassment: 'ban', sexualContent: 'warn' },
+      },
+      { moderation: moderationWarnConfig },
+    );
+
+    await checkAiAutoMod(message, client, guildConfig);
+
+    const expectedReason = 'AI Auto Mod: Harassment 60%, Sexual Content 55% / ban and warn';
+    expect(message.guild.members.ban).toHaveBeenCalledWith('user-1', {
+      reason: expectedReason,
+      deleteMessageSeconds: 0,
+    });
+    expect(createWarnCaseWithWarning).toHaveBeenCalledWith(
+      'guild-1',
+      expect.objectContaining({ reason: expectedReason }),
+      expect.objectContaining({ reason: expectedReason }),
+      guildConfig,
+    );
+  });
+
   it('skips warn DM when AI auto-mod DM notifications are disabled but continues warn pipeline', async () => {
     mockGenerate.mockResolvedValue(
       makeClaudeResponse({ toxicity: 0.1, spam: 0.1, harassment: 0.9, reason: 'harassment' }),
@@ -1174,7 +1212,10 @@ describe('checkAiAutoMod', () => {
       expect.objectContaining({ userId: 'user-1', severity: 'low' }),
       guildConfig,
     );
-    expect(message.member.timeout).toHaveBeenCalledWith(300000, 'AI Auto-Mod: toxicity — toxic');
+    expect(message.member.timeout).toHaveBeenCalledWith(
+      300000,
+      'AI Auto Mod: Toxicity 90% / delete, warn and timeout',
+    );
     expect(logAuditEvent).toHaveBeenCalledWith(
       mockPool,
       expect.objectContaining({ action: 'ai_automod.delete' }),
@@ -1684,7 +1725,7 @@ Reason: toxic`,
           channelId: 'chan-1',
           messageUrl: 'https://discord.com/channels/1/2/3',
           categories: ['toxicity'],
-          reason: 'AI Auto-Mod: toxicity — toxic',
+          reason: `AI Auto Mod: Toxicity 90% / ${configuredAction}`,
           scores: expect.objectContaining({ toxicity: 0.9 }),
           thresholds: expect.objectContaining({ toxicity: 0.7 }),
         }),
