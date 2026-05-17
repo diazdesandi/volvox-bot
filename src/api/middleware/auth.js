@@ -8,6 +8,7 @@ import { warn } from '../../logger.js';
 import { handleOAuthJwt } from './oauthJwt.js';
 
 const DISCORD_SNOWFLAKE_PATTERN = /^\d{17,20}$/;
+const HEADER_SAFE_ASCII_PATTERN = /^[\x20-\x7e]+$/;
 const TRUSTED_ACTOR_TAG_MAX_LENGTH = 128;
 
 function normalizeTrustedActorTag(value) {
@@ -15,6 +16,7 @@ function normalizeTrustedActorTag(value) {
 
   const trimmed = value.trim();
   if (!trimmed || /[\r\n]/.test(trimmed)) return null;
+  if (!HEADER_SAFE_ASCII_PATTERN.test(trimmed)) return null;
 
   return trimmed.slice(0, TRUSTED_ACTOR_TAG_MAX_LENGTH);
 }
