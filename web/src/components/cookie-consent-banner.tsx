@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   COOKIE_CONSENT_CHANGED_EVENT,
   COOKIE_PREFERENCES_OPEN_EVENT,
+  isAnalyticsConsentGranted,
   readCookieConsent,
   type StoredCookieConsent,
   saveCookieConsent,
@@ -24,20 +25,6 @@ import { cn } from '@/lib/utils';
 
 const COOKIE_SAVE_ERROR_MESSAGE =
   'Cookie preferences could not save in this browser. Check storage permissions and try again.';
-
-/**
- * Determine the initial analytics preference from stored cookie consent.
- *
- * @param consent - The persisted cookie consent object or `null`
- * @returns `true` if stored consent explicitly enables analytics, `false` otherwise
- */
-function getInitialAnalyticsPreference(consent: StoredCookieConsent | null): boolean {
-  const categories = consent?.categories;
-
-  return typeof categories === 'object' && typeof categories.analytics === 'boolean'
-    ? categories.analytics
-    : false;
-}
 
 /**
  * Renders a cookie consent banner and a preferences dialog for managing essential and analytics cookies.
@@ -67,7 +54,7 @@ export function CookieConsentBanner() {
     const consent = readCookieConsent();
 
     setStoredConsent(consent);
-    setAnalyticsEnabled(getInitialAnalyticsPreference(consent));
+    setAnalyticsEnabled(isAnalyticsConsentGranted(consent));
     setHasMounted(true);
 
     const handleConsentChanged = (event: Event) => {
@@ -78,7 +65,7 @@ export function CookieConsentBanner() {
       setStoredConsent(nextConsent);
 
       if (!isPreferencesOpenRef.current) {
-        setAnalyticsEnabled(getInitialAnalyticsPreference(nextConsent));
+        setAnalyticsEnabled(isAnalyticsConsentGranted(nextConsent));
         setPreferenceError(null);
       }
     };
@@ -86,7 +73,7 @@ export function CookieConsentBanner() {
     const handlePreferencesOpen = () => {
       const latestConsent = readCookieConsent();
       setStoredConsent(latestConsent);
-      setAnalyticsEnabled(getInitialAnalyticsPreference(latestConsent));
+      setAnalyticsEnabled(isAnalyticsConsentGranted(latestConsent));
       setPreferenceError(null);
       isPreferencesOpenRef.current = true;
       setIsPreferencesOpen(true);
@@ -125,7 +112,7 @@ export function CookieConsentBanner() {
   }, [shouldShowBanner]);
 
   const resetDraftPreferences = () => {
-    setAnalyticsEnabled(getInitialAnalyticsPreference(storedConsent));
+    setAnalyticsEnabled(isAnalyticsConsentGranted(storedConsent));
     setPreferenceError(null);
   };
 

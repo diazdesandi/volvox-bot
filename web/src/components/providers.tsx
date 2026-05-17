@@ -20,7 +20,7 @@ import {
   COOKIE_CONSENT_CHANGED_EVENT,
   COOKIE_CONSENT_STORAGE_KEY,
   hasAnalyticsConsent,
-  type StoredCookieConsent,
+  isAnalyticsConsentGranted,
 } from '@/lib/cookie-consent';
 
 /**
@@ -90,15 +90,6 @@ function getGuildTelemetryScope(guildId: string | null): 'none' | 'selected' {
   return guildId ? 'selected' : 'none';
 }
 
-function getAnalyticsConsentFromEventDetail(consent: unknown): boolean {
-  if (!consent || typeof consent !== 'object') {
-    return false;
-  }
-
-  const categories = (consent as Partial<StoredCookieConsent>).categories;
-  return categories?.analytics === true;
-}
-
 /**
  * Tracks whether the user has consented to analytics and updates in response to consent changes.
  *
@@ -117,7 +108,7 @@ function useAnalyticsConsent() {
 
     const handleConsentChanged = (event: Event) => {
       if (event instanceof CustomEvent) {
-        setAnalyticsConsent(getAnalyticsConsentFromEventDetail(event.detail));
+        setAnalyticsConsent(isAnalyticsConsentGranted(event.detail));
         return;
       }
 

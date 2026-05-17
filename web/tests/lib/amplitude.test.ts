@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { COOKIE_CONSENT_STORAGE_KEY } from '@/lib/cookie-consent';
 
 const { mockInit, mockReset, mockSetOptOut, mockSetUserId, mockTrack } = vi.hoisted(() => ({
   mockInit: vi.fn(),
@@ -34,7 +35,7 @@ describe('dashboard Amplitude analytics', () => {
 
   function storeAnalyticsConsent(analytics = true) {
     globalThis.localStorage.setItem(
-      'volvox.cookieConsent.v1',
+      COOKIE_CONSENT_STORAGE_KEY,
       JSON.stringify({
         version: 1,
         decidedAt: '2026-05-16T00:00:00.000Z',

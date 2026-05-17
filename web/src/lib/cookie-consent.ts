@@ -78,6 +78,21 @@ function isValidStoredConsent(value: unknown): value is StoredCookieConsent {
 }
 
 /**
+ * Extracts the analytics category from a consent-shaped value.
+ *
+ * @param consent - Unknown consent payload, usually from storage or a consent-change event.
+ * @returns `true` only when the payload explicitly grants analytics consent.
+ */
+export function isAnalyticsConsentGranted(consent: unknown): boolean {
+  if (!consent || typeof consent !== 'object') {
+    return false;
+  }
+
+  const categories = (consent as Partial<StoredCookieConsent>).categories;
+  return categories?.analytics === true;
+}
+
+/**
  * Dispatches a window `CustomEvent` to notify listeners of the current cookie consent state.
  *
  * No-ops when `globalThis.window` is undefined.
@@ -170,7 +185,7 @@ export function readCookieConsent(now = new Date()): StoredCookieConsent | null 
  * @returns `true` only when a valid stored decision explicitly enables analytics.
  */
 export function hasAnalyticsConsent(now = new Date()): boolean {
-  return readCookieConsent(now)?.categories.analytics === true;
+  return isAnalyticsConsentGranted(readCookieConsent(now));
 }
 
 /**
