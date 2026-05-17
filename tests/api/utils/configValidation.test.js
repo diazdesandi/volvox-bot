@@ -525,30 +525,20 @@ describe('configValidation', () => {
       ).toEqual([]);
     });
 
-    it('should reject webhook action URLs targeting private networks', () => {
+    it('should reject removed webhook xp actions', () => {
       const defaultActionErrors = validateSingleValue('xp.defaultActions', [
-        { type: 'webhook', url: 'https://localhost/hook' },
+        { type: 'webhook', url: 'https://example.com/hook' },
       ]);
       const levelActionErrors = validateSingleValue('xp.levelActions', [
-        { level: 5, actions: [{ type: 'webhook', url: 'https://169.254.169.254/hook' }] },
+        { level: 5, actions: [{ type: 'webhook', url: 'https://example.com/hook' }] },
       ]);
 
-      expect(defaultActionErrors.some((error) => error.includes('private/internal'))).toBe(true);
-      expect(levelActionErrors.some((error) => error.includes('private/internal'))).toBe(true);
-    });
-
-    it('should accept public HTTP and HTTPS webhook action URLs', () => {
-      expect(
-        validateSingleValue('xp.defaultActions', [
-          { type: 'webhook', url: 'http://example.com/hook' },
-          { type: 'webhook', url: 'https://example.com/hook' },
-        ]),
-      ).toEqual([]);
+      expect(defaultActionErrors.some((error) => error.includes('must be one of'))).toBe(true);
+      expect(levelActionErrors.some((error) => error.includes('must be one of'))).toBe(true);
     });
 
     it('should require executor fields for typed xp actions', () => {
       const defaultActionErrors = validateSingleValue('xp.defaultActions', [
-        { type: 'webhook' },
         { type: 'grantRole' },
         { type: 'xpBonus' },
         { type: 'addReaction' },
@@ -564,12 +554,11 @@ describe('configValidation', () => {
 
       expect(defaultActionErrors).toEqual(
         expect.arrayContaining([
-          expect.stringContaining('xp.defaultActions[0].url: required'),
-          expect.stringContaining('xp.defaultActions[1].roleId: required'),
-          expect.stringContaining('xp.defaultActions[2].amount: required'),
-          expect.stringContaining('xp.defaultActions[3].emoji: required'),
-          expect.stringContaining('xp.defaultActions[4].prefix: required'),
-          expect.stringContaining('xp.defaultActions[5].suffix: required'),
+          expect.stringContaining('xp.defaultActions[0].roleId: required'),
+          expect.stringContaining('xp.defaultActions[1].amount: required'),
+          expect.stringContaining('xp.defaultActions[2].emoji: required'),
+          expect.stringContaining('xp.defaultActions[3].prefix: required'),
+          expect.stringContaining('xp.defaultActions[4].suffix: required'),
         ]),
       );
       expect(levelActionErrors).toEqual(

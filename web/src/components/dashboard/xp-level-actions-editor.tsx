@@ -1,7 +1,6 @@
 'use client';
 
 import { Check, ChevronDown, ChevronsUpDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
-import { Collapsible as CollapsiblePrimitive } from 'radix-ui';
 import { useEffect, useMemo, useState } from 'react';
 import { generateId, inputClasses } from '@/components/dashboard/config-editor-utils';
 import { Button } from '@/components/ui/button';
@@ -16,12 +15,10 @@ import {
 } from '@/components/ui/command';
 import { DiscordMarkdownEditor } from '@/components/ui/discord-markdown-editor';
 import { defaultEmbedConfig, EmbedBuilder, type EmbedConfig } from '@/components/ui/embed-builder';
-import { InfoTip } from '@/components/ui/info-tip';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RoleSelector } from '@/components/ui/role-selector';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type {
   BotConfig,
@@ -63,7 +60,6 @@ const ACTION_TYPE_OPTIONS: Array<SearchSelectOption<XpLevelAction['type']>> = [
     label: 'Nickname Suffix',
     description: 'Add text after the member nickname.',
   },
-  { value: 'webhook', label: 'Run Webhook', description: 'Send a templated webhook payload.' },
 ];
 
 const CHANNEL_MODE_OPTIONS: Array<SearchSelectOption<NonNullable<XpLevelAction['channelMode']>>> = [
@@ -188,14 +184,6 @@ function createAction(type: XpLevelAction['type']): XpLevelAction {
       return { id, type, prefix: '[Lvl {{level}}] ' };
     case 'nickSuffix':
       return { id, type, suffix: ' [Lvl {{level}}]' };
-    case 'webhook':
-      return {
-        id,
-        type,
-        url: '',
-        payload:
-          '{"user":"{{username}}","userId":"{{userId}}","serverId":"{{serverId}}","level":"{{level}}"}',
-      };
     default:
       return { id, type };
   }
@@ -544,41 +532,6 @@ function SearchableActionSelect<T extends string>({
   );
 }
 
-function TemplateVariableList() {
-  return (
-    <CollapsiblePrimitive.Root
-      defaultOpen
-      className="group rounded-xl border border-border/50 bg-muted/20 p-1"
-    >
-      <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <CollapsiblePrimitive.Trigger className="flex flex-1 cursor-pointer items-center justify-between text-left text-xs font-semibold uppercase tracking-widest text-muted-foreground transition-colors hover:text-primary">
-          <Label className="cursor-pointer">Variables</Label>
-          <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
-        </CollapsiblePrimitive.Trigger>
-        <InfoTip text="Dynamic placeholders replaced with real data at message time." />
-      </div>
-      <CollapsiblePrimitive.Content className="mt-1 flex flex-wrap gap-2 px-3 pb-3">
-        {TEMPLATE_VARIABLES.map((variable) => (
-          <span
-            key={variable}
-            className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-2 py-1 font-mono text-[11px] text-primary"
-            title={
-              TEMPLATE_SAMPLES[variable] ? `Example: ${TEMPLATE_SAMPLES[variable]}` : undefined
-            }
-          >
-            {`{{${variable}}}`}
-            {TEMPLATE_SAMPLES[variable] ? (
-              <span className="max-w-28 truncate text-muted-foreground">
-                {TEMPLATE_SAMPLES[variable]}
-              </span>
-            ) : null}
-          </span>
-        ))}
-      </CollapsiblePrimitive.Content>
-    </CollapsiblePrimitive.Root>
-  );
-}
-
 function normalizeLevelActionsForWriteback(
   shouldNormalize: boolean,
   levelActions: DeepPartial<XpLevelActionEntry>[] | undefined,
@@ -635,8 +588,6 @@ function ActionCard({
   onMove,
 }: ActionCardProps) {
   const format = action.format ?? 'text';
-  const webhookUrlId = `${actionId}-webhook-url`;
-  const webhookPayloadId = `${actionId}-webhook-payload`;
 
   return (
     <div className="space-y-4 rounded-xl border border-border/50 bg-background/60 p-4">
@@ -859,33 +810,6 @@ function ActionCard({
           <p className="text-xs text-muted-foreground">
             Discord nicknames max out at 32 characters after template rendering.
           </p>
-        </div>
-      )}
-
-      {action.type === 'webhook' && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor={webhookUrlId}>Webhook URL</Label>
-            <Input
-              id={webhookUrlId}
-              value={action.url ?? ''}
-              disabled={saving}
-              onChange={(event) => onChange({ ...action, url: event.target.value })}
-              placeholder="https://example.com/hook"
-            />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor={webhookPayloadId}>Payload Template</Label>
-            <Textarea
-              id={webhookPayloadId}
-              value={action.payload ?? ''}
-              disabled={saving}
-              onChange={(event) => onChange({ ...action, payload: event.target.value })}
-              rows={4}
-              placeholder='{"userId":"{{userId}}","serverId":"{{serverId}}","level":"{{level}}"}'
-            />
-            <TemplateVariableList />
-          </div>
         </div>
       )}
     </div>

@@ -139,16 +139,16 @@ export default function PrivacyPage() {
                 We share data with third parties only as needed to provide the service. This may
                 include Discord for bot and account functionality, Anthropic and MiniMax for AI
                 processing, Sentry for error monitoring, Amplitude for optional analytics when you
-                consent to the analytics category, and guild-configured webhooks or integrations
-                enabled by server administrators.
+                consent to the analytics category, and integrations enabled by server
+                administrators.
               </p>
             </div>
             <div className="space-y-2">
               <h3 className={subheadingClassName}>Administrator-controlled destinations</h3>
               <p className={bodyClassName}>
                 Server administrators may configure Volvox.Bot to post content, moderation events,
-                or transcripts to channels, dashboards, or webhooks they control. Those destinations
-                are governed by the administrator&apos;s own settings and policies.
+                or transcripts to channels and dashboards they control. Those destinations are
+                governed by the administrator&apos;s own settings and policies.
               </p>
             </div>
           </div>

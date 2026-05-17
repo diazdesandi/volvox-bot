@@ -13,7 +13,6 @@ import { getConfiguredRoleIds } from '../utils/permissions.js';
 import { safeSend } from '../utils/safeSend.js';
 import { getConfig } from './config.js';
 import { createWarning } from './warningEngine.js';
-import { fireEvent } from './webhookNotifier.js';
 
 /**
  * Color map for mod log embeds by action type.
@@ -168,17 +167,6 @@ export async function createCase(guildId, data) {
       moderator: data.moderatorTag,
     });
 
-    // Fire webhook notification — fire-and-forget, don't block case creation
-    fireEvent('moderation.action', guildId, {
-      action: data.action,
-      caseNumber: createdCase.case_number,
-      targetId: data.targetId,
-      targetTag: data.targetTag,
-      moderatorId: data.moderatorId,
-      moderatorTag: data.moderatorTag,
-      reason: data.reason || null,
-    }).catch(() => {});
-
     return createdCase;
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -190,8 +178,6 @@ export async function createCase(guildId, data) {
 
 /**
  * Atomically create a warn moderation case and linked warning record.
- * The moderation.action webhook is fired only after both records commit, so warning persistence
- * failures cannot leave dashboard/history/webhook state claiming a warn succeeded.
  * @param {string} guildId - Discord guild ID
  * @param {Object} caseData - Moderation case data
  * @param {string} caseData.targetId - Target user ID
@@ -247,16 +233,6 @@ export async function createWarnCaseWithWarning(guildId, caseData, warningData, 
       target: caseData.targetTag,
       moderator: caseData.moderatorTag,
     });
-
-    fireEvent('moderation.action', guildId, {
-      action: 'warn',
-      caseNumber: createdCase.case_number,
-      targetId: caseData.targetId,
-      targetTag: caseData.targetTag,
-      moderatorId: caseData.moderatorId,
-      moderatorTag: caseData.moderatorTag,
-      reason: caseData.reason || null,
-    }).catch(() => {});
 
     return { caseData: createdCase, warning };
   } catch (err) {

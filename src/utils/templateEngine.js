@@ -1,7 +1,7 @@
 /**
  * Template Interpolation Engine
  * Replaces {{variable}} tokens in strings with values from a context object.
- * Used by level-up actions for DMs, announcements, embeds, and webhooks.
+ * Used by level-up actions for DMs, announcements, and embeds.
  *
  * @see https://github.com/VolvoxLLC/volvox-bot/issues/367
  */

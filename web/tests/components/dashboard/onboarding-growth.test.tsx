@@ -1146,27 +1146,6 @@ describe('XpLevelActionsEditor', () => {
     });
   });
 
-  it('shows webhook template variables with user and server ids', () => {
-    render(
-      <XpLevelActionsEditor
-        draftConfig={{
-          xp: {
-            defaultActions: [{ id: 'action-1', type: 'webhook', url: '', payload: '' }],
-            levelActions: [],
-          },
-        }}
-        guildId="guild-1"
-        saving={false}
-        updateDraftConfig={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText('{{userId}}')).toBeInTheDocument();
-    expect(screen.getByText('{{serverId}}')).toBeInTheDocument();
-    expect(screen.getByText('{{serverName}}')).toBeInTheDocument();
-    expect(screen.queryByText('{{server}}')).not.toBeInTheDocument();
-  });
-
   it('recomputes the next unused level from the latest updater state', () => {
     const updateDraftConfig = vi.fn((updater) =>
       updater({

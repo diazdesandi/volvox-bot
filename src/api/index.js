@@ -16,7 +16,6 @@ import guildsRouter from './routes/guilds.js';
 import healthRouter from './routes/health.js';
 import membersRouter from './routes/members.js';
 import moderationRouter from './routes/moderation.js';
-import notificationsRouter from './routes/notifications.js';
 import performanceRouter from './routes/performance.js';
 import statsRouter from './routes/stats.js';
 import tempRolesRouter from './routes/tempRoles.js';
@@ -78,8 +77,6 @@ router.use('/guilds/:id/welcome', requireAuth(), auditLogMiddleware(), welcomeRo
 // Performance metrics — require x-api-secret (authenticated via route handler)
 router.use('/performance', performanceRouter);
 
-// Notification webhook management routes — require API secret or OAuth2 JWT
-router.use('/guilds', requireAuth(), auditLogMiddleware(), notificationsRouter);
 // Webhook routes — require API secret or OAuth2 JWT (endpoint further restricts to api-secret)
 router.use('/webhooks', requireAuth(), webhooksRouter);
 

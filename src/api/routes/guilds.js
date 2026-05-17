@@ -23,7 +23,6 @@ import { fetchUserGuilds } from '../utils/discordApi.js';
 import { parseLimit, parsePage } from '../utils/pagination.js';
 import { getSessionToken } from '../utils/sessionStore.js';
 import { validateConfigPatchBody } from '../utils/validateConfigPatch.js';
-import { fireAndForgetWebhook } from '../utils/webhook.js';
 
 const router = Router();
 
@@ -875,13 +874,6 @@ router.patch('/:id/config', requireGuildAdmin, validateGuild, async (req, res) =
       guild: req.params.id,
       scope: writeScope,
     });
-    fireAndForgetWebhook('DASHBOARD_WEBHOOK_URL', {
-      event: 'config.updated',
-      guildId: req.params.id,
-      section: topLevelKey,
-      updatedKeys: [path],
-      timestamp: Date.now(),
-    });
     res.json(effectiveSection);
   } catch (err) {
     error('Failed to update config via API', { path, error: err.message });
@@ -979,13 +971,6 @@ router.put('/:id/config', requireGuildAdmin, validateGuild, async (req, res) => 
     info('Bulk config updated via API', {
       patchesCount: validatedPatches.length,
       guild: req.params.id,
-    });
-
-    // We can emit one webhook event for the whole bulk update
-    fireAndForgetWebhook('DASHBOARD_WEBHOOK_URL', {
-      event: 'config.updated.bulk',
-      guildId: req.params.id,
-      timestamp: Date.now(),
     });
 
     // Responding with the full effective config minus sensitive fields

@@ -25,8 +25,8 @@ export default function TermsPage() {
       <p className="text-sm font-medium text-muted-foreground/60">Effective: April 18, 2026</p>
       <p className="text-muted-foreground">
         These Terms of Service govern your access to and use of Volvox.Bot, including our Discord
-        bot, website, dashboard, moderation features, webhook integrations, and related services
-        (collectively, the &ldquo;Service&rdquo;). By using the Service, you agree to these Terms.
+        bot, website, dashboard, moderation features, and related services (collectively, the
+        &ldquo;Service&rdquo;). By using the Service, you agree to these Terms.
       </p>
 
       <section className="flex flex-col gap-3">
@@ -44,9 +44,8 @@ export default function TermsPage() {
         <p className="text-muted-foreground">
           Volvox.Bot is an AI-powered Discord bot and management platform that may provide features
           such as moderation automation, AI chat, dynamic welcome flows, spam detection, server
-          management controls, a web dashboard, and configurable notification webhooks. Features may
-          change over time, may vary by plan or server configuration, and may be modified,
-          suspended, or discontinued at any time.
+          management controls, and a web dashboard. Features may change over time, may vary by plan
+          or server configuration, and may be modified, suspended, or discontinued at any time.
         </p>
       </section>
 
@@ -106,8 +105,8 @@ export default function TermsPage() {
             messages.
           </li>
           <li>
-            Configure moderation rules, webhooks, or automations in a way that is deceptive,
-            unlawful, or harmful to others.
+            Configure moderation rules or automations in a way that is deceptive, unlawful, or
+            harmful to others.
           </li>
           <li>
             Use the Service in a way that violates Discord&apos;s rules or the rights of server
@@ -115,8 +114,8 @@ export default function TermsPage() {
           </li>
         </ul>
         <p className="text-muted-foreground">
-          You are responsible for your server settings, moderation policies, webhook destinations,
-          and the consequences of actions initiated through your configuration.
+          You are responsible for your server settings, moderation policies, and the consequences of
+          actions initiated through your configuration.
         </p>
       </section>
 
@@ -178,8 +177,8 @@ export default function TermsPage() {
         </p>
         <p className="text-muted-foreground">
           The Service may also rely on third-party infrastructure, AI providers, hosting services,
-          analytics, authentication providers, or webhook destinations that we do not control. We
-          are not responsible for third-party services, their availability, or their policies.
+          analytics, authentication providers, or other destinations that we do not control. We are
+          not responsible for third-party services, their availability, or their policies.
           Volvox.Bot is an independent product and is not affiliated with, endorsed by, or sponsored
           by Discord.
         </p>
@@ -215,8 +214,8 @@ export default function TermsPage() {
           You agree to defend, indemnify, and hold harmless Volvox LLC and its affiliates, officers,
           employees, contractors, and licensors from and against any claims, liabilities, damages,
           losses, and expenses, including reasonable attorneys&apos; fees, arising out of or related
-          to your use of the Service, your server configurations, your webhook integrations, your
-          content, or your violation of these Terms or applicable law.
+          to your use of the Service, your server configurations, your content, or your violation of
+          these Terms or applicable law.
         </p>
       </section>
 

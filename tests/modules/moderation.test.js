@@ -46,10 +46,6 @@ vi.mock('../../src/utils/safeSend.js', () => ({
   }),
 }));
 
-vi.mock('../../src/modules/webhookNotifier.js', () => ({
-  fireEvent: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../src/utils/duration.js', () => ({
   parseDuration: vi.fn().mockReturnValue(3600000),
   formatDuration: vi.fn().mockReturnValue('1 hour'),
@@ -72,7 +68,6 @@ import {
   startTempbanScheduler,
   stopTempbanScheduler,
 } from '../../src/modules/moderation.js';
-import { fireEvent } from '../../src/modules/webhookNotifier.js';
 import { safeSend } from '../../src/utils/safeSend.js';
 
 describe('moderation module', () => {
@@ -183,7 +178,7 @@ describe('moderation module', () => {
       severity: 'low',
     };
 
-    it('should atomically create a linked warn case and warning before firing moderation.action', async () => {
+    it('should atomically create a linked warn case and warning', async () => {
       const createdCase = {
         id: 1,
         guild_id: 'guild1',
@@ -208,14 +203,9 @@ describe('moderation module', () => {
 
       expect(result).toEqual({ caseData: createdCase, warning });
       expect(mockConnection.query).toHaveBeenCalledWith('COMMIT');
-      expect(fireEvent).toHaveBeenCalledWith(
-        'moderation.action',
-        'guild1',
-        expect.objectContaining({ action: 'warn', caseNumber: 4, targetId: 'user1' }),
-      );
     });
 
-    it('should rollback and not fire moderation.action when warning persistence fails', async () => {
+    it('should rollback when warning persistence fails', async () => {
       mockConnection.query
         .mockResolvedValueOnce({}) // BEGIN
         .mockResolvedValueOnce({}) // advisory lock
@@ -229,7 +219,6 @@ describe('moderation module', () => {
 
       expect(mockConnection.query).toHaveBeenCalledWith('ROLLBACK');
       expect(mockConnection.query).not.toHaveBeenCalledWith('COMMIT');
-      expect(fireEvent).not.toHaveBeenCalled();
       expect(mockConnection.release).toHaveBeenCalled();
     });
   });

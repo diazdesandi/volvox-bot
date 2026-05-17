@@ -63,9 +63,8 @@ export const AI_CHAT_POOL: readonly AIChatItem[] = [
     answer: 'Use /warn, /mute, /ban, or /kick. Each logs to the audit trail automatically.',
   },
   {
-    question: 'How do I set up webhooks?',
-    answer:
-      'Go to Server Settings → Integrations → Webhooks. Click "New Webhook" and copy the URL.',
+    question: 'How do I set up welcome messages?',
+    answer: 'Use Dashboard → Settings → Welcome. Pick a channel and customize the message.',
   },
   {
     question: 'Can I customize the AI personality?',
@@ -84,7 +83,7 @@ export const AI_CHAT_POOL: readonly AIChatItem[] = [
 ];
 
 export const CONVERSATION_POOL: readonly ConversationItem[] = [
-  { initial: 'M', question: 'How to configure webhooks?', avatarColor: 'purple' },
+  { initial: 'M', question: 'Welcome message setup?', avatarColor: 'purple' },
   { initial: 'S', question: 'Explain the XP system', avatarColor: 'green' },
   { initial: 'J', question: 'Ban appeal process?', avatarColor: 'orange' },
   { initial: 'A', question: 'Set up welcome messages', avatarColor: 'purple' },

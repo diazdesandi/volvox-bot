@@ -14,7 +14,6 @@ import {
 } from '../utils/configAllowlist.js';
 import { CONFIG_SCHEMA, normalizeSingleValue, validateValue } from '../utils/configValidation.js';
 import { DANGEROUS_KEYS } from '../utils/dangerousKeys.js';
-import { fireAndForgetWebhook } from '../utils/webhook.js';
 
 // Re-export flattenToLeafPaths for backward compatibility - use local definition
 // (import removed to avoid redeclare error)
@@ -245,11 +244,6 @@ router.put('/', requireGlobalAdmin, async (req, res) => {
   if (failed.length === 0) {
     // All writes succeeded
     info('Global config updated via config API', { sections: updatedSections });
-    fireAndForgetWebhook('CONFIG_CHANGE_WEBHOOK_URL', {
-      event: 'config.updated',
-      sections: updatedSections,
-      timestamp: Date.now(),
-    });
     return res.json(maskedConfig);
   }
 
@@ -270,12 +264,6 @@ router.put('/', requireGlobalAdmin, async (req, res) => {
     failed: failed.map((f) => f.path),
   });
   // Report successfully-written sections, not requested ones
-  const writtenSections = [...new Set(succeeded.map((s) => s.path.split('.')[0]))];
-  fireAndForgetWebhook('CONFIG_CHANGE_WEBHOOK_URL', {
-    event: 'config.updated',
-    sections: writtenSections,
-    timestamp: Date.now(),
-  });
   return res.status(207).json({
     error: 'Partial config update — some writes failed',
     results,

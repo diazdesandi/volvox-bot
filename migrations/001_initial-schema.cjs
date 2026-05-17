@@ -461,24 +461,6 @@ exports.up = (pgm) => {
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_voice_sessions_guild_joined ON voice_sessions(guild_id, joined_at)');
   pgm.sql('CREATE UNIQUE INDEX IF NOT EXISTS idx_voice_sessions_open_unique ON voice_sessions(guild_id, user_id) WHERE left_at IS NULL');
 
-  // ── webhook_delivery_log ──────────────────────────────────────────
-  pgm.sql(`
-    CREATE TABLE IF NOT EXISTS webhook_delivery_log (
-      id SERIAL PRIMARY KEY,
-      guild_id TEXT NOT NULL,
-      endpoint_id TEXT NOT NULL,
-      event_type TEXT NOT NULL,
-      payload JSONB NOT NULL,
-      status TEXT NOT NULL CHECK (status IN ('success', 'failed', 'pending')),
-      response_code INTEGER,
-      response_body TEXT,
-      attempt INTEGER NOT NULL DEFAULT 1,
-      delivered_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_webhook_delivery_log_guild ON webhook_delivery_log(guild_id, delivered_at DESC)');
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_webhook_delivery_log_endpoint ON webhook_delivery_log(endpoint_id, delivered_at DESC)');
-
   // ── command_usage ─────────────────────────────────────────────────
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS command_usage (
@@ -570,7 +552,6 @@ exports.down = (pgm) => {
   pgm.sql('DROP TABLE IF EXISTS reaction_role_menus CASCADE');
   pgm.sql('DROP TABLE IF EXISTS guild_command_aliases CASCADE');
   pgm.sql('DROP TABLE IF EXISTS command_usage CASCADE');
-  pgm.sql('DROP TABLE IF EXISTS webhook_delivery_log CASCADE');
   pgm.sql('DROP TABLE IF EXISTS voice_sessions CASCADE');
   pgm.sql('DROP TABLE IF EXISTS audit_logs CASCADE');
   pgm.sql('DROP TABLE IF EXISTS tickets CASCADE');

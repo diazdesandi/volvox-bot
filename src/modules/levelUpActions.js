@@ -15,7 +15,6 @@ import { normalizeXpAction } from './actions/normalizeAction.js';
 import { handleRemoveRole } from './actions/removeRole.js';
 import { checkRoleRateLimit, collectXpManagedRoles } from './actions/roleUtils.js';
 import { handleSendDm } from './actions/sendDm.js';
-import { handleWebhook } from './actions/webhook.js';
 import { handleXpBonus } from './actions/xpBonus.js';
 
 /**
@@ -46,7 +45,6 @@ registerAction('addReaction', handleAddReaction);
 registerAction('xpBonus', handleXpBonus);
 registerAction('nickPrefix', handleNickPrefix);
 registerAction('nickSuffix', handleNickSuffix);
-registerAction('webhook', handleWebhook);
 
 function getLevelUpDmRateLimitScope(level) {
   return `levelUpDm:${level}`;

@@ -37,10 +37,6 @@ vi.mock('../../src/utils/duration.js', () => ({
   formatDuration: vi.fn().mockReturnValue('1 hour'),
 }));
 
-vi.mock('../../src/modules/webhookNotifier.js', () => ({
-  fireEvent: vi.fn(),
-}));
-
 vi.mock('../../src/utils/safeSend.js', () => ({
   safeSend: vi.fn(),
 }));

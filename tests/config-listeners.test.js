@@ -13,10 +13,6 @@ vi.mock('../src/modules/config.js', () => ({
   onConfigChange: vi.fn(),
 }));
 
-vi.mock('../src/modules/webhookNotifier.js', () => ({
-  fireEvent: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../src/utils/cache.js', () => ({
   cacheDelPattern: vi.fn().mockResolvedValue(0),
 }));
@@ -85,7 +81,15 @@ describe('config-listeners', () => {
       expect(registeredKeys).toContain('botStatus.rotation.enabled');
       expect(registeredKeys).toContain('botStatus.rotation.intervalMinutes');
       expect(registeredKeys).toContain('botStatus.rotation.messages');
-      expect(registeredKeys).toHaveLength(17);
+      expect(registeredKeys).toHaveLength(16);
+    });
+
+    it('does not register removed outbound webhook notification listeners', () => {
+      registerConfigListeners({ dbPool: {}, config: {} });
+
+      const registeredKeys = onConfigChange.mock.calls.map(([path]) => path);
+
+      expect(registeredKeys).not.toContain('*');
     });
 
     it('reloads bot status for global presence changes only', () => {
@@ -120,36 +124,6 @@ describe('config-listeners', () => {
 
       expect(loggerInfo).not.toHaveBeenCalled();
       expect(loggerError).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('webhook listeners', () => {
-    let fireEvent;
-
-    beforeEach(async () => {
-      const webhookMod = await import('../src/modules/webhookNotifier.js');
-      fireEvent = webhookMod.fireEvent;
-    });
-
-    it('registers a catch-all listener that forwards guild-scoped config changes', async () => {
-      const listeners = registerAndCapture();
-
-      await listeners['*']('newVal', 'oldVal', 'welcome.channelId', 'guild-42');
-
-      expect(fireEvent).toHaveBeenCalledWith('config.changed', 'guild-42', {
-        path: 'welcome.channelId',
-      });
-    });
-
-    it('does not forward logging, notification, or global config changes', async () => {
-      const listeners = registerAndCapture();
-
-      await listeners['*']('debug', 'info', 'logging.level', 'guild-42');
-      await listeners['*']('new-hook', 'old-hook', 'notifications.webhookUrl', 'guild-42');
-      await listeners['*']('newVal', 'oldVal', 'welcome.channelId', 'global');
-      await listeners['*']('newVal', 'oldVal', 'welcome.channelId', undefined);
-
-      expect(fireEvent).not.toHaveBeenCalled();
     });
   });
 

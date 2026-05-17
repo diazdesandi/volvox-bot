@@ -51,7 +51,6 @@ const XP_ACTION_TYPES = [
   'addReaction',
   'nickPrefix',
   'nickSuffix',
-  'webhook',
 ];
 
 const XP_EMBED_FIELD_SCHEMA = {
@@ -126,8 +125,6 @@ const XP_ACTION_ITEM_SCHEMA = {
     amount: { type: 'number', integer: true, min: 1, max: 1000000, nullable: true },
     prefix: { type: 'string', nullable: true },
     suffix: { type: 'string', nullable: true },
-    url: { type: 'string', nullable: true, ssrfUrl: true, allowHttp: true },
-    payload: { type: 'string', nullable: true },
     embed: XP_EMBED_SCHEMA,
   },
   openProperties: true,
@@ -140,7 +137,6 @@ const XP_ACTION_REQUIRED_FIELDS = {
   addReaction: ['emoji'],
   nickPrefix: ['prefix'],
   nickSuffix: ['suffix'],
-  webhook: ['url'],
 };
 
 function validateXpActionRequiredFields(action, path) {

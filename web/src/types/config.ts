@@ -332,8 +332,7 @@ export interface XpLevelAction {
     | 'xpBonus'
     | 'addReaction'
     | 'nickPrefix'
-    | 'nickSuffix'
-    | 'webhook';
+    | 'nickSuffix';
   roleId?: string;
   message?: string;
   template?: string;
@@ -344,8 +343,6 @@ export interface XpLevelAction {
   amount?: number;
   prefix?: string;
   suffix?: string;
-  url?: string;
-  payload?: string;
   embed?: XpActionEmbedConfig;
 }
 
