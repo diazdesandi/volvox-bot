@@ -13,10 +13,11 @@ const TRUSTED_ACTOR_TAG_MAX_LENGTH = 128;
 
 function normalizeTrustedActorTag(value) {
   if (typeof value !== 'string') return null;
+  if (/[\r\n]/.test(value)) return null;
+  if (!HEADER_SAFE_ASCII_PATTERN.test(value)) return null;
 
   const trimmed = value.trim();
-  if (!trimmed || /[\r\n]/.test(trimmed)) return null;
-  if (!HEADER_SAFE_ASCII_PATTERN.test(trimmed)) return null;
+  if (!trimmed) return null;
 
   return trimmed.slice(0, TRUSTED_ACTOR_TAG_MAX_LENGTH);
 }

@@ -164,8 +164,13 @@ describe('auth middleware', () => {
   });
 
   it.each([
+    '',
+    '   ',
+    '\nAda',
     'Ada\nLovelace',
     'Ada\rLovelace',
+    'Ada\r',
+    '\tAda',
     'Ada \u{1f680}',
     '\u674e\u96f7',
     'Ada\x7f',
