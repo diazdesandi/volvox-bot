@@ -30,7 +30,7 @@ AI-powered Discord bot and dashboard — built by the [Volvox](https://volvox.de
 - **⭐ Starboard** — Highlight popular messages with star reactions.
 - **🎤 Voice Activity Tracking** — Voice channel metrics and leaderboards.
 - **🎫 Tickets** — Support ticket system with threads.
-- **💬 Polls · ✂️ Snippets · ⏰ Reminders · 👀 Code Review**
+- **💬 Polls · ✂️ Snippets · 👀 Code Review**
 
 ### Moderation
 

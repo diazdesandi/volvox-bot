@@ -8,7 +8,6 @@
 import { Events } from 'discord.js';
 import { error as logError } from '../../logger.js';
 import { handlePollButton } from '../handlers/pollHandler.js';
-import { handleReminderButton } from '../handlers/reminderHandler.js';
 import { handleReviewButton } from '../handlers/reviewHandler.js';
 import {
   handleTicketCloseButton,
@@ -22,7 +21,6 @@ import {
 
 // Backward-compatible re-exports (deprecated — use handler functions directly)
 export { registerPollButtonHandler } from '../handlers/pollHandler.js';
-export { registerReminderButtonHandler } from '../handlers/reminderHandler.js';
 export { registerReviewClaimHandler } from '../handlers/reviewHandler.js';
 export {
   registerTicketCloseButtonHandler,
@@ -38,7 +36,6 @@ const handlers = [
   handleTicketOpenButton,
   handleTicketModal,
   handleTicketCloseButton,
-  handleReminderButton,
   handleWelcomeOnboarding,
 ];
 

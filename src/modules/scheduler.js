@@ -13,7 +13,6 @@ import { fetchChannelCached } from '../utils/discordCache.js';
 import { safeSend } from '../utils/safeSend.js';
 import { getConfig } from './config.js';
 import { closeExpiredPolls } from './pollHandler.js';
-import { checkReminders } from './reminderHandler.js';
 import { expireStaleReviews } from './reviewHandler.js';
 import { checkAutoClose } from './ticketHandler.js';
 
@@ -91,8 +90,6 @@ async function pollScheduledMessages(client) {
     }
     // Close expired polls
     await closeExpiredPolls(client);
-    // Check and fire due reminders
-    await checkReminders(client);
 
     // Expire stale review requests
     await expireStaleReviews(client);

@@ -203,7 +203,6 @@
       "rank": "everyone",
       "leaderboard": "everyone",
       "profile": "everyone",
-      "remind": "everyone",
       "review": "everyone",
       "reload": "admin"
     }
@@ -304,10 +303,6 @@
   "auditLog": {
     "enabled": true,
     "retentionDays": 90
-  },
-  "reminders": {
-    "enabled": false,
-    "maxPerUser": 25
   },
   "aiAutoMod": {
     "enabled": false,

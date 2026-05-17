@@ -1,7 +1,6 @@
 /**
  * Cron expression parsing utilities.
- * Extracted from scheduler.js to break the circular dependency between
- * scheduler.js and reminderHandler.js.
+ * Extracted from scheduler.js to keep scheduling-related utilities reusable.
  *
  * @see https://github.com/VolvoxLLC/volvox-bot/issues/137
  */

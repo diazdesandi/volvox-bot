@@ -39,10 +39,6 @@ vi.mock('../../src/modules/pollHandler.js', () => ({
   closeExpiredPolls: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../src/modules/reminderHandler.js', () => ({
-  checkReminders: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../../src/modules/reviewHandler.js', () => ({
   expireStaleReviews: vi.fn().mockResolvedValue(undefined),
 }));

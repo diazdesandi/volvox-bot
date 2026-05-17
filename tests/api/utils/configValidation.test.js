@@ -267,13 +267,6 @@ describe('configValidation', () => {
       expect(validateSingleValue('auditLog.retentionDays', 90)).toEqual([]);
     });
 
-    it('should enforce reminders.maxPerUser range', () => {
-      expect(validateSingleValue('reminders.maxPerUser', 0)).toEqual(
-        expect.arrayContaining([expect.stringContaining('>= 1')]),
-      );
-      expect(validateSingleValue('reminders.maxPerUser', 50)).toEqual([]);
-    });
-
     it('should enforce voice.xpPerMinute range', () => {
       expect(validateSingleValue('voice.xpPerMinute', -1)).toEqual(
         expect.arrayContaining([expect.stringContaining('>= 0')]),

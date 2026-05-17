@@ -7,7 +7,6 @@ const {
   handleTicketOpenButton,
   handleTicketModal,
   handleTicketCloseButton,
-  handleReminderButton,
   handleWelcomeOnboarding,
 } = vi.hoisted(() => ({
   logError: vi.fn(),
@@ -16,7 +15,6 @@ const {
   handleTicketOpenButton: vi.fn(),
   handleTicketModal: vi.fn(),
   handleTicketCloseButton: vi.fn(),
-  handleReminderButton: vi.fn(),
   handleWelcomeOnboarding: vi.fn(),
 }));
 
@@ -34,9 +32,6 @@ vi.mock('../../../src/modules/handlers/ticketHandler.js', () => ({
   handleTicketModal,
   handleTicketCloseButton,
 }));
-vi.mock('../../../src/modules/handlers/reminderHandler.js', () => ({
-  handleReminderButton,
-}));
 vi.mock('../../../src/modules/handlers/welcomeOnboardingHandler.js', () => ({
   handleWelcomeOnboarding,
   registerWelcomeOnboardingHandlers: vi.fn(),
@@ -52,7 +47,6 @@ beforeEach(() => {
   handleTicketOpenButton.mockResolvedValue(false);
   handleTicketModal.mockResolvedValue(false);
   handleTicketCloseButton.mockResolvedValue(false);
-  handleReminderButton.mockResolvedValue(false);
   handleWelcomeOnboarding.mockResolvedValue(false);
 });
 

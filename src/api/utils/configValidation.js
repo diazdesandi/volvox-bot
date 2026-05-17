@@ -488,13 +488,6 @@ export const CONFIG_SCHEMA = {
       },
     },
   },
-  reminders: {
-    type: 'object',
-    properties: {
-      enabled: { type: 'boolean' },
-      maxPerUser: { type: 'number', min: 1, max: 100 },
-    },
-  },
   quietMode: {
     type: 'object',
     properties: {

@@ -817,11 +817,6 @@ describe('events module', () => {
       expect(eventsModule.registerPollButtonHandler).toBeUndefined();
     });
 
-    it('does not export registerReminderButtonHandler from events.js', async () => {
-      const eventsModule = await import('../../src/modules/events.js');
-      expect(eventsModule.registerReminderButtonHandler).toBeUndefined();
-    });
-
     it('does not export registerReviewClaimHandler from events.js', async () => {
       const eventsModule = await import('../../src/modules/events.js');
       expect(eventsModule.registerReviewClaimHandler).toBeUndefined();

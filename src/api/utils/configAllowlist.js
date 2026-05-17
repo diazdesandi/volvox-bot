@@ -24,7 +24,6 @@ export const SAFE_CONFIG_KEYS = new Set([
   'tickets',
   'review',
   'auditLog',
-  'reminders',
   'aiAutoMod',
   'botStatus',
   'quietMode',

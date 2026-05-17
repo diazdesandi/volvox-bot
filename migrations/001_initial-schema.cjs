@@ -444,26 +444,6 @@ exports.up = (pgm) => {
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)');
   pgm.sql('CREATE INDEX IF NOT EXISTS idx_audit_logs_guild_user ON audit_logs(guild_id, user_id)');
 
-  // ── reminders ─────────────────────────────────────────────────────
-  pgm.sql(`
-    CREATE TABLE IF NOT EXISTS reminders (
-      id SERIAL PRIMARY KEY,
-      guild_id VARCHAR NOT NULL,
-      user_id VARCHAR NOT NULL,
-      channel_id VARCHAR NOT NULL,
-      message TEXT NOT NULL,
-      remind_at TIMESTAMPTZ NOT NULL,
-      recurring_cron VARCHAR,
-      snoozed_count INT NOT NULL DEFAULT 0,
-      failed_delivery_count INT NOT NULL DEFAULT 0,
-      completed BOOLEAN NOT NULL DEFAULT FALSE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(remind_at) WHERE completed = false');
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_reminders_user_active ON reminders(guild_id, user_id) WHERE completed = false');
-  pgm.sql('CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(guild_id, user_id, completed)');
-
   // ── voice_sessions ────────────────────────────────────────────────
   pgm.sql(`
     CREATE TABLE IF NOT EXISTS voice_sessions (
@@ -592,7 +572,6 @@ exports.down = (pgm) => {
   pgm.sql('DROP TABLE IF EXISTS command_usage CASCADE');
   pgm.sql('DROP TABLE IF EXISTS webhook_delivery_log CASCADE');
   pgm.sql('DROP TABLE IF EXISTS voice_sessions CASCADE');
-  pgm.sql('DROP TABLE IF EXISTS reminders CASCADE');
   pgm.sql('DROP TABLE IF EXISTS audit_logs CASCADE');
   pgm.sql('DROP TABLE IF EXISTS tickets CASCADE');
   pgm.sql('DROP TABLE IF EXISTS flagged_messages CASCADE');
@@ -607,6 +586,7 @@ exports.down = (pgm) => {
   pgm.sql('DROP TABLE IF EXISTS polls CASCADE');
   pgm.sql('DROP TABLE IF EXISTS starboard_posts CASCADE');
   pgm.sql('DROP TABLE IF EXISTS scheduled_messages CASCADE');
+  pgm.sql('DROP TABLE IF EXISTS reminders CASCADE');
   pgm.sql('DROP TABLE IF EXISTS help_topics CASCADE');
   pgm.sql('DROP TABLE IF EXISTS bot_restarts CASCADE');
   pgm.sql('DROP TABLE IF EXISTS logs CASCADE');

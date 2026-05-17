@@ -31,6 +31,10 @@ describe('configAllowlist', () => {
     it('should not allow removed GitHub feed config writes', () => {
       expect(SAFE_CONFIG_KEYS.has('github')).toBe(false);
     });
+
+    it('should not allow removed reminder config writes', () => {
+      expect(SAFE_CONFIG_KEYS.has('reminders')).toBe(false);
+    });
   });
 
   describe('READABLE_CONFIG_KEYS', () => {
