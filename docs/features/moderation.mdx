@@ -25,6 +25,25 @@ Active Sentry is Volvox.Bot's moderation engine. It runs automatically, and you 
 4. Use **Config → Moderation & Safety → Content Safety** to select the detection model, thresholds, and actions
 5. Use **Config → AI & Automation → Triage** to select the supported classifier and response models for AI triage
 
+## Review a member's moderation history
+
+When you need to investigate a specific member, you have two entry points:
+
+- **From the member's profile** — Open **Dashboard → Members → [member]**. The **Moderation History** panel lists every case for that member, paginated 10 per page, with a breakdown of total warnings, timeouts, kicks, and bans at the top. Use this when you start from a specific person.
+- **From the Moderation page** — Use the **User history** lookup and enter a Discord user ID. Use this when you start from a case number or a moderator note.
+
+Select **View full history** on a member profile to jump to the Moderation page with that member preloaded. The dashboard preloads the user ID from the URL once per visit, so changing servers or paginating won't re-trigger the lookup.
+
+You can also link members directly to the preloaded view:
+
+```text Preloaded user history URL
+https://volvox.bot/dashboard/moderation?userId=<discord-user-id>
+```
+
+### Jump to the Discord log message
+
+When you open a case, the **Log Message** field links straight to the original log post in Discord if the bot still has the channel and message ID for that case. Select the link to open Discord in a new tab at the exact log message. Cases logged before the bot started recording channel IDs still show the message ID as plain text — those cases stay readable but aren't clickable.
+
 <Callout type="tip">
 Configure escalation rules so that repeated warnings automatically escalate to timeouts or bans.
 </Callout>
