@@ -166,8 +166,7 @@ const ACTION_GROUPS = [
     label: 'Notifications',
     category: 'notifications',
     options: [
-      { value: 'notifications.webhooks_create', label: 'Notifications: Add webhook' },
-      { value: 'notifications.webhooks_delete', label: 'Notifications: Delete webhook' },
+      { value: 'notifications.create', label: 'Notifications: Add webhook' },
       { value: 'notifications.test_create', label: 'Notifications: Test webhook' },
     ],
   },

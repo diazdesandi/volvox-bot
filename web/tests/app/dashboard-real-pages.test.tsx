@@ -571,6 +571,30 @@ describe('previously unexcluded app pages', () => {
     expect(screen.queryByText('API secret')).not.toBeInTheDocument();
   });
 
+  it('uses emitted notification audit action keys in filter options', async () => {
+    render(<AuditLogPage />);
+
+    await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
+    expect(screen.getByRole('option', { name: /Notifications: Add webhook/i })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Notifications: Test webhook/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: /Notifications: Delete webhook/i }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('option', { name: /Notifications: Add webhook/i }));
+    expect(mockAuditState.setFilters).toHaveBeenCalledWith({
+      action: 'notifications.create',
+      offset: 0,
+    });
+
+    await userEvent.click(screen.getByRole('combobox', { name: /audit action filter/i }));
+    await userEvent.click(screen.getByRole('option', { name: /Notifications: Test webhook/i }));
+    expect(mockAuditState.setFilters).toHaveBeenCalledWith({
+      action: 'notifications.test_create',
+      offset: 0,
+    });
+  });
+
   it('does not style restorative moderation actions as destructive', () => {
     Object.assign(mockAuditState, {
       entries: [
